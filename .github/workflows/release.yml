@@ -1,6 +1,9 @@
 name: Release packages
 
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       publish:
@@ -10,7 +13,7 @@ on:
         default: false
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -21,6 +24,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Match tag to package version
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          test "${GITHUB_REF_NAME}" = "v${version}"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -45,7 +54,13 @@ jobs:
         run: npm run release:pack
 
       - name: Publish with npm provenance
-        if: ${{ inputs.publish }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
         env:
           VEXA_RELEASE_CONFIRM: PUBLISH
         run: npm run release:publish
+
+      - name: Create GitHub release
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --title "Vexa Video SDK $GITHUB_REF_NAME" --notes-file "docs/releases/${GITHUB_REF_NAME}.md"
