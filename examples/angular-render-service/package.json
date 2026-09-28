@@ -1,0 +1,9 @@
+{
+  "name": "@moosky-video/example-angular-render-service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@moosky-video/sdk": "1.0.0"
+  }
+}

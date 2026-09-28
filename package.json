@@ -1,0 +1,58 @@
+{
+  "name": "vexa-video-sdk",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production-grade video processing and composition SDK for Node.js and TypeScript.",
+  "type": "module",
+  "engines": {
+    "node": ">=24.21.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "dev": "node ./scripts/dev.mjs",
+    "playground": "npm run build && node examples/visual-playground/server.mjs",
+    "verify": "npm run check && npm run build",
+    "build": "tsc -b",
+    "clean": "node ./scripts/clean.mjs",
+    "format:check": "node ./scripts/check-format.mjs",
+    "test": "node --import tsx --test \"packages/**/*.test.ts\"",
+    "test:watch": "node --import tsx --test --watch \"packages/**/*.test.ts\"",
+    "typecheck": "tsc -b --pretty false",
+    "check": "npm run typecheck && npm test",
+    "example:probe": "node --import tsx examples/probe/src/index.ts",
+    "example:angular-service": "npm run build && node examples/angular-render-service/dist/index.js",
+    "cli": "npm run build && node packages/cli/dist/bin.js",
+    "example:rest-service": "npm run build && node examples/rest-service/dist/index.js",
+    "release:check": "node scripts/check-release.mjs",
+    "release:pack": "node scripts/release-pack.mjs",
+    "release:publish": "node scripts/publish-workspaces.mjs"
+  },
+  "devDependencies": {
+    "@angular/build": "21.2.24",
+    "@angular/cli": "21.2.24",
+    "@angular/common": "21.2.24",
+    "@angular/compiler": "21.2.24",
+    "@angular/compiler-cli": "21.2.24",
+    "@angular/core": "21.2.24",
+    "@angular/platform-browser": "21.2.24",
+    "@types/node": "^24.3.0",
+    "rxjs": ">=7.8 <8",
+    "tsx": "^4.20.5",
+    "typescript": "5.9.3"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mooskyai/vexa-video-sdk.git"
+  },
+  "homepage": "https://github.com/mooskyai/vexa-video-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/mooskyai/vexa-video-sdk/issues"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./packages/core"
+    },
+    {
+      "path": "./packages/angular"
+    },
+    {
+      "path": "./packages/ai"
+    },
+    {
+      "path": "./packages/ffmpeg"
+    },
+    {
+      "path": "./packages/sdk"
+    },
+    {
+      "path": "./examples/probe"
+    },
+    {
+      "path": "./examples/angular-render-service"
+    },
+    {
+      "path": "./examples/angular-client"
+    },
+    {
+      "path": "./packages/editor"
+    },
+    {
+      "path": "./packages/cli"
+    },
+    {
+      "path": "./examples/rest-service"
+    }
+  ]
+}

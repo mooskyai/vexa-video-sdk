@@ -1,0 +1,47 @@
+{
+  "name": "@moosky-video/core",
+  "version": "1.0.0",
+  "type": "module",
+  "private": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "import": "./dist/browser.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.map"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "engines": {
+    "node": ">=24.21.0"
+  },
+  "description": "Backend-neutral media types, schemas, validation, and browser-safe contracts.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mooskyai/vexa-video-sdk.git"
+  },
+  "homepage": "https://github.com/mooskyai/vexa-video-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/mooskyai/vexa-video-sdk/issues"
+  },
+  "keywords": [
+    "video",
+    "media",
+    "typescript",
+    "sdk"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

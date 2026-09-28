@@ -1,0 +1,14 @@
+services:
+  vexa-worker:
+    build:
+      context: ../..
+      dockerfile: deploy/docker-worker/Dockerfile
+    ports:
+      - "4190:4190"
+    environment:
+      VEXA_WORKER_CONCURRENCY: "2"
+    volumes:
+      - vexa-worker-data:/var/lib/vexa
+
+volumes:
+  vexa-worker-data:

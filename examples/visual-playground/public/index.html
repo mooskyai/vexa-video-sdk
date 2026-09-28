@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vexa Video — Editor Playground</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="editor-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">V</div>
+        <div>
+          <strong>Vexa Video</strong>
+          <span>Video SDK Playground</span>
+        </div>
+      </div>
+
+      <div class="project-title">
+        <strong id="projectName">Untitled video</strong>
+        <span id="saveState">Local development session</span>
+      </div>
+
+      <div class="top-actions">
+        <span id="serverStatus" class="status-dot"><i></i> Local</span>
+        <button id="topUploadButton" class="button secondary">Import</button>
+        <button id="topRenderButton" class="button primary" disabled>Render</button>
+      </div>
+    </header>
+
+    <aside class="tool-rail" aria-label="Editor sections">
+      <button class="rail-button active" data-section="mediaPanel" title="Media"><span>M</span><small>Media</small></button>
+      <button class="rail-button" data-section="trimSection" title="Trim"><span>T</span><small>Trim</small></button>
+      <button class="rail-button" data-section="transformSection" title="Transform"><span>X</span><small>Edit</small></button>
+      <button class="rail-button" data-section="projectSection" data-drawer-title="Project" title="Timeline project"><span>P</span><small>Project</small></button>
+      <button class="rail-button" data-section="audioSection" data-drawer-title="Audio" title="Audio"><span>A</span><small>Audio</small></button>
+      <button class="rail-button" data-section="captionsSection" data-drawer-title="Captions" title="Captions"><span>C</span><small>Captions</small></button>
+      <button class="rail-button" data-section="streamingSection" data-drawer-title="Streaming" title="Streaming"><span>S</span><small>Stream</small></button>
+      <button class="rail-button" data-section="hardwareSection" data-drawer-title="Hardware" title="Hardware acceleration"><span>H</span><small>GPU</small></button>
+      <button class="rail-button" data-section="jobsSection" data-drawer-title="Jobs" title="Background jobs"><span>J</span><small>Jobs</small></button>
+      <button class="rail-button" data-section="exportSection" title="Export"><span>R</span><small>Render</small></button>
+    </aside>
+
+    <aside id="mediaPanel" class="media-panel" aria-label="Project media">
+      <div class="panel-title">
+        <div>
+          <span class="kicker">Project media</span>
+          <h2>Media</h2>
+        </div>
+        <button id="mediaUploadButton" class="icon-button" title="Upload media">+</button>
+      </div>
+
+      <input id="fileInput" type="file" accept="video/*,audio/*,image/*,.mkv,.mov,.avi,.webm,.m4a,.mp3,.opus,.wav,.png,.jpg,.jpeg,.webp" hidden>
+
+      <button id="dropZone" class="drop-zone">
+        <strong>Upload media</strong>
+        <span>Video, audio, and image assets</span>
+      </button>
+
+      <div class="remote-import-card">
+        <label for="remoteMediaUrl">Remote media</label>
+        <div class="remote-import-row">
+          <input id="remoteMediaUrl" type="url" inputmode="url" placeholder="https://cdn.example.com/video.mp4" autocomplete="off">
+          <button id="remoteImportButton" type="button" class="button secondary">Import</button>
+        </div>
+        <small>Public HTTPS URLs only. Loopback and private-network destinations are blocked.</small>
+      </div>
+
+      <div class="media-list" id="mediaList">
+        <div class="empty-state" id="mediaEmpty">
+          <span class="empty-icon">▶</span>
+          <strong>No source loaded</strong>
+          <p>Upload media to begin visual SDK testing.</p>
+        </div>
+
+        <button id="sourceAsset" class="asset-card hidden" data-mode="source">
+          <div class="asset-thumb"><span>▶</span></div>
+          <div class="asset-copy">
+            <strong id="assetName">Source video</strong>
+            <span id="assetMeta">Waiting for media</span>
+          </div>
+          <span class="asset-badge">SRC</span>
+        </button>
+
+        <button id="outputAsset" class="asset-card hidden" data-mode="output">
+          <div class="asset-thumb output-thumb"><span>✓</span></div>
+          <div class="asset-copy">
+            <strong>Latest render</strong>
+            <span id="outputAssetMeta">No render yet</span>
+          </div>
+          <span class="asset-badge rendered">OUT</span>
+        </button>
+        <div id="assetLibrary" class="asset-library"></div>
+      </div>
+
+      <div class="media-details">
+        <div class="details-heading">
+          <strong>Source metadata</strong>
+          <button id="forcePreviewButton" class="text-button" disabled>Browser preview</button>
+        </div>
+        <div id="sourceMetadata" class="metadata-list empty">Upload a source to inspect it.</div>
+      </div>
+
+      <div class="generated-section">
+        <strong>Generated assets</strong>
+        <div id="generatedAssets" class="generated-assets">
+          <span class="muted">Thumbnails and audio outputs appear here.</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="preview-workspace">
+      <div class="preview-toolbar">
+        <div class="mode-tabs" role="tablist">
+          <button id="sourceTab" class="mode-tab active" data-mode="source">Source</button>
+          <button id="outputTab" class="mode-tab" data-mode="output" disabled>Rendered output</button>
+        </div>
+        <div class="preview-info">
+          <span id="previewBadge">No media</span>
+          <span id="previewResolution">—</span>
+        </div>
+      </div>
+
+      <section class="stage-wrap">
+        <div id="emptyStage" class="stage-empty">
+          <div class="stage-empty-icon">▶</div>
+          <h1>Load a video to start testing</h1>
+          <p>The editor will use the original media for SDK processing and a browser-safe preview for playback when needed.</p>
+          <button id="stageUploadButton" class="button primary">Choose video</button>
+        </div>
+
+        <div id="videoStage" class="video-stage hidden">
+          <video id="editorVideo" preload="metadata" playsinline></video>
+          <div id="captionPreviewOverlay" class="caption-preview-overlay hidden" aria-live="polite"></div>
+          <div id="loadingOverlay" class="loading-overlay hidden">
+            <div class="spinner"></div>
+            <strong id="loadingText">Preparing preview…</strong>
+          </div>
+          <div id="playbackError" class="playback-error hidden">
+            <strong>Browser playback failed</strong>
+            <span id="playbackErrorText">Creating a compatible preview can fix unsupported codecs.</span>
+            <button id="playbackFallbackButton" class="button secondary">Create H.264 preview</button>
+          </div>
+        </div>
+      </section>
+
+      <div class="transport-bar">
+        <div class="transport-left">
+          <button id="backFiveButton" class="transport-button" title="Back 5 seconds">−5</button>
+          <button id="playButton" class="play-button" disabled>▶</button>
+          <button id="forwardFiveButton" class="transport-button" title="Forward 5 seconds">+5</button>
+        </div>
+        <div class="time-readout"><strong id="currentTime">00:00.00</strong><span>/</span><span id="durationTime">00:00.00</span></div>
+        <input id="seekBar" class="seek-bar" type="range" min="0" max="100" step="0.01" value="0" disabled>
+        <div class="transport-right">
+          <button id="muteButton" class="transport-button" disabled>Sound</button>
+          <button id="fullscreenButton" class="transport-button" type="button" title="Fullscreen preview">Full</button>
+          <select id="playbackRate" class="compact-select" disabled>
+            <option value="0.5">0.5x</option>
+            <option value="1" selected>1x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2x</option>
+          </select>
+        </div>
+      </div>
+    </main>
+
+    <aside class="inspector-panel" aria-label="Clip inspector">
+      <div class="inspector-tabs">
+        <button class="active">Inspector</button>
+        <button id="jsonTabButton">Payload</button>
+        <button id="openControlsDrawer" class="drawer-trigger" type="button" aria-controls="secondaryDrawer" aria-expanded="false" title="Open advanced controls">More</button>
+      </div>
+
+      <div id="inspectorContent" class="inspector-content">
+        <section id="trimSection" class="inspector-section">
+          <div class="section-row">
+            <div><span class="section-label">Clip timing</span><strong>Trim</strong></div>
+            <label class="switch"><input id="trimEnabled" type="checkbox"><span></span></label>
+          </div>
+          <div class="field-grid two">
+            <label>Start <input id="trimStart" type="number" min="0" step="0.1" value="0"></label>
+            <label>Duration <input id="trimDuration" type="number" min="0.1" step="0.1" placeholder="Full"></label>
+          </div>
+        </section>
+
+        <section id="transformSection" class="inspector-section">
+          <div class="section-row">
+            <div><span class="section-label">Transform</span><strong>Resize</strong></div>
+            <label class="switch"><input id="resizeEnabled" type="checkbox"><span></span></label>
+          </div>
+          <div class="field-grid two">
+            <label>Width <input id="resizeWidth" type="number" min="1" value="1280"></label>
+            <label>Height <input id="resizeHeight" type="number" min="1" value="720"></label>
+          </div>
+          <div class="segmented" id="fitSegmented">
+            <button type="button" data-fit="contain" class="active">Contain</button>
+            <button type="button" data-fit="cover">Cover</button>
+            <button type="button" data-fit="fill">Fill</button>
+          </div>
+          <select id="resizeFit" hidden><option value="contain">Contain</option><option value="cover">Cover</option><option value="fill">Fill</option></select>
+        </section>
+
+        <section class="inspector-section">
+          <div class="section-row">
+            <div><span class="section-label">Framing</span><strong>Crop</strong></div>
+            <label class="switch"><input id="cropEnabled" type="checkbox"><span></span></label>
+          </div>
+          <div class="field-grid two">
+            <label>Width <input id="cropWidth" type="number" min="1" value="720"></label>
+            <label>Height <input id="cropHeight" type="number" min="1" value="720"></label>
+            <label>X <input id="cropX" type="number" min="0" placeholder="Center"></label>
+            <label>Y <input id="cropY" type="number" min="0" placeholder="Center"></label>
+          </div>
+        </section>
+
+        <section class="inspector-section">
+          <div class="section-row">
+            <div><span class="section-label">Transform</span><strong>Rotate</strong></div>
+            <label class="switch"><input id="rotateEnabled" type="checkbox"><span></span></label>
+          </div>
+          <div class="field-grid one">
+            <label>Degrees <input id="rotateDegrees" type="number" step="1" value="90"></label>
+          </div>
+          <div class="quick-actions">
+            <button data-rotate="0">0°</button><button data-rotate="90">90°</button><button data-rotate="180">180°</button><button data-rotate="270">270°</button>
+          </div>
+        </section>
+
+        <section id="exportSection" class="inspector-section">
+          <div class="section-row"><div><span class="section-label">Output</span><strong>Export</strong></div></div>
+          <div class="field-grid two">
+            <label>Container <select id="outputFormat"><option value="mp4">MP4</option><option value="webm">WebM</option></select></label>
+            <label>Video codec <select id="videoCodec"><option value="">Auto (optimizer)</option><option value="h264">H.264</option><option value="h265">H.265</option><option value="av1">AV1</option><option value="vp9">VP9</option><option value="copy">Copy</option></select></label>
+            <label>Audio codec <select id="audioCodec"><option value="">Auto (optimizer)</option><option value="aac">AAC</option><option value="opus">Opus</option><option value="mp3">MP3</option><option value="copy">Copy</option><option value="none">No audio</option></select></label>
+            <label>CRF <input id="crf" type="number" min="0" max="63" placeholder="Auto"></label>
+            <label>Preset <select id="preset"><option value="">Auto</option><option>ultrafast</option><option>veryfast</option><option>fast</option><option>medium</option><option>slow</option><option>veryslow</option></select></label>
+            <label>Pixel format <input id="pixelFormat" placeholder="Auto / yuv420p"></label>
+            <label>Video bitrate <input id="videoBitrate" placeholder="e.g. 4M"></label>
+            <label>Audio bitrate <input id="audioBitrate" placeholder="Auto / 192k"></label>
+          </div>
+        </section>
+
+        <section class="inspector-section">
+          <div class="section-row"><div><span class="section-label">Terminal output</span><strong>Thumbnail</strong></div></div>
+          <div class="field-grid two">
+            <label>At (sec) <input id="thumbnailAt" type="number" min="0" step="0.1" value="0"></label>
+            <label>Quality <input id="thumbnailQuality" type="number" min="1" max="31" value="3"></label>
+          </div>
+          <button id="thumbnailButton" class="button secondary full" disabled>Generate thumbnail</button>
+        </section>
+      </div>
+
+      <div id="payloadContent" class="payload-content hidden">
+        <div class="payload-heading"><strong>SDK operation payload</strong><span>Updates live</span></div>
+        <pre id="operationPreview">{}</pre>
+        <div class="payload-heading plan-heading"><strong>Optimizer execution plan</strong><button id="planButton" class="text-button" disabled>Refresh plan</button></div>
+        <pre id="executionPlanPreview" class="plan-output">Upload a video, then refresh the plan.</pre>
+        <div class="payload-heading log-heading"><strong>Acceptance log</strong><button id="clearLogButton" class="text-button">Clear</button></div>
+        <pre id="logOutput" class="log-output">Ready. Upload a video to begin.</pre>
+      </div>
+    </aside>
+
+    <div id="drawerBackdrop" class="drawer-backdrop" aria-hidden="true"></div>
+    <aside id="secondaryDrawer" class="control-drawer" role="dialog" aria-hidden="true" aria-labelledby="drawerTitle">
+      <div class="drawer-header">
+        <div class="drawer-heading">
+          <span class="kicker">Advanced controls</span>
+          <strong id="drawerTitle">Project</strong>
+        </div>
+        <button id="drawerCloseButton" class="icon-button drawer-close" type="button" aria-label="Close advanced controls">×</button>
+      </div>
+      <nav class="drawer-nav" aria-label="Advanced controls">
+        <button type="button" data-drawer-jump="projectSection">Project</button>
+        <button type="button" data-drawer-jump="audioSection">Audio</button>
+        <button type="button" data-drawer-jump="captionsSection">Captions</button>
+        <button type="button" data-drawer-jump="streamingSection">Stream</button>
+        <button type="button" data-drawer-jump="hardwareSection">GPU</button>
+        <button type="button" data-drawer-jump="jobsSection">Jobs</button>
+      </nav>
+      <div id="drawerContent" class="drawer-content">
+                <section id="projectSection" class="inspector-section">
+                  <div class="section-row"><div><span class="section-label">Timeline composition</span><strong>Project</strong></div></div>
+                  <div class="field-grid three">
+                    <label>Width <input id="projectWidth" type="number" min="1" value="1280"></label>
+                    <label>Height <input id="projectHeight" type="number" min="1" value="720"></label>
+                    <label>FPS <input id="projectFps" type="number" min="1" step="1" value="30"></label>
+                  </div>
+                  <div class="field-grid one"><label>Background <input id="projectBackground" value="black"></label></div>
+                  <div class="quick-actions project-actions">
+                    <button id="addAssetToTimelineButton" type="button" disabled>Add selected media</button>
+                    <button id="clearTimelineButton" type="button">Clear timeline</button>
+                  </div>
+                  <div class="project-subsection">
+                    <strong>Add text layer</strong>
+                    <div class="field-grid two">
+                      <label>Text <input id="projectText" value="Vexa Video"></label>
+                      <label>Start <input id="projectTextStart" type="number" min="0" step="0.1" value="0.5"></label>
+                      <label>Duration <input id="projectTextDuration" type="number" min="0.1" step="0.1" value="2"></label>
+                      <label>Font size <input id="projectTextSize" type="number" min="1" value="48"></label>
+                    </div>
+                    <button id="addTextToTimelineButton" class="button secondary full" type="button">Add text layer</button>
+                  </div>
+                  <div id="selectedProjectClipPanel" class="project-subsection hidden">
+                    <strong>Selected timeline clip</strong>
+                    <div class="field-grid two">
+                      <label>Start <input id="projectClipStart" type="number" min="0" step="0.1"></label>
+                      <label>Duration <input id="projectClipDuration" type="number" min="0.1" step="0.1"></label>
+                      <label>X <input id="projectClipX" type="number" step="1" placeholder="Center"></label>
+                      <label>Y <input id="projectClipY" type="number" step="1" placeholder="Center"></label>
+                      <label>Width <input id="projectClipWidth" type="number" min="1" placeholder="Canvas"></label>
+                      <label>Height <input id="projectClipHeight" type="number" min="1" placeholder="Canvas"></label>
+                      <label>Rotation <input id="projectClipRotation" type="number" step="1" value="0"></label>
+                      <label>Opacity <input id="projectClipOpacity" type="number" min="0" max="1" step="0.05" value="1"></label>
+                      <label>Volume <input id="projectClipVolume" type="number" min="0" step="0.05" value="1"></label>
+                      <label>Blend mode
+                        <select id="projectClipBlend">
+                          <option value="normal">Normal</option>
+                          <option value="multiply">Multiply</option>
+                          <option value="screen">Screen</option>
+                          <option value="overlay">Overlay</option>
+                          <option value="addition">Addition</option>
+                          <option value="difference">Difference</option>
+                          <option value="darken">Darken</option>
+                          <option value="lighten">Lighten</option>
+                        </select>
+                      </label>
+                      <label>Transition in
+                        <select id="projectClipTransitionIn">
+                          <option value="none">None</option>
+                          <option value="fade">Fade</option>
+                          <option value="crossfade">Crossfade</option>
+                          <option value="wipe-left">Wipe left</option>
+                          <option value="wipe-right">Wipe right</option>
+                        </select>
+                      </label>
+                      <label>Transition duration <input id="projectClipTransitionDuration" type="number" min="0" step="0.1" value="0"></label>
+                      <label>Fade out <input id="projectClipFadeOut" type="number" min="0" step="0.1" value="0"></label>
+                      <label>Motion preset
+                        <select id="projectClipAnimation">
+                          <option value="none">None</option>
+                          <option value="pan-right">Pan left → right</option>
+                          <option value="pan-left">Pan right → left</option>
+                          <option value="zoom-in">Zoom in</option>
+                          <option value="rotate-90">Rotate 0 → 90°</option>
+                          <option value="volume-rise">Volume 25% → 100%</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div class="quick-actions project-actions">
+                      <button id="applyProjectClipButton" type="button">Apply clip</button>
+                      <button id="removeProjectClipButton" type="button">Remove clip</button>
+                    </div>
+                    <div class="quick-actions project-actions track-actions">
+                      <button id="projectTrackUpButton" type="button">Track ↑</button>
+                      <button id="projectTrackDownButton" type="button">Track ↓</button>
+                      <button id="projectTrackVisibleButton" type="button">Hide track</button>
+                      <button id="projectTrackMuteButton" type="button">Mute track</button>
+                      <button id="projectTrackLockButton" type="button">Lock track</button>
+                    </div>
+                  </div>
+                  <div class="quick-actions project-actions">
+                    <button id="projectPlanButton" type="button" disabled>Plan project</button>
+                    <button id="projectRenderButton" type="button" disabled>Render project</button>
+                  </div>
+                  <pre id="projectPlanPreview" class="plan-output project-plan-output">Add clips, then plan the timeline.</pre>
+                </section>
+                <section id="audioSection" class="inspector-section">
+                  <div class="section-row"><div><span class="section-label">Audio processing</span><strong>Audio</strong></div></div>
+                  <div class="field-grid two">
+                    <label>Normalize
+                      <select id="audioNormalize"><option value="off">Off</option><option value="on">On</option></select>
+                    </label>
+                    <label>Target LUFS <input id="audioTargetLufs" type="number" step="0.5" value="-16"></label>
+                    <label>True peak dB <input id="audioTruePeak" type="number" step="0.1" value="-1.5"></label>
+                    <label>Loudness range <input id="audioLra" type="number" step="0.5" value="11"></label>
+                    <label>Fade in <input id="audioFadeIn" type="number" min="0" step="0.1" value="0"></label>
+                    <label>Fade out <input id="audioFadeOut" type="number" min="0" step="0.1" value="0"></label>
+                    <label>Channels
+                      <select id="audioChannels"><option value="source">Source</option><option value="mono">Mono</option><option value="stereo">Stereo</option></select>
+                    </label>
+                    <label>Codec
+                      <select id="audioEngineCodec"><option value="aac">AAC</option><option value="mp3">MP3</option><option value="opus">Opus</option><option value="copy">Copy</option></select>
+                    </label>
+                    <label>Bitrate <input id="audioEngineBitrate" value="192k"></label>
+                    <label>Ducking sidechain
+                      <select id="audioDuckingSource"><option value="">Off</option></select>
+                    </label>
+                    <label>Threshold <input id="audioDuckingThreshold" type="number" min="0.001" max="1" step="0.01" value="0.1"></label>
+                    <label>Ratio <input id="audioDuckingRatio" type="number" min="1" max="20" step="0.5" value="8"></label>
+                  </div>
+                  <div class="quick-actions audio-engine-actions">
+                    <button id="audioPlanButton" type="button" disabled>Plan audio</button>
+                    <button id="audioProcessButton" type="button" disabled>Process audio</button>
+                    <button id="audioSilenceButton" type="button" disabled>Detect silence</button>
+                    <button id="audioWaveformButton" type="button" disabled>Waveform</button>
+                  </div>
+                  <div class="field-grid two audio-analysis-fields">
+                    <label>Silence threshold dB <input id="audioSilenceNoise" type="number" step="1" value="-40"></label>
+                    <label>Minimum silence <input id="audioSilenceDuration" type="number" min="0.05" step="0.1" value="0.5"></label>
+                  </div>
+                  <pre id="audioEngineOutput" class="plan-output audio-engine-output">Select an audio-capable asset to inspect or process it.</pre>
+                  <div class="project-subsection">
+                    <strong>Extract audio from video</strong>
+                    <div class="field-grid two">
+                      <label>Codec <select id="extractCodec"><option value="aac">AAC</option><option value="mp3">MP3</option><option value="opus">Opus</option><option value="copy">Copy</option></select></label>
+                      <label>Bitrate <input id="extractBitrate" value="192k"></label>
+                    </div>
+                    <button id="audioButton" class="button secondary full" disabled>Extract audio</button>
+                  </div>
+                </section>
+                <section id="captionsSection" class="inspector-section">
+                  <div class="section-row"><div><span class="section-label">Text & subtitles</span><strong>Captions</strong></div></div>
+                  <div class="field-grid two">
+                    <label>Format
+                      <select id="captionFormat"><option value="srt">SRT</option><option value="vtt">WebVTT</option><option value="ass">ASS</option></select>
+                    </label>
+                    <label>Template
+                      <select id="captionTemplate"><option value="subtitle">Subtitle</option><option value="headline">Headline</option><option value="minimal">Minimal</option></select>
+                    </label>
+                    <label>Font size <input id="captionFontSize" type="number" min="1" value="42"></label>
+                    <label>Position <select id="captionPosition"><option value="bottom">Bottom</option><option value="center">Center</option><option value="top">Top</option></select></label>
+                    <label>Animation <select id="captionAnimation"><option value="none">None</option><option value="fade">Fade</option><option value="pop">Pop</option></select></label>
+                    <label>Text color <input id="captionColor" value="white"></label>
+                    <label>Background <input id="captionBackground" value="black@0.55"></label>
+                  </div>
+                  <label class="caption-editor-label">Caption source
+                    <textarea id="captionSource" rows="10">1
+        00:00:00,500 --> 00:00:02,500
+        Welcome to Vexa Video
+
+        2
+        00:00:03,000 --> 00:00:05,000
+        Captions are rendered by the SDK.</textarea>
+                  </label>
+                  <label class="caption-render-toggle">
+                    <input id="captionIncludeRender" type="checkbox" checked>
+                    <span>Include parsed captions in the main Render action and live preview</span>
+                  </label>
+                  <div id="captionPreviewStatus" class="caption-preview-status">Parse captions to activate live preview.</div>
+                  <div class="quick-actions caption-actions">
+                    <button id="captionParseButton" type="button" disabled>Parse & preview</button>
+                    <button id="captionPlanButton" type="button" disabled>Plan burn-in</button>
+                    <button id="captionBurnButton" type="button" disabled>Render with captions</button>
+                  </div>
+                  <pre id="captionOutput" class="plan-output caption-output">Select a video asset to test captions.</pre>
+                </section>
+                <section id="streamingSection" class="inspector-section">
+                  <div class="section-row"><div><span class="section-label">Adaptive delivery</span><strong>Streaming</strong></div></div>
+                  <div class="field-grid two">
+                    <label>Protocol
+                      <select id="streamProtocol"><option value="hls">HLS</option><option value="dash">MPEG-DASH</option></select>
+                    </label>
+                    <label>ABR preset
+                      <select id="streamPreset"><option value="mobile">Mobile</option><option value="balanced" selected>Balanced</option><option value="hd">HD</option></select>
+                    </label>
+                    <label>Segment seconds <input id="streamSegmentDuration" type="number" min="1" max="30" step="0.5" value="4"></label>
+                    <label>HLS playlist
+                      <select id="streamHlsPlaylistType"><option value="vod">VOD</option><option value="event">Event</option></select>
+                    </label>
+                  </div>
+                  <div class="quick-actions streaming-actions">
+                    <button id="streamPlanButton" type="button" disabled>Plan package</button>
+                    <button id="streamPackageButton" type="button" disabled>Create package</button>
+                  </div>
+                  <div class="project-subsection">
+                    <strong>Preview sprite</strong>
+                    <div class="field-grid three">
+                      <label>Interval <input id="spriteInterval" type="number" min="0.25" step="0.25" value="5"></label>
+                      <label>Tile width <input id="spriteWidth" type="number" min="32" step="2" value="160"></label>
+                      <label>Columns <input id="spriteColumns" type="number" min="1" max="20" value="5"></label>
+                    </div>
+                    <button id="streamSpriteButton" class="button secondary full" type="button" disabled>Generate sprite + VTT</button>
+                  </div>
+                  <pre id="streamingOutput" class="plan-output streaming-output">Select a video asset to plan an adaptive streaming package.</pre>
+                </section>
+                <section id="hardwareSection" class="inspector-section">
+                  <div class="section-row"><div><span class="section-label">Acceleration</span><strong>Hardware encoding</strong></div></div>
+                  <div class="field-grid two">
+                    <label>Provider
+                      <select id="hardwareAcceleration">
+                        <option value="cpu" selected>CPU</option>
+                        <option value="auto">Auto detect</option>
+                        <option value="nvidia">NVIDIA NVENC</option>
+                        <option value="intel">Intel Quick Sync</option>
+                        <option value="amd">AMD AMF</option>
+                        <option value="apple">Apple VideoToolbox</option>
+                      </select>
+                    </label>
+                    <label>Benchmark codec
+                      <select id="hardwareBenchmarkCodec">
+                        <option value="h264" selected>H.264</option>
+                        <option value="h265">H.265 / HEVC</option>
+                        <option value="av1">AV1</option>
+                        <option value="vp9">VP9</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label class="caption-render-toggle">
+                    <input id="hardwareFallback" type="checkbox" checked>
+                    <span>Fall back to CPU when the requested hardware encoder is unavailable</span>
+                  </label>
+                  <div class="quick-actions hardware-actions">
+                    <button id="hardwareDetectButton" type="button">Detect hardware</button>
+                    <button id="hardwareBenchmarkButton" type="button" disabled>Benchmark source</button>
+                  </div>
+                  <pre id="hardwareOutput" class="plan-output hardware-output">Detect FFmpeg hardware encoders and runtime GPU availability.</pre>
+                </section>
+                <section id="jobsSection" class="inspector-section">
+                  <div class="section-row"><div><span class="section-label">Background execution</span><strong>Render jobs</strong></div></div>
+                  <p class="muted">Queue the current clip render through the local worker pool. Jobs keep state, progress, retries, idempotency, and cancellation independent of the browser request.</p>
+                  <div class="field-grid two">
+                    <label>Idempotency key <input id="jobIdempotencyKey" placeholder="Optional, e.g. render-order-42"></label>
+                    <label>Max attempts <input id="jobMaxAttempts" type="number" min="1" max="5" step="1" value="1"></label>
+                  </div>
+                  <div class="quick-actions job-actions">
+                    <button id="jobQueueRenderButton" type="button" disabled>Queue current render</button>
+                    <button id="jobCancelButton" type="button" disabled>Cancel job</button>
+                    <button id="jobRefreshButton" type="button">Refresh jobs</button>
+                  </div>
+                  <pre id="jobOutput" class="plan-output job-output">Queue a video render to inspect its lifecycle.</pre>
+                </section>
+      </div>
+    </aside>
+
+    <section class="timeline-panel" aria-label="Timeline">
+      <div class="timeline-toolbar">
+        <div class="timeline-tools">
+          <strong>Timeline</strong>
+          <div class="timeline-mode-tabs">
+            <button id="clipTimelineButton" class="active" type="button">Clip edit</button>
+            <button id="projectTimelineButton" type="button">Project</button>
+          </div>
+          <span id="timelineSummary">No clip loaded</span>
+        </div>
+        <div class="render-progress-inline">
+          <span id="renderState">Idle</span>
+          <progress id="renderProgress" max="100" value="0"></progress>
+          <strong id="progressText">0%</strong>
+          <button id="cancelButton" class="button danger compact hidden">Cancel</button>
+        </div>
+      </div>
+
+      <div class="timeline-body">
+        <div class="track-labels">
+          <div class="ruler-label"></div>
+          <div><strong>Video</strong><span>V1</span></div>
+          <div><strong>Text</strong><span>T1</span></div>
+          <div><strong>Audio</strong><span>A1</span></div>
+        </div>
+        <div id="timelineCanvas" class="timeline-canvas">
+          <div id="timeRuler" class="time-ruler"></div>
+          <div class="track-row video-track"><div id="videoClip" class="timeline-clip video-clip hidden"><span id="videoClipName">Source</span><small id="videoClipDuration">0s</small></div><div id="projectVideoClips" class="project-track-clips hidden"></div></div>
+          <div class="track-row text-track"><div id="projectTextClips" class="project-track-clips hidden"></div></div>
+          <div class="track-row audio-track"><div id="audioClip" class="timeline-clip audio-clip hidden"><span>Source audio</span><small>AAC</small></div><div id="projectAudioClips" class="project-track-clips hidden"></div></div>
+          <div id="timelinePlayhead" class="timeline-playhead hidden"><i></i></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

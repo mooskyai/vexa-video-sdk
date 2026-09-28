@@ -1,0 +1,50 @@
+{
+  "name": "@moosky-video/cli",
+  "version": "1.0.0",
+  "type": "module",
+  "private": false,
+  "bin": {
+    "vexa": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/cli.d.ts",
+      "import": "./dist/cli.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.map"
+  ],
+  "dependencies": {
+    "@moosky-video/core": "1.0.0",
+    "@moosky-video/sdk": "1.0.0"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "engines": {
+    "node": ">=24.21.0"
+  },
+  "description": "Command-line interface for Vexa Video SDK.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mooskyai/vexa-video-sdk.git"
+  },
+  "homepage": "https://github.com/mooskyai/vexa-video-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/mooskyai/vexa-video-sdk/issues"
+  },
+  "keywords": [
+    "video",
+    "ffmpeg",
+    "cli",
+    "media"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

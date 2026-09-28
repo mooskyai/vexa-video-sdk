@@ -1,0 +1,51 @@
+name: Release packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish verified packages to npm
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  verify-and-release:
+    runs-on: ubuntu-latest
+    environment: npm-release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Verify repository
+        run: npm run verify
+
+      - name: Validate release metadata
+        run: npm run release:check
+
+      - name: Dry-run package contents
+        run: npm run release:pack
+
+      - name: Publish with npm provenance
+        if: ${{ inputs.publish }}
+        env:
+          VEXA_RELEASE_CONFIRM: PUBLISH
+        run: npm run release:publish
