@@ -13,12 +13,12 @@ import type {
   TrimOptions,
   VideoLoadOptions,
   WaveformOptions
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import {
   InvalidMediaSourceError,
   InvalidOperationError,
   normalizeAudioOperations
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import {
   createAudioExecutionPlan,
   detectSilence,
@@ -27,7 +27,7 @@ import {
   resolveMediaBinaries,
   runAudioExecutionPlan,
   type MediaBinaries
-} from "@moosky-video/ffmpeg";
+} from "@vexa-video/ffmpeg";
 
 interface AudioRuntime {
   binariesPromise?: Promise<MediaBinaries>;

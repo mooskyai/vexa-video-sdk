@@ -8,7 +8,7 @@ import type {
   JobSnapshot,
   JobState,
   JobSubmissionOptions
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import {
   InvalidJobError,
   JobCancelledError,
@@ -19,7 +19,7 @@ import {
   isTerminalJobState,
   jobRetryDelay,
   normalizeJobRetryPolicy
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 
 export interface JobProgressUpdate<TData = unknown> {
   percent?: number;

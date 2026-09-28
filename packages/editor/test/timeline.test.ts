@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { VideoProjectAst } from "@moosky-video/core/browser";
+import type { VideoProjectAst } from "@vexa-video/core/browser";
 import {
   TimelineHistory,
   applyTimelineEditorCommand,
@@ -61,6 +61,6 @@ test("editor package source stays browser-safe", async () => {
   const { resolve } = await import("node:path");
   const source = await readFile(resolve(process.cwd(), "packages/editor/src/timeline.ts"), "utf8");
   assert.doesNotMatch(source, /from\s+["']node:/u);
-  assert.doesNotMatch(source, /@moosky-video\/sdk/u);
+  assert.doesNotMatch(source, /@vexa-video\/sdk/u);
   assert.doesNotMatch(source, /child_process/u);
 });

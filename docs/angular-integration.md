@@ -1,6 +1,6 @@
 # Angular Integration
 
-`@moosky-video/angular` is the browser-facing integration layer for Vexa Video SDK. It communicates with a Node render service while keeping FFmpeg, local filesystem access, worker infrastructure, and other Node-only dependencies outside the browser bundle.
+`@vexa-video/angular` is the browser-facing integration layer for Vexa Video SDK. It communicates with a Node render service while keeping FFmpeg, local filesystem access, worker infrastructure, and other Node-only dependencies outside the browser bundle.
 
 ## Architecture
 
@@ -8,7 +8,7 @@
 Angular application
       |
       v
-@moosky-video/angular
+@vexa-video/angular
       |
  fetch / custom transport
       |
@@ -16,12 +16,12 @@ Angular application
 Node render service
       |
       v
-@moosky-video/sdk
+@vexa-video/sdk
       |
  jobs / storage / hardware / FFmpeg
 ```
 
-The Angular package must not have runtime imports from `@moosky-video/sdk`, `node:*`, or `child_process`.
+The Angular package must not have runtime imports from `@vexa-video/sdk`, `node:*`, or `child_process`.
 
 ## Compatibility
 
@@ -34,7 +34,7 @@ Avoid resolving install conflicts with `--force` or `--legacy-peer-deps`; those 
 ## Configure providers
 
 ```ts
-import { provideVexaVideo } from "@moosky-video/angular";
+import { provideVexaVideo } from "@vexa-video/angular";
 
 export const appConfig = {
   providers: [
@@ -67,7 +67,7 @@ import { inject } from "@angular/core";
 import {
   VexaMediaService,
   VexaRenderService
-} from "@moosky-video/angular";
+} from "@vexa-video/angular";
 
 const media = inject(VexaMediaService);
 const renders = inject(VexaRenderService);
@@ -159,7 +159,7 @@ The browser should exchange serializable domain objects, not live Node SDK insta
 
 ## Example render service
 
-The repository includes `examples/angular-render-service`, a small Node HTTP service using `@moosky-video/sdk` and `JobQueue`.
+The repository includes `examples/angular-render-service`, a small Node HTTP service using `@vexa-video/sdk` and `JobQueue`.
 
 Start it with:
 

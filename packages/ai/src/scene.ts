@@ -1,5 +1,5 @@
-import { runProcess } from "@moosky-video/ffmpeg";
-import { Video } from "@moosky-video/sdk";
+import { runProcess } from "@vexa-video/ffmpeg";
+import { Video } from "@vexa-video/sdk";
 import type {
   SceneBoundary,
   SceneDetectionAdapter,

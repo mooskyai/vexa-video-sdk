@@ -1,6 +1,6 @@
 import { computed, signal, type Signal, type WritableSignal } from "@angular/core";
 import { Observable, type Subscription } from "rxjs";
-import type { JobSnapshot, JobSubmissionOptions } from "@moosky-video/core/browser";
+import type { JobSnapshot, JobSubmissionOptions } from "@vexa-video/core/browser";
 import type { NormalizedVexaVideoConfig } from "./config.js";
 import type {
   VexaProjectRenderRequest,

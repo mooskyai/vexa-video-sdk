@@ -21,7 +21,7 @@ PluginRegistry
     +---- encoder provider ----------> plugin-owned encoder selection
 ```
 
-`@moosky-video/core/browser` exports plugin metadata/catalog types only. It never loads plugin implementations.
+`@vexa-video/core/browser` exports plugin metadata/catalog types only. It never loads plugin implementations.
 
 ## Plugin metadata
 

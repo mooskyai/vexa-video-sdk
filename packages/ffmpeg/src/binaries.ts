@@ -1,4 +1,4 @@
-import { BinaryNotFoundError } from "@moosky-video/core";
+import { BinaryNotFoundError } from "@vexa-video/core";
 import { runProcess } from "./process.js";
 
 export interface MediaBinaries {

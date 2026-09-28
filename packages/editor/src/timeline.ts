@@ -1,4 +1,4 @@
-import type { TimelineClip, VideoProjectAst } from "@moosky-video/core/browser";
+import type { TimelineClip, VideoProjectAst } from "@vexa-video/core/browser";
 
 export interface TimelineSelection {
   trackId: string;

@@ -31,7 +31,7 @@ Achievements:
 
 - npm workspace monorepo exists.
 - TypeScript project references build the package graph.
-- `@moosky-video/core`, `@moosky-video/ffmpeg`, and `@moosky-video/sdk` have clear package boundaries.
+- `@vexa-video/core`, `@vexa-video/ffmpeg`, and `@vexa-video/sdk` have clear package boundaries.
 - GitHub Actions validates supported Node versions.
 - contribution, security, architecture, and roadmap documentation exists.
 - Node.js `24.21.0+` is the minimum supported runtime.
@@ -576,14 +576,14 @@ Status: implemented; local acceptance is in progress. Do not start Milestone 11 
 
 Achievements:
 
-- `@moosky-video/angular` builds as a separate browser-facing workspace package.
-- the package has no runtime import from `@moosky-video/sdk`, `node:*`, or `child_process`.
+- `@vexa-video/angular` builds as a separate browser-facing workspace package.
+- the package has no runtime import from `@vexa-video/sdk`, `node:*`, or `child_process`.
 - `provideVexaVideo(...)` configures base URL, endpoint paths, polling, credentials, per-request headers, and custom fetch.
 - media, render, and preview services are injectable through Angular providers.
 - `VexaJobRef` exposes Angular Signals; `VexaRenderService.watch(...)` exposes RxJS polling.
 - upload/render contracts use plain serializable DTOs and browser-safe shared core types.
 - custom transport/media/render providers can replace default behavior.
-- `@moosky-video/core/browser` provides browser-safe shared contracts without bringing Node execution code into the Angular package.
+- `@vexa-video/core/browser` provides browser-safe shared contracts without bringing Node execution code into the Angular package.
 - `examples/angular-client` demonstrates standalone Angular provider/service usage.
 - `examples/angular-render-service` implements compatible upload/job/output endpoints using the Node SDK.
 - the render-service root route provides a developer-facing status page.
@@ -610,9 +610,9 @@ Verify dependency/toolchain behavior:
 Verify automated behavior:
 
 - run `npm run verify`; all existing tests plus Angular config/browser-safety tests must pass.
-- confirm `packages/angular/dist` contains no `node:` or `@moosky-video/sdk` runtime imports.
+- confirm `packages/angular/dist` contains no `node:` or `@vexa-video/sdk` runtime imports.
 - confirm config normalization rejects invalid base URLs, polling intervals, and endpoint paths.
-- confirm `@moosky-video/core/browser` emits an empty runtime module while exposing browser-facing declaration types.
+- confirm `@vexa-video/core/browser` emits an empty runtime module while exposing browser-facing declaration types.
 - compile `examples/angular-client` and `examples/angular-render-service` through the root TypeScript project graph.
 - confirm the Angular browser entry point uses a promise/catch bootstrap rather than top-level `await`.
 
@@ -694,7 +694,7 @@ Status: implemented and optional; formal sequence still depends on Milestone 10/
 
 Achievements:
 
-- separate `@moosky-video/ai` workspace package with no mandatory AI/model provider dependency in core, FFmpeg, or the normal SDK.
+- separate `@vexa-video/ai` workspace package with no mandatory AI/model provider dependency in core, FFmpeg, or the normal SDK.
 - provider-neutral transcription adapter with normalized segment/word timing and confidence validation.
 - automatic `CaptionDocument` generation using existing caption templates/styles.
 - built-in deterministic FFmpeg scene-boundary detector plus replaceable scene adapter contract.
@@ -714,7 +714,7 @@ Verify automated behavior:
 - run the real scene integration test against a synthetic hard-cut video and confirm scene boundaries are detected near the cut times.
 - run the smart-reframe integration test and confirm the generated project contains animated x/y/width/height keyframes.
 - run the highlight-project integration test and confirm scored highlights become deterministic timeline clips.
-- confirm `@moosky-video/ai` has only internal Vexa dependencies and does not add a provider SDK to the root dependency graph.
+- confirm `@vexa-video/ai` has only internal Vexa dependencies and does not add a provider SDK to the root dependency graph.
 
 Verify with an application-owned provider when available:
 
@@ -729,11 +729,11 @@ Status: implemented; public-registry publication and clean-install tarball accep
 
 Achievements:
 
-- `@moosky-video/cli` provides probe, plan, render, hardware-inspection, and HLS/DASH package commands without a command-framework dependency.
+- `@vexa-video/cli` provides probe, plan, render, hardware-inspection, and HLS/DASH package commands without a command-framework dependency.
 - `examples/rest-service` exposes health, raw media upload, background render jobs, cancellation, and rendered output serving through the existing `JobQueue`/`Video` APIs.
 - `deploy/docker-worker` provides a Node 24 + FFmpeg container recipe and Compose example with configurable worker concurrency and persistent workspace storage.
 - React and Vue source examples demonstrate upload → background job → polling → output playback without adding framework dependencies to the monorepo runtime.
-- `@moosky-video/editor` provides browser-safe timeline selection/playhead/viewport state, snapping, immutable clip move/trim commands, and undo/redo history.
+- `@vexa-video/editor` provides browser-safe timeline selection/playhead/viewport state, snapping, immutable clip move/trim commands, and undo/redo history.
 - `HostedRenderer` plus `HostedRenderAdapter` define a provider-neutral submit/get/cancel/wait contract for hosted/cloud execution.
 - release packages contain public metadata, files/exports, package READMEs, canonical repository URLs, MIT license metadata, and public publish configuration.
 - release scripts validate synchronized versions/metadata, dry-run npm package contents, and guard actual publish behind explicit confirmation.

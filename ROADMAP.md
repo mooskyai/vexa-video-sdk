@@ -36,8 +36,8 @@ This document tracks product capabilities and the next engineering priorities fo
 
 These constraints are treated as product guarantees unless intentionally changed through a documented API revision:
 
-1. `@moosky-video/core` remains backend-neutral and serializable where practical.
-2. `@moosky-video/sdk` remains a Node.js execution package.
+1. `@vexa-video/core` remains backend-neutral and serializable where practical.
+2. `@vexa-video/sdk` remains a Node.js execution package.
 3. Browser packages must not import Node execution code, FFmpeg wrappers, Redis clients, or `node:*` runtime modules.
 4. FFmpeg processes are launched with explicit argument arrays rather than shell-concatenated command strings.
 5. Execution plans remain inspectable before expensive media work begins.
@@ -48,7 +48,7 @@ These constraints are treated as product guarantees unless intentionally changed
 
 The plugin host is implemented and keeps extension points explicit: lifecycle-managed custom video operations, storage adapters, job handlers, render backends, encoder providers, package manifests, and browser-safe metadata catalogs.
 
-The optional `@moosky-video/ai` package builds on that modular direction without adding model/provider dependencies to deterministic media packages. Its current scope includes:
+The optional `@vexa-video/ai` package builds on that modular direction without adding model/provider dependencies to deterministic media packages. Its current scope includes:
 
 - provider-neutral transcription adapters and normalized word/segment timing;
 - automatic `CaptionDocument` generation;
@@ -93,7 +93,7 @@ Potential later additions include:
 - more streaming profiles and DRM/provider integration points;
 - browser/WebCodecs execution where it is reliable and useful;
 - additional framework integrations;
-- richer provider adapters such as semantic search, transcription services, and vision models built on `@moosky-video/ai`.
+- richer provider adapters such as semantic search, transcription services, and vision models built on `@vexa-video/ai`.
 
 ## Quality gate for every feature area
 

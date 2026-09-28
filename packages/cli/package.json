@@ -1,5 +1,5 @@
 {
-  "name": "@moosky-video/cli",
+  "name": "@vexa-video/cli",
   "version": "1.0.0",
   "type": "module",
   "private": false,
@@ -18,8 +18,8 @@
     "dist/**/*.map"
   ],
   "dependencies": {
-    "@moosky-video/core": "1.0.0",
-    "@moosky-video/sdk": "1.0.0"
+    "@vexa-video/core": "1.0.0",
+    "@vexa-video/sdk": "1.0.0"
   },
   "scripts": {
     "build": "tsc -b"

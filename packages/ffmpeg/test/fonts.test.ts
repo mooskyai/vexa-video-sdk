@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { InvalidProjectError } from "@moosky-video/core";
+import { InvalidProjectError } from "@vexa-video/core";
 import { resolveDefaultFontFile } from "../src/fonts.js";
 
 test("resolveDefaultFontFile honors VEXA_VIDEO_FONT_FILE", async () => {

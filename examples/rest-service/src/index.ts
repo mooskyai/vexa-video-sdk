@@ -4,8 +4,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { extname, join, resolve } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { randomUUID } from "node:crypto";
-import type { ExportOptions, VideoOperation } from "@moosky-video/core";
-import { JobQueue, Video, VideoSdkError } from "@moosky-video/sdk";
+import type { ExportOptions, VideoOperation } from "@vexa-video/core";
+import { JobQueue, Video, VideoSdkError } from "@vexa-video/sdk";
 
 const host = process.env.VEXA_REST_HOST ?? "127.0.0.1";
 const port = Number(process.env.VEXA_REST_PORT ?? "4190");

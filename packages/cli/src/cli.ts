@@ -1,5 +1,5 @@
-import { Hardware, Streaming, Video } from "@moosky-video/sdk";
-import type { ExportOptions, HardwareAccelerationPreference, ResizeFit, StreamingPresetName, StreamingProtocol } from "@moosky-video/core";
+import { Hardware, Streaming, Video } from "@vexa-video/sdk";
+import type { ExportOptions, HardwareAccelerationPreference, ResizeFit, StreamingPresetName, StreamingProtocol } from "@vexa-video/core";
 
 export type CliCommandName = "help" | "version" | "probe" | "plan" | "render" | "hardware" | "stream";
 

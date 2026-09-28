@@ -1,4 +1,4 @@
-import { Video, createProject } from "@moosky-video/sdk";
+import { Video, createProject } from "@vexa-video/sdk";
 import type { SmartReframeOptions, SmartReframePlan, SubjectTrackingAdapter } from "./contracts.js";
 import { finitePositive, normalizeTracking } from "./normalize.js";
 

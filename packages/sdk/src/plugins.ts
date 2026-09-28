@@ -9,14 +9,14 @@ import type {
   PluginMetadata,
   PluginPackageManifest,
   VideoOperation
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import {
   InvalidPluginError,
   PluginConflictError,
   PluginDependencyError,
   PluginExecutionError,
   PluginNotFoundError
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import { JobQueue, type JobHandler, type JobHandlerOptions } from "./jobs.js";
 import { Storage, type StorageAdapter, type StorageOptions } from "./storage.js";
 import { Video } from "./video.js";

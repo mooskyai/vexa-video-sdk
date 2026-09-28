@@ -7,7 +7,7 @@ import {
   type VexaMediaAsset,
   type VexaRenderResult,
   type VexaVideoRenderRequest
-} from "@moosky-video/angular";
+} from "@vexa-video/angular";
 
 @Component({
   selector: "vexa-example-app",

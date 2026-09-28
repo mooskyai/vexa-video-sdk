@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { InvalidOperationError } from "@moosky-video/core";
+import { InvalidOperationError } from "@vexa-video/core";
 import { Video } from "../src/video.js";
 
 test("Video editing methods build an immutable operation pipeline", () => {

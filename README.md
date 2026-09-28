@@ -77,7 +77,7 @@ npm run verify
 A basic video edit:
 
 ```ts
-import { Video } from "@moosky-video/sdk";
+import { Video } from "@vexa-video/sdk";
 
 await Video.load("input.mp4")
   .trim({ start: 5, duration: 20 })
@@ -122,7 +122,7 @@ For compatible untouched media, Vexa can choose stream copy instead of re-encodi
 `VideoProject` provides a serializable multi-track editing model:
 
 ```ts
-import { createProject } from "@moosky-video/sdk";
+import { createProject } from "@vexa-video/sdk";
 
 const project = createProject({
   id: "demo",
@@ -160,7 +160,7 @@ Projects support video, audio, image, and text tracks; clip-relative keyframes; 
 ## Audio
 
 ```ts
-import { Audio } from "@moosky-video/sdk";
+import { Audio } from "@vexa-video/sdk";
 
 await Audio.load("music.wav")
   .trim({ start: 2, duration: 30 })
@@ -176,7 +176,7 @@ Audio workflows also include sidechain ducking, silence detection, and waveform 
 ## Captions
 
 ```ts
-import { Captions, Video } from "@moosky-video/sdk";
+import { Captions, Video } from "@vexa-video/sdk";
 
 const captions = Captions.applyTemplate(
   Captions.parse(`1
@@ -200,7 +200,7 @@ Supported text formats are SRT, WebVTT, and ASS. Caption documents can preserve 
 ## Adaptive streaming
 
 ```ts
-import { Streaming } from "@moosky-video/sdk";
+import { Streaming } from "@vexa-video/sdk";
 
 await Streaming.load("input.mp4").package("./dist/hls", {
   protocol: "hls",
@@ -214,7 +214,7 @@ Vexa can create HLS and MPEG-DASH packages, custom rendition ladders, aligned se
 ## Hardware acceleration
 
 ```ts
-import { Hardware, Video } from "@moosky-video/sdk";
+import { Hardware, Video } from "@vexa-video/sdk";
 
 const capabilities = await Hardware.detect();
 console.log(capabilities.providers);
@@ -235,7 +235,7 @@ An encoder is not considered usable merely because it appears in `ffmpeg -encode
 ## Storage and remote media
 
 ```ts
-import { Storage, Video } from "@moosky-video/sdk";
+import { Storage, Video } from "@vexa-video/sdk";
 
 const storage = new Storage();
 
@@ -252,7 +252,7 @@ Remote HTTP handling is conservative by default: HTTPS only, no embedded credent
 ## Jobs and workers
 
 ```ts
-import { JobQueue, Video } from "@moosky-video/sdk";
+import { JobQueue, Video } from "@vexa-video/sdk";
 
 const jobs = new JobQueue({ concurrency: 2 });
 
@@ -277,10 +277,10 @@ The same serializable job model can run through the local worker pool or a Redis
 
 ## Angular integration
 
-`@moosky-video/angular` is a separate browser-safe package. It never imports FFmpeg, `child_process`, `node:*`, or the Node-only `@moosky-video/sdk` runtime.
+`@vexa-video/angular` is a separate browser-safe package. It never imports FFmpeg, `child_process`, `node:*`, or the Node-only `@vexa-video/sdk` runtime.
 
 ```ts
-import { provideVexaVideo } from "@moosky-video/angular";
+import { provideVexaVideo } from "@vexa-video/angular";
 
 export const appConfig = {
   providers: [
@@ -326,7 +326,7 @@ See [docs/angular-integration.md](./docs/angular-integration.md) for configurati
 `PluginRegistry` provides explicit, namespaced extension points without allowing installed packages to silently replace Vexa's normal planning or safety behavior.
 
 ```ts
-import { definePlugin, PluginRegistry, Video } from "@moosky-video/sdk";
+import { definePlugin, PluginRegistry, Video } from "@vexa-video/sdk";
 
 const watermarkTools = definePlugin({
   metadata: {
@@ -362,12 +362,12 @@ See [docs/plugins.md](./docs/plugins.md).
 
 ## Optional AI extension
 
-`@moosky-video/ai` is a separate Node package. It does not add model SDKs or provider credentials to `@moosky-video/core`, `@moosky-video/ffmpeg`, or the normal Node SDK. Applications choose the transcription, tracking, and highlight providers they want.
+`@vexa-video/ai` is a separate Node package. It does not add model SDKs or provider credentials to `@vexa-video/core`, `@vexa-video/ffmpeg`, or the normal Node SDK. Applications choose the transcription, tracking, and highlight providers they want.
 
 Generate captions from any transcription adapter:
 
 ```ts
-import { VexaAI } from "@moosky-video/ai";
+import { VexaAI } from "@vexa-video/ai";
 
 const ai = new VexaAI({
   transcription: myTranscriptionAdapter
@@ -434,10 +434,10 @@ Source-only React and Vue examples demonstrate the same upload → job → progr
 
 ## Browser timeline editor foundation
 
-`@moosky-video/editor` provides framework-neutral timeline state helpers for browser editors. It owns selection, playhead, viewport/zoom state, time snapping, clip move/trim commands, and undo/redo history while keeping the project itself as a serializable `VideoProjectAst`.
+`@vexa-video/editor` provides framework-neutral timeline state helpers for browser editors. It owns selection, playhead, viewport/zoom state, time snapping, clip move/trim commands, and undo/redo history while keeping the project itself as a serializable `VideoProjectAst`.
 
 ```ts
-import { TimelineHistory, createTimelineEditorState } from "@moosky-video/editor";
+import { TimelineHistory, createTimelineEditorState } from "@vexa-video/editor";
 
 const history = new TimelineHistory(
   createTimelineEditorState(project, { snapSeconds: 0.1 })
@@ -461,7 +461,7 @@ The package has no DOM renderer and no Node execution dependency, so Angular/Rea
 `HostedRenderer` wraps cloud or hosted render providers behind a small submit/get/cancel adapter contract:
 
 ```ts
-import { HostedRenderer } from "@moosky-video/sdk";
+import { HostedRenderer } from "@vexa-video/sdk";
 
 const renderer = new HostedRenderer(myHostedAdapter);
 
@@ -504,13 +504,13 @@ See [docs/visual-playground.md](./docs/visual-playground.md).
 
 | Package | Responsibility |
 | --- | --- |
-| `@moosky-video/core` | Backend-neutral types, ASTs, validation, errors, and browser-safe shared contracts |
-| `@moosky-video/ffmpeg` | FFmpeg/ffprobe planning, filter compilation, process execution, hardware detection, streaming packaging |
-| `@moosky-video/sdk` | Node-only developer API for media, storage, hardware, and jobs/workers |
-| `@moosky-video/angular` | Browser-safe Angular providers, uploads, render clients, Signals/RxJS state, and preview helpers |
-| `@moosky-video/ai` | Optional Node-side AI/provider adapters plus deterministic media-planning helpers |
-| `@moosky-video/editor` | Browser-safe, framework-neutral timeline-editor state/history foundations |
-| `@moosky-video/cli` | Node.js command-line interface for probing, planning, rendering, hardware, and streaming |
+| `@vexa-video/core` | Backend-neutral types, ASTs, validation, errors, and browser-safe shared contracts |
+| `@vexa-video/ffmpeg` | FFmpeg/ffprobe planning, filter compilation, process execution, hardware detection, streaming packaging |
+| `@vexa-video/sdk` | Node-only developer API for media, storage, hardware, and jobs/workers |
+| `@vexa-video/angular` | Browser-safe Angular providers, uploads, render clients, Signals/RxJS state, and preview helpers |
+| `@vexa-video/ai` | Optional Node-side AI/provider adapters plus deterministic media-planning helpers |
+| `@vexa-video/editor` | Browser-safe, framework-neutral timeline-editor state/history foundations |
+| `@vexa-video/cli` | Node.js command-line interface for probing, planning, rendering, hardware, and streaming |
 
 ## Architecture
 
@@ -518,15 +518,15 @@ See [docs/visual-playground.md](./docs/visual-playground.md).
 Angular application                       Node application / render service
         |                                           |
         v                                           v
-@moosky-video/angular ---------------------> @moosky-video/sdk
+@vexa-video/angular ---------------------> @vexa-video/sdk
         |                              serializable contracts
         |                                           |
-        +------------------- @moosky-video/core ------+
+        +------------------- @vexa-video/core ------+
                                                     |
                                                     v
                                       planning + optimization
                                                     |
-                                      @moosky-video/ffmpeg
+                                      @vexa-video/ffmpeg
                                                     |
                                   FFmpeg / ffprobe / storage
 ```

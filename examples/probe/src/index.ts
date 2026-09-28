@@ -1,4 +1,4 @@
-import { Video } from "@moosky-video/sdk";
+import { Video } from "@vexa-video/sdk";
 
 const source = process.argv[2];
 

@@ -3,7 +3,7 @@ import {
   ProcessAbortedError,
   ProcessExecutionError,
   ProcessTimeoutError
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 
 export interface RunProcessOptions {
   signal?: AbortSignal;

@@ -1,5 +1,5 @@
-import type { CaptionCue, CaptionDocument } from "@moosky-video/core";
-import { Captions } from "@moosky-video/sdk";
+import type { CaptionCue, CaptionDocument } from "@vexa-video/core";
+import { Captions } from "@vexa-video/sdk";
 import type {
   AutomaticCaptionOptions,
   CaptionGenerationResult,

@@ -20,7 +20,7 @@ test("Angular package contains no Node runtime or SDK imports", async () => {
   for (const file of files) {
     const source = await readFile(file, "utf8");
     assert.doesNotMatch(source, /from\s+["']node:/u, file);
-    assert.doesNotMatch(source, /["']@moosky-video\/sdk["']/u, file);
+    assert.doesNotMatch(source, /["']@vexa-video\/sdk["']/u, file);
     assert.doesNotMatch(source, /child_process/u, file);
   }
 });

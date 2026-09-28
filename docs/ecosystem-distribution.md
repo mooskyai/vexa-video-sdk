@@ -2,11 +2,11 @@
 
 This repository contains the distribution surfaces around the media SDK:
 
-- `@moosky-video/cli` for command-line probing, planning, rendering, hardware inspection, and adaptive packaging;
+- `@vexa-video/cli` for command-line probing, planning, rendering, hardware inspection, and adaptive packaging;
 - `examples/rest-service` as a dependency-light HTTP/job-service template;
 - `deploy/docker-worker` as a containerized render-service/worker recipe with FFmpeg;
 - `examples/react-client` and `examples/vue-client` as source-only browser integration examples;
-- `@moosky-video/editor` as framework-neutral timeline state/history/snap foundations;
+- `@vexa-video/editor` as framework-neutral timeline state/history/snap foundations;
 - `HostedRenderer` and `HostedRenderAdapter` for provider-neutral hosted rendering;
 - `.github/workflows/release.yml` plus release validation scripts for controlled npm publication.
 
@@ -15,11 +15,11 @@ This repository contains the distribution surfaces around the media SDK:
 After packages are published:
 
 ```bash
-npx @moosky-video/cli probe input.mp4
-npx @moosky-video/cli plan input.mp4 output.mp4 --width 1280 --height 720 --hardware auto
-npx @moosky-video/cli render input.mp4 output.mp4 --video-codec h264 --audio-codec aac
-npx @moosky-video/cli hardware --json
-npx @moosky-video/cli stream input.mp4 ./hls --protocol hls --preset balanced
+npx @vexa-video/cli probe input.mp4
+npx @vexa-video/cli plan input.mp4 output.mp4 --width 1280 --height 720 --hardware auto
+npx @vexa-video/cli render input.mp4 output.mp4 --video-codec h264 --audio-codec aac
+npx @vexa-video/cli hardware --json
+npx @vexa-video/cli stream input.mp4 ./hls --protocol hls --preset balanced
 ```
 
 ## REST service template
@@ -44,7 +44,7 @@ React and Vue examples are intentionally source-only so the monorepo does not fo
 
 ## Browser editor foundation
 
-`@moosky-video/editor` is framework-neutral and owns serializable timeline selection, playhead, viewport, snapping, clip move/trim operations, and undo/redo history. It does not render DOM or import Node execution code.
+`@vexa-video/editor` is framework-neutral and owns serializable timeline selection, playhead, viewport, snapping, clip move/trim operations, and undo/redo history. It does not render DOM or import Node execution code.
 
 ## Public releases
 

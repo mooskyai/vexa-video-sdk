@@ -1,6 +1,6 @@
 # AI extension
 
-`@moosky-video/ai` is an optional Node-side package for AI/provider-assisted media workflows. It deliberately stays outside `@moosky-video/core`, `@moosky-video/ffmpeg`, and the main SDK runtime so applications can choose their own transcription, vision, tracking, and highlight providers without making those dependencies mandatory for every Vexa user.
+`@vexa-video/ai` is an optional Node-side package for AI/provider-assisted media workflows. It deliberately stays outside `@vexa-video/core`, `@vexa-video/ffmpeg`, and the main SDK runtime so applications can choose their own transcription, vision, tracking, and highlight providers without making those dependencies mandatory for every Vexa user.
 
 ## Design rule
 
@@ -27,7 +27,7 @@ Provider-specific credentials, clients, request formats, and model names remain 
 ## Configure adapters
 
 ```ts
-import { VexaAI } from "@moosky-video/ai";
+import { VexaAI } from "@vexa-video/ai";
 
 const ai = new VexaAI({
   transcription: myTranscriptionAdapter,
@@ -167,6 +167,6 @@ The project is a normal `VideoProjectAst`, so applications can inspect, edit, se
 
 ## Dependency policy
 
-`@moosky-video/ai` includes no OpenAI, Whisper, cloud speech, object-detection, or tracking-model SDK. Install the provider SDK you need in your application and implement the matching adapter interface.
+`@vexa-video/ai` includes no OpenAI, Whisper, cloud speech, object-detection, or tracking-model SDK. Install the provider SDK you need in your application and implement the matching adapter interface.
 
 This keeps provider churn, credentials, model lifecycle, usage policy, and billing outside Vexa's deterministic media packages.

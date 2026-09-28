@@ -2,7 +2,7 @@ import { constants } from "node:fs";
 import { access } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
-import { InvalidProjectError } from "@moosky-video/core";
+import { InvalidProjectError } from "@vexa-video/core";
 
 export interface ResolveDefaultFontFileOptions {
   env?: NodeJS.ProcessEnv;

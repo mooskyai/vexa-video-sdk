@@ -4,8 +4,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { extname, join, resolve, sep } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { randomUUID } from "node:crypto";
-import type { ExportOptions, ProjectRenderOptions, VideoOperation, VideoProjectAst } from "@moosky-video/core";
-import { JobQueue, Video, VideoProject, VideoSdkError } from "@moosky-video/sdk";
+import type { ExportOptions, ProjectRenderOptions, VideoOperation, VideoProjectAst } from "@vexa-video/core";
+import { JobQueue, Video, VideoProject, VideoSdkError } from "@vexa-video/sdk";
 
 const host = process.env.VEXA_ANGULAR_HOST ?? "127.0.0.1";
 const port = Number(process.env.VEXA_ANGULAR_PORT ?? "4180");
@@ -104,7 +104,7 @@ function serviceLandingPage(): string {
 <main>
   <div class="ok"><span class="dot"></span>Service running</div>
   <h1>Vexa Angular Render Service</h1>
-  <p>This is the Node render API used by <code>@moosky-video/angular</code>. It is not the Angular application itself. Run the Angular client separately and configure its <code>baseUrl</code> to this service.</p>
+  <p>This is the Node render API used by <code>@vexa-video/angular</code>. It is not the Angular application itself. Run the Angular client separately and configure its <code>baseUrl</code> to this service.</p>
   <section>
     <h2>API endpoints</h2>
     <table>

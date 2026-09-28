@@ -15,13 +15,13 @@ import type {
   VideoLoadOptions,
   VideoOperation,
   VideoPipelineAst
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import {
   InvalidMediaSourceError,
   InvalidOperationError,
   createVideoPipelineAst,
   normalizeVideoOperations
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import {
   createCaptionExecutionPlan,
   createExportExecutionPlan,
@@ -33,7 +33,7 @@ import {
   resolveMediaBinaries,
   runFfmpegPlan,
   type MediaBinaries
-} from "@moosky-video/ffmpeg";
+} from "@vexa-video/ffmpeg";
 
 interface VideoRuntime {
   binariesPromise?: Promise<MediaBinaries>;

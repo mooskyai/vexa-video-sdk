@@ -5,8 +5,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { InvalidStorageError, RemoteMediaRejectedError } from "@moosky-video/core";
-import { runProcess } from "@moosky-video/ffmpeg";
+import { InvalidStorageError, RemoteMediaRejectedError } from "@vexa-video/core";
+import { runProcess } from "@vexa-video/ffmpeg";
 import { Storage, parseStorageSource } from "../src/storage.js";
 import { Video } from "../src/video.js";
 

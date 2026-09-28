@@ -4,11 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
-import { runProcess } from "@moosky-video/ffmpeg";
+import { runProcess } from "@vexa-video/ffmpeg";
 import {
   InvalidPluginError,
   PluginDependencyError
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import { JobQueue } from "../src/jobs.js";
 import { PluginRegistry, definePlugin } from "../src/plugins.js";
 import { Storage } from "../src/storage.js";

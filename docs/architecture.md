@@ -15,13 +15,13 @@ The architecture has four primary goals:
 
 | Package | Runtime | Responsibility |
 | --- | --- | --- |
-| `@moosky-video/core` | shared | Types, ASTs, validation, normalized domain models, typed errors |
-| `@moosky-video/ffmpeg` | Node.js | ffprobe/FFmpeg adapters, planning, filters, hardware detection, streaming packaging |
-| `@moosky-video/sdk` | Node.js | Developer-facing media APIs, storage, jobs, workers, hardware, and plugin host |
-| `@moosky-video/angular` | Browser | Angular DI, uploads, render clients, Signals/RxJS state, preview helpers |
-| `@moosky-video/ai` | Node.js (optional) | Provider-neutral transcription/tracking/highlight adapters plus deterministic AI-assisted planning helpers |
+| `@vexa-video/core` | shared | Types, ASTs, validation, normalized domain models, typed errors |
+| `@vexa-video/ffmpeg` | Node.js | ffprobe/FFmpeg adapters, planning, filters, hardware detection, streaming packaging |
+| `@vexa-video/sdk` | Node.js | Developer-facing media APIs, storage, jobs, workers, hardware, and plugin host |
+| `@vexa-video/angular` | Browser | Angular DI, uploads, render clients, Signals/RxJS state, preview helpers |
+| `@vexa-video/ai` | Node.js (optional) | Provider-neutral transcription/tracking/highlight adapters plus deterministic AI-assisted planning helpers |
 
-A browser-safe subpath, `@moosky-video/core/browser`, exposes serializable TypeScript contracts without exposing Node execution classes.
+A browser-safe subpath, `@vexa-video/core/browser`, exposes serializable TypeScript contracts without exposing Node execution classes.
 
 ## Runtime boundary
 
@@ -29,20 +29,20 @@ A browser-safe subpath, `@moosky-video/core/browser`, exposes serializable TypeS
 Browser / Angular                           Node render environment
       |                                              |
       v                                              v
-@moosky-video/angular ---------------------> @moosky-video/sdk
+@vexa-video/angular ---------------------> @vexa-video/sdk
       |                         HTTP/custom transport |
       |                                              v
-      +-------- shared serializable contracts -> @moosky-video/core
+      +-------- shared serializable contracts -> @vexa-video/core
                                                      |
                                                      v
                                            planning / validation
                                                      |
-                                           @moosky-video/ffmpeg
+                                           @vexa-video/ffmpeg
                                                      |
                                           FFmpeg / ffprobe / I/O
 ```
 
-`@moosky-video/angular` must not import `@moosky-video/sdk`, `node:*`, `child_process`, Redis clients, or FFmpeg wrappers at runtime.
+`@vexa-video/angular` must not import `@vexa-video/sdk`, `node:*`, `child_process`, Redis clients, or FFmpeg wrappers at runtime.
 
 ## Core domain model
 
@@ -247,7 +247,7 @@ The Angular package is an adapter to a render service, not a browser build of th
 Angular component/service
           |
           v
- @moosky-video/angular
+ @vexa-video/angular
     |              |
  Signals          RxJS
     |              |
@@ -260,7 +260,7 @@ Angular component/service
           Node render service
                   |
                   v
-            @moosky-video/sdk
+            @vexa-video/sdk
 ```
 
 Transport, media/upload behavior, and render providers can be replaced independently so applications can integrate authentication, storage, GraphQL/RPC, or custom job infrastructure without changing Angular-facing components.
@@ -319,7 +319,7 @@ Plugin metadata is separated from runtime implementation functions and can be ex
 
 ## Optional AI extension path
 
-`@moosky-video/ai` sits above the deterministic media SDK and normalizes provider/model output before creating captions, projects, or execution requests.
+`@vexa-video/ai` sits above the deterministic media SDK and normalizes provider/model output before creating captions, projects, or execution requests.
 
 ```text
 transcription / vision / tracking / highlight provider
@@ -369,22 +369,22 @@ CLI / REST / Docker / React / Vue / Angular
        +----------+-----------+
        |                      |
        v                      v
- @moosky-video/editor      HostedRenderer
+ @vexa-video/editor      HostedRenderer
 (browser state only)    provider adapter
                               |
                               v
                     local/cloud execution
                               |
                               v
-                       @moosky-video/sdk
+                       @vexa-video/sdk
                               |
                               v
                     planning + FFmpeg
 ```
 
-`@moosky-video/cli` invokes the same `Video`, `Streaming`, and `Hardware` APIs used by applications. The REST template submits work through `JobQueue`, and the Docker recipe runs that template with Node 24 plus FFmpeg. None of these surfaces introduce an alternate media execution semantics.
+`@vexa-video/cli` invokes the same `Video`, `Streaming`, and `Hardware` APIs used by applications. The REST template submits work through `JobQueue`, and the Docker recipe runs that template with Node 24 plus FFmpeg. None of these surfaces introduce an alternate media execution semantics.
 
-`@moosky-video/editor` is browser-safe and framework-neutral. It owns timeline interaction state and immutable project edits only; it never imports FFmpeg, local storage, or Node process code.
+`@vexa-video/editor` is browser-safe and framework-neutral. It owns timeline interaction state and immutable project edits only; it never imports FFmpeg, local storage, or Node process code.
 
 `HostedRenderer` is deliberately provider-neutral. The adapter contract owns cloud vendor SDKs/authentication and exposes submit/get/cancel semantics to the SDK. This keeps hosted execution replaceable without putting a specific cloud provider into core packages.
 
@@ -403,22 +403,22 @@ CLI / REST / Docker / React / Vue / Angular
        +----------+-----------+
        |                      |
        v                      v
- @moosky-video/editor      HostedRenderer
+ @vexa-video/editor      HostedRenderer
 (browser state only)    provider adapter
                               |
                               v
                     local/cloud execution
                               |
                               v
-                       @moosky-video/sdk
+                       @vexa-video/sdk
                               |
                               v
                     planning + FFmpeg
 ```
 
-`@moosky-video/cli` invokes the same `Video`, `Streaming`, and `Hardware` APIs used by applications. The REST template submits work through `JobQueue`, and the Docker recipe runs that template with Node 24 plus FFmpeg. None of these surfaces introduce alternate media execution semantics.
+`@vexa-video/cli` invokes the same `Video`, `Streaming`, and `Hardware` APIs used by applications. The REST template submits work through `JobQueue`, and the Docker recipe runs that template with Node 24 plus FFmpeg. None of these surfaces introduce alternate media execution semantics.
 
-`@moosky-video/editor` is browser-safe and framework-neutral. It owns timeline interaction state and immutable project edits only; it never imports FFmpeg, local storage, or Node process code.
+`@vexa-video/editor` is browser-safe and framework-neutral. It owns timeline interaction state and immutable project edits only; it never imports FFmpeg, local storage, or Node process code.
 
 `HostedRenderer` is deliberately provider-neutral. The adapter contract owns cloud vendor SDKs/authentication and exposes submit/get/cancel semantics to the SDK. This keeps hosted execution replaceable without putting a specific cloud provider into core packages.
 

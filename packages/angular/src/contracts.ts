@@ -4,7 +4,7 @@ import type {
   ProbeResult,
   VideoOperation,
   VideoProjectAst
-} from "@moosky-video/core/browser";
+} from "@vexa-video/core/browser";
 
 export type {
   CaptionDocument,
@@ -21,7 +21,7 @@ export type {
   VideoOperation,
   VideoPipelineAst,
   VideoProjectAst
-} from "@moosky-video/core/browser";
+} from "@vexa-video/core/browser";
 
 export interface VexaMediaAsset {
   id: string;

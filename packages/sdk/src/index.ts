@@ -158,7 +158,7 @@ export type {
   PreviewSpriteCue,
   PreviewSpritePlan,
   PreviewSpriteResult
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 export {
   BinaryNotFoundError,
   HardwareAccelerationUnavailableError,
@@ -189,4 +189,4 @@ export {
   ProcessExecutionError,
   ProcessTimeoutError,
   VideoSdkError
-} from "@moosky-video/core";
+} from "@vexa-video/core";

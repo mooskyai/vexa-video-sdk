@@ -15,7 +15,7 @@ Vexa packages are released from one repository and use a synchronized version du
 The following are public when exported from a published package entry point:
 
 - classes, functions, constants, interfaces, and type aliases;
-- package subpath exports such as `@moosky-video/core/browser`;
+- package subpath exports such as `@vexa-video/core/browser`;
 - serializable schema fields and documented string unions;
 - documented execution-plan fields;
 - documented error codes.

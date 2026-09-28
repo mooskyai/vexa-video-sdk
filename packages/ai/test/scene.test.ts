@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { runProcess } from "@moosky-video/ffmpeg";
+import { runProcess } from "@vexa-video/ffmpeg";
 import { FfmpegSceneDetector, parseFfmpegSceneMetadata } from "../src/scene.js";
 
 const sample = `

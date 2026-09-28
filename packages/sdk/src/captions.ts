@@ -1,5 +1,5 @@
-import type { CaptionDocument, CaptionFormat, CaptionStyle, CaptionTemplateName } from "@moosky-video/core";
-import { applyCaptionTemplate, captionTemplate, parseCaptions, serializeCaptions } from "@moosky-video/core";
+import type { CaptionDocument, CaptionFormat, CaptionStyle, CaptionTemplateName } from "@vexa-video/core";
+import { applyCaptionTemplate, captionTemplate, parseCaptions, serializeCaptions } from "@vexa-video/core";
 
 export class Captions {
   static parse(content: string, format: CaptionFormat): CaptionDocument {

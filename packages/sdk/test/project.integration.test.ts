@@ -3,8 +3,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { runProcess } from "@moosky-video/ffmpeg";
-import { InvalidProjectError } from "@moosky-video/core";
+import { runProcess } from "@vexa-video/ffmpeg";
+import { InvalidProjectError } from "@vexa-video/core";
 import { VideoProject } from "../src/project.js";
 import { Video } from "../src/video.js";
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { CaptionDocument, ProbeResult } from "@moosky-video/core";
+import type { CaptionDocument, ProbeResult } from "@vexa-video/core";
 import { compileCaptionFilterGraph, createCaptionExecutionPlan } from "../src/captions.js";
 
 const document: CaptionDocument = {

@@ -1,4 +1,4 @@
-import type { VideoOperation } from "@moosky-video/core";
+import type { VideoOperation } from "@vexa-video/core";
 
 function formatNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(6)));

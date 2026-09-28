@@ -43,13 +43,13 @@ function runNpm(args, failureMessage) {
 }
 
 const workspaces = [
-  ["@moosky-video/core", "packages/core"],
-  ["@moosky-video/ffmpeg", "packages/ffmpeg"],
-  ["@moosky-video/sdk", "packages/sdk"],
-  ["@moosky-video/angular", "packages/angular"],
-  ["@moosky-video/ai", "packages/ai"],
-  ["@moosky-video/editor", "packages/editor"],
-  ["@moosky-video/cli", "packages/cli"]
+  ["@vexa-video/core", "packages/core"],
+  ["@vexa-video/ffmpeg", "packages/ffmpeg"],
+  ["@vexa-video/sdk", "packages/sdk"],
+  ["@vexa-video/angular", "packages/angular"],
+  ["@vexa-video/ai", "packages/ai"],
+  ["@vexa-video/editor", "packages/editor"],
+  ["@vexa-video/cli", "packages/cli"]
 ];
 
 for (const [workspace, directory] of workspaces) {

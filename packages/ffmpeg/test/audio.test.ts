@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { AudioOperation, ProbeResult } from "@moosky-video/core";
+import type { AudioOperation, ProbeResult } from "@vexa-video/core";
 import {
   compileWaveformArgs,
   createAudioExecutionPlan,

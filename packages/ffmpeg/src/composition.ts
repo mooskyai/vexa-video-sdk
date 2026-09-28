@@ -10,7 +10,7 @@ import type {
   VideoCodec,
   VideoProjectAst,
   ProbeResult
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import {
   IncompatibleOutputError,
   InvalidProjectError,
@@ -18,7 +18,7 @@ import {
   numericPropertyHasKeyframes,
   numericPropertyValue,
   projectDurationSeconds
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import {
   assertAudioCodecCompatible,
   assertVideoCodecCompatible,

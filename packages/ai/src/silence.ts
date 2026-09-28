@@ -1,5 +1,5 @@
-import type { SilenceRange } from "@moosky-video/core";
-import { Audio, Video, VideoProject, createProject } from "@moosky-video/sdk";
+import type { SilenceRange } from "@vexa-video/core";
+import { Audio, Video, VideoProject, createProject } from "@vexa-video/sdk";
 import type { RemoveSilenceOptions, SilenceRemovalOptions, SilenceRemovalPlan, TimeRange } from "./contracts.js";
 import { finiteNonNegative, finitePositive } from "./normalize.js";
 

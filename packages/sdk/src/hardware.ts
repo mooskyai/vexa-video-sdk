@@ -6,12 +6,12 @@ import type {
   HardwareBenchmarkResult,
   HardwareDetectionOptions,
   HardwareVideoCodec
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import {
   benchmarkHardwareEncoder,
   detectHardwareAcceleration,
   resolveHardwareAcceleration
-} from "@moosky-video/ffmpeg";
+} from "@vexa-video/ffmpeg";
 
 export class Hardware {
   static async detect(

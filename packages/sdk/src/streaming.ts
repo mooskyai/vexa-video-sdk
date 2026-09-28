@@ -9,8 +9,8 @@ import type {
   StreamingPackageOptions,
   StreamingPackageResult,
   VideoLoadOptions
-} from "@moosky-video/core";
-import { InvalidMediaSourceError, InvalidStreamingError } from "@moosky-video/core";
+} from "@vexa-video/core";
+import { InvalidMediaSourceError, InvalidStreamingError } from "@vexa-video/core";
 import {
   createPreviewSpritePlan,
   createStreamingExecutionPlan,
@@ -20,7 +20,7 @@ import {
   runPreviewSpritePlan,
   runStreamingExecutionPlan,
   type MediaBinaries
-} from "@moosky-video/ffmpeg";
+} from "@vexa-video/ffmpeg";
 
 interface StreamingRuntime {
   binariesPromise?: Promise<MediaBinaries>;

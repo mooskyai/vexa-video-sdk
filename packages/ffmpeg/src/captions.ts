@@ -1,5 +1,5 @@
-import type { CaptionDocument, CaptionStyle, ExportOptions, HardwareAccelerationCapabilities, MediaExecutionPlan, ProbeResult, VideoOperation } from "@moosky-video/core";
-import { InvalidCaptionError, normalizeCaptionDocument } from "@moosky-video/core";
+import type { CaptionDocument, CaptionStyle, ExportOptions, HardwareAccelerationCapabilities, MediaExecutionPlan, ProbeResult, VideoOperation } from "@vexa-video/core";
+import { InvalidCaptionError, normalizeCaptionDocument } from "@vexa-video/core";
 import { defaultVideoCodec, detectOutputContainer } from "./compatibility.js";
 import { createExportExecutionPlan } from "./plan.js";
 

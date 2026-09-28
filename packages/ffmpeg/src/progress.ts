@@ -1,4 +1,4 @@
-import type { MediaProgress } from "@moosky-video/core";
+import type { MediaProgress } from "@vexa-video/core";
 
 interface ProgressState {
   frame?: string;

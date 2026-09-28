@@ -1,4 +1,4 @@
-import { Video, createProject } from "@moosky-video/sdk";
+import { Video, createProject } from "@vexa-video/sdk";
 import type { HighlightExtractionAdapter, HighlightProjectOptions, HighlightProjectResult } from "./contracts.js";
 import { finiteNonNegative, normalizeHighlights } from "./normalize.js";
 

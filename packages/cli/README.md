@@ -1,4 +1,4 @@
-# @moosky-video/cli
+# @vexa-video/cli
 
 Command-line interface for Vexa Video SDK.
 

@@ -1,5 +1,5 @@
 import type { ApplicationConfig } from "@angular/core";
-import { provideVexaVideo } from "@moosky-video/angular";
+import { provideVexaVideo } from "@vexa-video/angular";
 
 export const appConfig: ApplicationConfig = {
   providers: [

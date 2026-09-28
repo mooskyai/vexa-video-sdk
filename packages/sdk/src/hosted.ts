@@ -4,8 +4,8 @@ import type {
   HostedRenderJob,
   HostedRenderRequest,
   HostedRenderWaitOptions
-} from "@moosky-video/core";
-import { isHostedRenderTerminal } from "@moosky-video/core";
+} from "@vexa-video/core";
+import { isHostedRenderTerminal } from "@vexa-video/core";
 
 function positiveFinite(value: number, label: string): number {
   if (!Number.isFinite(value) || value <= 0) throw new TypeError(`${label} must be greater than 0.`);

@@ -1,4 +1,4 @@
-# @moosky-video/sdk
+# @vexa-video/sdk
 
 Node.js execution SDK for Vexa Video SDK: video, audio, timeline projects, captions, streaming, storage, jobs, plugins, hardware acceleration, and hosted-render adapters.
 

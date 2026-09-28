@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { InvalidOperationError } from "@moosky-video/core";
+import { InvalidOperationError } from "@vexa-video/core";
 import {
   compileExportArgs,
   compileExtractAudioArgs,

@@ -45,13 +45,13 @@ if (process.env.VEXA_RELEASE_CONFIRM !== "PUBLISH") {
 }
 
 const workspaces = [
-  "@moosky-video/core",
-  "@moosky-video/ffmpeg",
-  "@moosky-video/sdk",
-  "@moosky-video/angular",
-  "@moosky-video/ai",
-  "@moosky-video/editor",
-  "@moosky-video/cli"
+  "@vexa-video/core",
+  "@vexa-video/ffmpeg",
+  "@vexa-video/sdk",
+  "@vexa-video/angular",
+  "@vexa-video/ai",
+  "@vexa-video/editor",
+  "@vexa-video/cli"
 ];
 
 for (const workspace of workspaces) {

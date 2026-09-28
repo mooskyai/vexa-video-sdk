@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { ProbeResult } from "@moosky-video/core";
-import { IncompatibleOutputError, InvalidOperationError } from "@moosky-video/core";
+import type { ProbeResult } from "@vexa-video/core";
+import { IncompatibleOutputError, InvalidOperationError } from "@vexa-video/core";
 import { createExportExecutionPlan } from "../src/plan.js";
 
 const h264AacProbe: ProbeResult = {

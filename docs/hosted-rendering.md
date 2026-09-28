@@ -3,7 +3,7 @@
 Vexa keeps hosted rendering provider-neutral. `HostedRenderer` wraps an application-supplied adapter with one small contract: submit, inspect, and cancel a remote render job.
 
 ```ts
-import { HostedRenderer } from "@moosky-video/sdk";
+import { HostedRenderer } from "@vexa-video/sdk";
 
 const renderer = new HostedRenderer({
   async submit(request, options) {

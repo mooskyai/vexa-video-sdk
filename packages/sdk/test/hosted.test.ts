@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { HostedRenderAdapter, HostedRenderJob, HostedRenderRequest } from "@moosky-video/core";
+import type { HostedRenderAdapter, HostedRenderJob, HostedRenderRequest } from "@vexa-video/core";
 import { HostedRenderer } from "../src/hosted.js";
 
 class FakeHostedAdapter implements HostedRenderAdapter {

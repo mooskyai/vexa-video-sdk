@@ -6,7 +6,7 @@ import type {
   ProjectRenderOptions,
   VideoLoadOptions,
   VideoProjectAst
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 
 export interface AiControlOptions {
   signal?: AbortSignal;

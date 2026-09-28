@@ -3,8 +3,8 @@ import type {
   ProbeOptions,
   ProbeResult,
   VideoStreamInfo
-} from "@moosky-video/core";
-import { ProbeError } from "@moosky-video/core";
+} from "@vexa-video/core";
+import { ProbeError } from "@vexa-video/core";
 import { runProcess } from "./process.js";
 
 type FfprobeTags = Record<string, string | undefined>;

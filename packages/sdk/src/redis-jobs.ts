@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
-import type { JobSnapshot } from "@moosky-video/core";
+import type { JobSnapshot } from "@vexa-video/core";
 import {
   JobIdempotencyConflictError,
   JobTransportError,
   isTerminalJobState
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import type { DistributedJobTransport } from "./jobs.js";
 
 export interface RedisCommandClient {

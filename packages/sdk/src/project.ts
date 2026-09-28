@@ -8,13 +8,13 @@ import type {
   TimelineClip,
   VideoLoadOptions,
   VideoProjectAst
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import {
   InvalidProjectError,
   createVideoProjectAst,
   normalizeVideoProject,
   projectDurationSeconds
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import {
   createProjectExecutionPlan,
   detectHardwareAcceleration,
@@ -23,7 +23,7 @@ import {
   resolveMediaBinaries,
   runFfmpeg,
   type MediaBinaries
-} from "@moosky-video/ffmpeg";
+} from "@vexa-video/ffmpeg";
 
 interface ProjectRuntime {
   binariesPromise?: Promise<MediaBinaries>;

@@ -1,6 +1,6 @@
 # Angular Client Demo
 
-This example demonstrates the browser-safe `@moosky-video/angular` package against the Node render service in `examples/angular-render-service`.
+This example demonstrates the browser-safe `@vexa-video/angular` package against the Node render service in `examples/angular-render-service`.
 
 The intended data flow is:
 
@@ -8,7 +8,7 @@ The intended data flow is:
 Angular UI
    |
    v
-@moosky-video/angular
+@vexa-video/angular
    |
    v
 Node render service
@@ -17,7 +17,7 @@ Node render service
 JobQueue
    |
    v
-@moosky-video/sdk
+@vexa-video/sdk
    |
    v
 FFmpeg

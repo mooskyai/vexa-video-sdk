@@ -49,7 +49,7 @@ Do not expose raw FFmpeg flags as the primary product API when a stable domain-l
 
 ### Preserve browser safety
 
-`@moosky-video/angular` must not import Node runtime modules or `@moosky-video/sdk` at runtime. Browser/server communication should use serializable contracts and replaceable transports.
+`@vexa-video/angular` must not import Node runtime modules or `@vexa-video/sdk` at runtime. Browser/server communication should use serializable contracts and replaceable transports.
 
 ### Prefer deterministic planning
 

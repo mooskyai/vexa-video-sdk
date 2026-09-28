@@ -8,8 +8,8 @@ import type {
   SilenceDetectionResult,
   SilenceRange,
   WaveformOptions
-} from "@moosky-video/core";
-import { IncompatibleOutputError, InvalidOperationError } from "@moosky-video/core";
+} from "@vexa-video/core";
+import { IncompatibleOutputError, InvalidOperationError } from "@vexa-video/core";
 import {
   assertAudioCodecCompatible,
   defaultAudioCodec,

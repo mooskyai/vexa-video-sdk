@@ -1,4 +1,4 @@
-import type { JobSnapshot, JobSubmissionOptions } from "@moosky-video/core/browser";
+import type { JobSnapshot, JobSubmissionOptions } from "@vexa-video/core/browser";
 import type { NormalizedVexaVideoConfig, VexaRequestContext } from "./config.js";
 import { joinVexaUrl } from "./config.js";
 import type { VexaMediaAsset, VexaUploadOptions } from "./contracts.js";

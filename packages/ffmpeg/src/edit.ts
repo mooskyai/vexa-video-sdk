@@ -5,7 +5,7 @@ import type {
   MediaOutputResult,
   ThumbnailOptions,
   VideoOperation
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import { FfmpegProgressParser } from "./progress.js";
 import { runProcess } from "./process.js";
 import {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { JobSnapshot } from "@moosky-video/core";
-import { JobIdempotencyConflictError, isTerminalJobState } from "@moosky-video/core";
+import type { JobSnapshot } from "@vexa-video/core";
+import { JobIdempotencyConflictError, isTerminalJobState } from "@vexa-video/core";
 import {
   DistributedJobQueue,
   DistributedJobWorker,

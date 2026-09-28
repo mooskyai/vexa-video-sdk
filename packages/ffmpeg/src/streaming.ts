@@ -10,12 +10,12 @@ import type {
   StreamingPackageOptions,
   StreamingPackageResult,
   StreamingRendition
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import {
   InvalidStreamingError,
   normalizeSegmentDuration,
   resolveStreamingRenditions
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import { FfmpegProgressParser } from "./progress.js";
 import { appendVideoEncoderOptions, hardwareOptimizationMarkers, resolveHardwareAcceleration } from "./hardware.js";
 import { runProcess } from "./process.js";

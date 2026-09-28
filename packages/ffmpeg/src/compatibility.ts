@@ -4,8 +4,8 @@ import type {
   OutputContainer,
   ProbeResult,
   VideoCodec
-} from "@moosky-video/core";
-import { IncompatibleOutputError } from "@moosky-video/core";
+} from "@vexa-video/core";
+import { IncompatibleOutputError } from "@vexa-video/core";
 
 const VIDEO_BY_CONTAINER: Partial<Record<OutputContainer, readonly Exclude<VideoCodec, "copy">[]>> = {
   mp4: ["h264", "h265", "av1"],

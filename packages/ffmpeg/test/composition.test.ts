@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createVideoProjectAst, normalizeVideoProject, type ProbeResult, type VideoProjectAst } from "@moosky-video/core";
+import { createVideoProjectAst, normalizeVideoProject, type ProbeResult, type VideoProjectAst } from "@vexa-video/core";
 import { createProjectExecutionPlan } from "../src/composition.js";
 
 const probe = (source: string): ProbeResult => ({

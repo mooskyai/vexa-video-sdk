@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { runProcess } from "@moosky-video/ffmpeg";
+import { runProcess } from "@vexa-video/ffmpeg";
 import { Streaming } from "../src/streaming.js";
 
 test("Streaming packages adaptive HLS/DASH and generates preview sprites", async () => {

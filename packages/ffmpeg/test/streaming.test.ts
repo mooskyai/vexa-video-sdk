@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { ProbeResult } from "@moosky-video/core";
+import type { ProbeResult } from "@vexa-video/core";
 import { createPreviewSpritePlan, createStreamingExecutionPlan, normalizeHlsPlaylistText, previewSpriteVtt, streamingExecutionCwd } from "../src/streaming.js";
 
 const probe: ProbeResult = {

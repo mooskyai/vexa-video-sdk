@@ -8,7 +8,7 @@ import type {
   ThumbnailOptions,
   VideoCodec,
   VideoOperation
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import {
   IncompatibleOutputError,
   InvalidOperationError,
@@ -17,7 +17,7 @@ import {
   normalizeVideoOperations,
   requestedAudioCodec,
   requestedVideoCodec
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import {
   assertAudioCodecCompatible,
   assertVideoCodecCompatible,

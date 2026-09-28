@@ -9,8 +9,8 @@ import type {
   HardwareEncoderCapability,
   HardwareProviderCapability,
   HardwareVideoCodec
-} from "@moosky-video/core";
-import { HardwareAccelerationUnavailableError, InvalidOperationError, ProcessAbortedError } from "@moosky-video/core";
+} from "@vexa-video/core";
+import { HardwareAccelerationUnavailableError, InvalidOperationError, ProcessAbortedError } from "@vexa-video/core";
 import { runProcess } from "./process.js";
 
 const CPU_ENCODERS: Record<HardwareVideoCodec, string> = {

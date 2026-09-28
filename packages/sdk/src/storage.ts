@@ -29,13 +29,13 @@ import type {
   StorageTransferResult,
   StorageUploadResult,
   StorageWorkspaceOptions
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 import {
   InvalidStorageError,
   RemoteMediaRejectedError,
   StorageAdapterNotFoundError,
   StorageTransferError
-} from "@moosky-video/core";
+} from "@vexa-video/core";
 
 const DEFAULT_MAX_BYTES = 2 * 1024 * 1024 * 1024;
 const DEFAULT_MAX_REDIRECTS = 5;
