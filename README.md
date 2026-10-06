@@ -565,9 +565,13 @@ CI uses the repository's supported Node.js line and installs FFmpeg before runni
 
 ## Project direction
 
-Vexa now includes the media core, browser integrations, extension layers, CLI/service tooling, container recipes, editor foundations, hosted-render contracts, and controlled release automation. Current work is focused on platform acceptance, deployment hardening, clean-install package verification, observability, and public release readiness.
+Vexa 1.x establishes the deterministic media, timeline, storage, jobs, hardware, browser-integration, plugin, AI-adapter, and distribution foundations.
 
-See [ROADMAP.md](./ROADMAP.md) for current priorities.
+Version 2 is planned around programmable video creation: code-defined compositions, deterministic frame animation, browser playback, a local Studio experience, Node and browser rendering, reusable motion primitives, parameterized templates, and agent-friendly composition workflows. The implementation will remain native to Vexa's architecture and will reuse the existing project/planning/FFmpeg paths rather than introducing an unrelated media engine.
+
+Production scheduling, render caching, advanced GPU pipelines, professional editing, cloud-media adapters, collaboration, and larger hosted-render infrastructure are deferred to Version 3.
+
+See [ROADMAP.md](./ROADMAP.md) for the current implementation sequence and architecture links.
 
 ## Contributing
 

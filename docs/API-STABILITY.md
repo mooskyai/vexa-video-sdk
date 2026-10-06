@@ -8,7 +8,7 @@ Vexa follows Semantic Versioning for published packages and treats public TypeSc
 - **Minor** releases add backward-compatible capabilities. Before `1.0.0`, a minor release may also contain a necessary public API correction, but it must be called out prominently in release notes.
 - **Major** releases may remove or change public APIs after a documented migration path.
 
-Vexa packages are released from one repository and use a synchronized version during the pre-1.0 period. Internal package dependencies use the matching release version so a release can be reproduced from its tag.
+Vexa packages are released from one repository and currently use a synchronized public version. Internal package dependencies use the matching release version so a release can be reproduced from its tag. New Version 2 packages join the synchronized release only after their public boundary is ready to be supported under the same major-version policy.
 
 ## Stable surface
 
@@ -33,6 +33,14 @@ Serialized contracts include an explicit `schemaVersion`. A reader must reject u
 ## Browser/runtime boundaries
 
 Browser-safe packages and entry points must remain free of Node execution imports. Moving a browser-safe API to a Node-only runtime, or vice versa, is considered a breaking change.
+
+Version 2 composition, player, React-authoring, Studio-browser, and web-renderer surfaces must preserve this rule. Node-only bundling, rendering, process execution, and service code must live behind an explicit Node package or server boundary.
+
+## Version 2 composition schemas
+
+Serializable composition/project/render contracts introduced for Version 2 must carry an explicit schema version when persisted or sent across a process/network boundary.
+
+The frame/time semantics of a published composition API are public behavior. A change that reinterprets frame offsets, sequence boundaries, interpolation, default props, or serialized render inputs may require a major version even when the TypeScript shape is unchanged.
 
 ## Release verification
 

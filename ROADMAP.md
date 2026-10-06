@@ -72,28 +72,45 @@ Release preparation now includes public package metadata, explicit exports/files
 - configure the protected `npm-release` environment/trusted publisher for the canonical repository;
 - document the final supported FFmpeg baseline and platform support matrix for the first public release.
 
-## Deployment and operations
+## Version 2 — programmable video creation
 
-Planned operational improvements:
+Version 2 is the active product direction. It adds a code-defined composition layer inspired by the capability class demonstrated by projects such as Remotion, but implemented independently on top of Vexa's existing contracts.
 
-- worker heartbeat and stale-claim recovery;
-- stronger distributed retry/reconciliation behavior;
-- queue metrics and tracing hooks;
-- structured logging contracts;
-- artifact retention and cleanup policy;
-- worker capability routing for GPU/codec availability;
-- deployment recipes for containerized render workers.
+The planned sequence is:
 
-## Future media capabilities
+| Stage | Status | Focus |
+| --- | --- | --- |
+| V2.1 | **Next** | Composition contracts, registry, stills, dynamic metadata |
+| V2.2 | **Planned** | Frame/time semantics, interpolation, easing, springs, loops, deterministic random |
+| V2.3 | **Planned** | Composition scene graph and media elements |
+| V2.4 | **Planned** | Browser-safe React authoring adapter |
+| V2.5 | **Planned** | Browser player and framework-neutral playback state |
+| V2.6 | **Planned** | TypeScript/TSX bundling and composition discovery |
+| V2.7 | **Planned** | Node composition/still renderer using existing Vexa execution paths |
+| V2.8 | **Planned** | Local Vexa Studio development environment |
+| V2.9 | **Planned** | Shapes, effects, transitions, fonts, and composition captions |
+| V2.10 | **Planned** | Optional extended programmable-media integrations |
+| V2.11 | **Planned** | Browser/WebCodecs rendering with typed fallback |
+| V2.12 | **Planned** | Parameterized templates and validated input schemas |
+| V2.13 | **Planned** | Hosted/serverless composition rendering through existing job contracts |
+| V2.14 | **Planned** | Agent/MCP/CLI composition workflows |
+| V2.15 | **Planned** | Frame-level visual regression and runtime parity testing |
+| V2.16 | **Planned** | Version 2 release hardening |
 
-Potential later additions include:
+Detailed scope and acceptance:
 
-- richer text/layout primitives;
-- hardware decode/upload paths in addition to hardware encode;
-- more streaming profiles and DRM/provider integration points;
-- browser/WebCodecs execution where it is reliable and useful;
-- additional framework integrations;
-- richer provider adapters such as semantic search, transcription services, and vision models built on `@vexa-video/ai`.
+- [Version 2 implementation plan](./docs/V2_MILESTONE.md)
+- [Version 2 testing plan](./docs/V2_MILESTONE_TESTING.md)
+
+### Clean-room reference policy
+
+Remotion is a capability/product reference only. Vexa must not copy or port Remotion source, tests, fixtures, or internal implementation. New APIs, schemas, tests, assets, and runtime design must be Vexa-owned and fit the package boundaries documented in this repository.
+
+## Version 3 — production media platform
+
+The operational/platform work previously considered next is moved behind the Version 2 programmable-composition foundation. Version 3 includes worker hardening, capability-aware scheduling, incremental render caching, advanced hardware pipelines, professional editor semantics, advanced preview/proxy workflows, AI editing, first-party cloud media adapters, streaming expansion, project-format evolution, collaboration, and hosted-render infrastructure.
+
+See [Version 3 implementation plan](./docs/V3_MILESTONE.md).
 
 ## Quality gate for every feature area
 
@@ -107,4 +124,4 @@ A feature is not considered ready until it has:
 - documentation and examples;
 - no regression in `npm run verify`.
 
-For the detailed acceptance matrix, see [docs/MILESTONE-TESTING.md](./docs/MILESTONE-TESTING.md).
+For the existing 1.x acceptance matrix, see [docs/MILESTONE-TESTING.md](./docs/MILESTONE-TESTING.md). Version 2 work additionally follows [docs/V2_MILESTONE_TESTING.md](./docs/V2_MILESTONE_TESTING.md).

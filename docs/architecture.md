@@ -107,6 +107,58 @@ single FFmpeg filter_complex where practical
 
 Keyframes are clip-relative and support linear, hold, ease-in, ease-out, and ease-in-out interpolation. Advanced transitions have explicit eligibility rules; invalid layouts fail during planning instead of being silently approximated.
 
+## Version 2 programmable composition layer
+
+Version 2 adds a programmable authoring/runtime layer above the existing project and media model.
+
+The intended boundary is:
+
+```text
+TypeScript / React / agent-authored composition
+                    |
+                    v
+       browser-safe composition runtime
+                    |
+          normalized scene/frame intent
+                    |
+          +---------+----------+
+          |                    |
+          v                    v
+ browser player/preview   Node composition renderer
+          |                    |
+          |                    v
+          |            existing Vexa SDK/project
+          |                    |
+          +--------------------+
+                    |
+                    v
+          planning / FFmpeg / storage
+```
+
+The composition runtime owns deterministic frame/time semantics, composition metadata, sequences, animation math, input props, and browser-safe scene intent. It must not own Node process execution.
+
+Likely Version 2 runtime boundaries are:
+
+| Surface | Runtime | Rule |
+| --- | --- | --- |
+| composition contracts/runtime | shared/browser-safe | No Node, FFmpeg, Redis, or filesystem execution imports |
+| React authoring adapter | browser/shared | React maps authoring components into Vexa composition semantics |
+| player | browser | Playback/preview only; no Node SDK runtime import |
+| bundler | Node/development | Builds browser-executable composition bundles |
+| renderer | Node | Reuses `@vexa-video/sdk`, storage, hardware, cancellation, progress, and FFmpeg execution |
+| Studio UI | browser | Reuses player/editor state; Node work goes through a development host |
+| web renderer | browser | Optional Canvas/WebCodecs backend with capability detection and typed fallback |
+
+Whenever a composition can be represented by `VideoProjectAst`, it should lower into that existing model so timeline rendering, captions, storage, hardware selection, and execution planning retain one source of media semantics.
+
+Browser-rendered or DOM/canvas compositions that cannot be lowered cleanly may use a dedicated frame-render backend, but final encoding/process behavior must still reuse shared codec/error/progress contracts where practical.
+
+### Independent implementation requirement
+
+Remotion is used only as a public capability reference for Version 2 planning. Vexa must not copy or port its source code, internal tests, fixtures, or implementation details. Vexa's composition contracts, package boundaries, tests, assets, and rendering integration must be designed independently around this repository's existing architecture.
+
+See `V2_MILESTONE.md` and `V2_MILESTONE_TESTING.md` for the implementation and acceptance sequence.
+
 ## Audio execution
 
 Audio uses its own immutable pipeline so audio-first workflows do not need a video wrapper.
