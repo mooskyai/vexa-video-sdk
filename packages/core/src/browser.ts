@@ -97,3 +97,19 @@ export type {
   HostedRenderWaitOptions,
   HostedRenderAdapter
 } from "./hosted.js";
+
+export type {
+  JsonObject,
+  JsonPrimitive,
+  JsonValue,
+  ProgrammableCompositionDimensions,
+  ProgrammableCompositionErrorCode,
+  ProgrammableCompositionKind,
+  ProgrammableCompositionSchemaVersion,
+  ProgrammableCompositionStaticMetadata,
+  ResolvedProgrammableComposition,
+  ResolvedProgrammableCompositionMetadata,
+  StillProgrammableCompositionMetadata,
+  VideoProgrammableCompositionMetadata,
+  VideoProgrammableCompositionTiming
+} from "./programmable-composition.js";

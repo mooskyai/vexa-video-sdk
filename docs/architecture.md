@@ -111,6 +111,10 @@ Keyframes are clip-relative and support linear, hold, ease-in, ease-out, and eas
 
 Version 2 adds a programmable authoring/runtime layer above the existing project and media model.
 
+The first implementation slice lives in `@vexa-video/core`. It introduces `defineComposition()`, `defineStill()`, JSON-safe default/input props, runtime prop validation hooks, sync/async dynamic metadata calculation, deterministic static metadata serialization, and `ProgrammableCompositionRegistry`. The registry discovers definitions in stable ID order and rejects duplicate IDs before any render work begins.
+
+Only serializable programmable-composition metadata types are exposed through `@vexa-video/core/browser`; authoring/runtime functions stay on the normal core surface. This keeps the browser-service boundary explicit while later React/player packages can still depend on the shared backend-neutral contracts.
+
 The intended boundary is:
 
 ```text

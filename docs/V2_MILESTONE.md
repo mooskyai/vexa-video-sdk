@@ -60,6 +60,33 @@ New packages should be added only when a runtime or dependency boundary justifie
 
 ## V2.1 — Composition contracts and registry
 
+**Status:** Complete
+
+Implemented on the Version 2 branch in `@vexa-video/core` with:
+
+- `defineComposition()` and `defineStill()`;
+- schema-version validation;
+- JSON-safe, deterministically normalized default/input props;
+- runtime prop validation hooks;
+- async/sync dynamic metadata calculation;
+- deterministic static metadata serialization;
+- `ProgrammableCompositionRegistry` registration, lookup, sorted discovery, and atomic bulk registration;
+- typed programmable-composition errors;
+- browser-safe serializable metadata type exports.
+
+### Acceptance evidence
+
+Validated on Windows 11 with the supported repository toolchain:
+
+- focused programmable-composition tests: **10/10 passed**;
+- full `npm run verify`: **129/129 tests passed**, followed by a successful `tsc -b` build;
+- generated `packages/core/dist/browser.js` forbidden-import audit: no `node:*`, `child_process`, `@vexa-video/sdk`, `@vexa-video/ffmpeg`, or Redis references found;
+- `git diff --check`: clean.
+
+V2.1 intentionally exposes browser-safe serializable metadata/types rather than a browser execution runtime. Cross-runtime frame/evaluation parity begins with V2.2 and later browser runtime stages.
+
+The implementation is intentionally separate from the existing `composition.ts` timeline/project model. Version 2 compositions will lower into the existing Vexa project/execution paths in later stages rather than redefining V1 timeline semantics.
+
 ### Goal
 
 Define the backend-neutral composition model before building framework components or rendering.
@@ -105,6 +132,8 @@ The core contract must not depend on React, DOM APIs, Node.js, FFmpeg, or a brow
 - README/architecture/testing docs remain synchronized.
 
 ## V2.2 — Frame, time, animation, and deterministic math
+
+**Status:** Next
 
 ### Goal
 

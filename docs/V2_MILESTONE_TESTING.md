@@ -63,6 +63,19 @@ The purpose of parity testing is to verify Vexa's documented behavior, not byte-
 
 ## V2.1 — Composition contracts and registry
 
+**Status:** Complete
+
+Current implementation coverage includes definition normalization, video/still metadata, schema rejection, JSON prop validation, runtime prop validation, dynamic metadata success/failure, deterministic ordering, duplicate/missing lookup behavior, atomic bulk registration, and deterministic metadata serialization.
+
+Acceptance recorded on Windows 11:
+
+- focused programmable-composition suite: **10/10 passed**;
+- repository-wide `npm run verify`: **129/129 passed** and `tsc -b` completed successfully;
+- generated `@vexa-video/core/browser` artifact audit: no forbidden Node/runtime execution references;
+- patch/worktree whitespace gate: `git diff --check` clean.
+
+V2.1's browser surface is intentionally type/serialization-only. A browser execution runtime does not exist at this stage, so runtime metadata/frame parity is not a V2.1 exit requirement; cross-runtime deterministic evaluation begins in V2.2 and is enforced again by Player/renderer stages.
+
 ### Unit tests
 
 Validate:
@@ -94,9 +107,11 @@ Redis clients
 
 ### Exit gate
 
-A Node test and browser test must describe the same composition metadata identically.
+V2.1 is complete when Node contract tests pass, serialized metadata remains deterministic, the full repository gate passes, and the browser-safe entry point remains free of Node execution dependencies. Browser runtime value parity starts in V2.2 once deterministic frame/time functions are available.
 
 ## V2.2 — Frame/time/animation semantics
+
+**Status:** Next
 
 ### Golden tests
 

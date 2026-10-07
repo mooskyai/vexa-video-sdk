@@ -10,5 +10,6 @@ export * from "./pipeline.js";
 export * from "./streaming.js";
 export * from "./storage.js";
 export * from "./plugins.js";
+export * from "./programmable-composition.js";
 
 export * from "./hosted.js";
