@@ -6,6 +6,7 @@ import { pipeline } from "node:stream/promises";
 import { Transform } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
+import { handleBundlerPlaygroundRequest } from "./bundler-playground.mjs";
 import { Audio, Captions, Hardware, JobQueue, Storage, Streaming, Video, VideoProject, VideoSdkError } from "../../packages/sdk/dist/index.js";
 
 const host = "127.0.0.1";
@@ -1122,6 +1123,11 @@ async function serveBrowserPackage(res, requestPath, method) {
 
 async function route(req, res) {
   const url = new URL(req.url ?? "/", `http://${host}:${port}`);
+
+  if (url.pathname.startsWith("/api/compositions/")) {
+    const handled = await handleBundlerPlaygroundRequest(req, res, { repositoryRoot, workspaceRoot, url });
+    if (handled) return;
+  }
 
   if (req.method === "POST" && url.pathname === "/api/jobs/render") {
     await handleJobSubmit(req, res);

@@ -394,6 +394,38 @@ The state machine should be framework-neutral where practical so Angular and fut
 
 ## V2.6 — Composition bundling and discovery
 
+**Status:** Complete
+
+Implemented in the current Version 2 branch slice with:
+
+- public Node-side `@vexa-video/bundler` package using esbuild as an explicit runtime dependency;
+- browser-executable ESM output from TypeScript and TSX composition entries;
+- a browser-safe `@vexa-video/bundler/entry` helper for validated, deterministically sorted `vexaCompositions` metadata;
+- build-time composition discovery with typed failures for missing/invalid discovery exports;
+- CSS extraction, fingerprinted local assets, copied public/static assets, and dynamic-import chunk splitting;
+- development/production modes and explicit none/external/inline source-map behavior;
+- environment allowlisting that replaces `process.env` and `import.meta.env` with only approved values;
+- schema-versioned deterministic `vexa.bundle.json` manifests with portable relative paths and SHA-256/byte metadata;
+- Windows path normalization helpers covering drive letters, backslashes, spaces, and deeply nested paths;
+- staging-directory output so a failed build does not replace the previous successful bundle;
+- typed/sanitized diagnostics that report project-relative source locations instead of machine-specific paths.
+
+Bundling/discovery executes trusted application code in the local Node build environment and is not a sandbox. Hosted use with untrusted code still requires process/container isolation.
+
+### Acceptance evidence
+
+Validated on Windows 11 with the supported repository toolchain:
+
+- focused bundler/discovery suite: **14/14 passed**;
+- full `npm run verify`: **204/204 tests passed**, followed by a successful `tsc -b` build;
+- real Vexa-owned fixtures exercised TypeScript, TSX, CSS, fingerprinted assets, public assets, dynamic imports, source-map modes, environment allowlisting, deterministic manifests/discovery, malformed-source diagnostics, and portable Windows path handling;
+- generated `packages/bundler/dist/entry.js` audit found no `node:*`, `child_process`, `@vexa-video/sdk`, `@vexa-video/ffmpeg`, or Redis references;
+- `npm run release:check`: all **10** public packages reported release-ready;
+- `npm run release:pack`: succeeded and included the bundler runtime, browser-safe entry helper, declarations, maps, README, and package manifest;
+- repository reference-hygiene scan returned no removed external-product references.
+
+V2.7 is the next implementation target.
+
 ### Goal
 
 Produce a browser-executable composition bundle for Studio and frame rendering.

@@ -1,0 +1,50 @@
+{
+  "name": "@vexa-video/bundler",
+  "version": "1.0.0",
+  "type": "module",
+  "private": false,
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./entry": {
+      "types": "./dist/entry.d.ts",
+      "import": "./dist/entry.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.map"
+  ],
+  "dependencies": {
+    "esbuild": "0.28.2"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "description": "Node.js composition bundling, deterministic manifests, and discovery tooling for Vexa programmable video.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mooskyai/vexa-video-sdk.git"
+  },
+  "homepage": "https://github.com/mooskyai/vexa-video-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/mooskyai/vexa-video-sdk/issues"
+  },
+  "keywords": [
+    "video",
+    "bundler",
+    "typescript",
+    "tsx",
+    "esbuild",
+    "vexa"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

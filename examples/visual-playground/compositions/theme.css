@@ -1,0 +1,7 @@
+:root {
+  --vexa-bundle-fixture-accent: #4f9cff;
+}
+
+.vexa-bundle-fixture {
+  color: var(--vexa-bundle-fixture-accent);
+}

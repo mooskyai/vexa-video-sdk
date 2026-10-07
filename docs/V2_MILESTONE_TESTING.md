@@ -294,6 +294,12 @@ Run on Chromium and Windows Edge.
 
 ## V2.6 — Bundler and composition discovery
 
+**Status:** Complete
+
+The focused V2.6 suite covers descriptor validation/sorting, TypeScript and TSX entry bundling, CSS and fingerprinted local assets, public/static copying, dynamic-import chunks, explicit source-map modes, environment filtering, deterministic production manifests, repeatable composition discovery, typed malformed-source diagnostics, and portable Windows path behavior.
+
+Acceptance recorded on Windows 11: focused bundler suite **14/14 passed**; full `npm run verify` **204/204 passed** with a successful TypeScript build; environment filtering, deterministic bundle/manifest generation, TS/TSX, CSS/assets, public assets, dynamic imports, source maps, malformed-source diagnostics, and Windows path behavior all passed through real Vexa-owned fixtures; generated `dist/entry.js` remained free of forbidden Node/SDK/FFmpeg/Redis imports; `release:check` reported **10** packages ready; and `release:pack` succeeded including `@vexa-video/bundler`.
+
 ### Fixtures
 
 Create Vexa-owned fixture projects for:

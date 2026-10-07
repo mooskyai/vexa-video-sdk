@@ -20,6 +20,7 @@ The architecture has four primary goals:
 | `@vexa-video/sdk` | Node.js | Developer-facing media APIs, storage, jobs, workers, hardware, and plugin host |
 | `@vexa-video/angular` | Browser | Angular DI, uploads, render clients, Signals/RxJS state, preview helpers |
 | `@vexa-video/ai` | Node.js (optional) | Provider-neutral transcription/tracking/highlight adapters plus deterministic AI-assisted planning helpers |
+| `@vexa-video/bundler` | Node.js development/build | TypeScript/TSX composition bundling, deterministic discovery/manifests, CSS/assets, source maps, and environment filtering |
 
 A browser-safe subpath, `@vexa-video/core/browser`, exposes serializable TypeScript contracts without exposing Node execution classes.
 
@@ -120,6 +121,8 @@ The third slice adds the normalized programmable scene graph. Groups/layers esta
 The fourth slice adds `@vexa-video/react` as a browser/shared authoring adapter. React components collect the same programmable-scene nodes used by non-React callers, while hooks derive frame/config/props from explicit shared runtime context. Sequence, series, loop, and freeze components delegate their timing math to `@vexa-video/core/browser`. A render-readiness controller tracks asynchronous authoring work without introducing player, bundler, SDK, or FFmpeg responsibilities into the React package.
 
 The fifth slice adds `@vexa-video/player` as a browser-safe, framework-neutral playback package. Its deterministic controller owns frame progression, seek/step/end/loop rules, volume/mute, rate, buffering, poster-frame state, resize math, errors, and typed events. A thin DOM host maps that state to requestAnimationFrame scheduling, ResizeObserver layout, fullscreen capability, and accessible native controls; React, Angular, and future adapters can bind the same controller rather than defining framework-specific playback semantics.
+
+The sixth slice adds `@vexa-video/bundler` as explicit Node-side development/build tooling. It uses an exported `vexaCompositions` metadata contract to discover compositions in stable ID order, emits browser ESM from TypeScript/TSX, extracts CSS, fingerprints imported assets, copies public assets, preserves dynamic-import chunking/source maps, and writes a schema-versioned deterministic bundle manifest. Only allowlisted environment values are embedded. Bundling/discovery is not a security sandbox; hosted processing of untrusted source must isolate the Node build process.
 
 `@vexa-video/core/browser` exposes serializable programmable-composition metadata plus pure composition definition/resolution, timing, and scene runtimes. Composition definition/registry authoring remains on the normal core surface. The browser entry must remain free of Node execution, FFmpeg, Redis, filesystem, and SDK runtime imports so future React/player packages can evaluate the same scene/timing semantics directly.
 

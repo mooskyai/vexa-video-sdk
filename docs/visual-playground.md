@@ -48,13 +48,20 @@ The UI provides one place to exercise the public media features:
 - hardware detection and benchmark diagnostics;
 - background render jobs;
 - generated-output playback and download links;
-- the framework-neutral programmable Player workspace, including play/pause, frame stepping, seeking, looping, playback rate, volume/mute, responsive fit modes, buffering state, fullscreen, live state, and typed player events.
+- the framework-neutral programmable Player workspace, including play/pause, frame stepping, seeking, looping, playback rate, volume/mute, responsive fit modes, buffering state, fullscreen, live state, and typed player events;
+- the V2 composition Bundles workspace, including deterministic composition discovery, development/production builds, source-map modes, emitted CSS/assets/chunks/public files, manifest inspection, and sanitized bundler failures.
 
 ## Programmable player
 
 Select **Player** from the left rail or the preview tabs in the normal playground at `http://127.0.0.1:4173/`. Player mode is part of the existing playground workspace: it hides unrelated media-editing inspector/timeline controls and gives playback, display, live-state, and event diagnostics their own focused layout. No separate demo URL is required.
 
-The visual surface is a deterministic acceptance composition driven by `@vexa-video/player`; it is not a second rendering engine. Use it to verify controller behavior and browser integration while V2.6/V2.7 add composition discovery and rendering paths.
+The visual surface is a deterministic acceptance composition driven by `@vexa-video/player`; it is not a second rendering engine. Use it to verify controller behavior and browser integration while later rendering stages connect real bundled compositions to frame/video output.
+
+## Composition bundles
+
+Select **Bundles** from the left rail or **Compositions** from the preview tabs. This workspace exercises the real Node-side `@vexa-video/bundler` against the Vexa-owned fixture under `examples/visual-playground/compositions/`.
+
+Use **Discover** to verify stable composition ordering and metadata. Use **Build bundle** to switch between development/production output and none/external/inline source maps, then inspect the schema-versioned manifest, emitted JavaScript/CSS, dynamic-import chunks, fingerprinted assets, copied public files, byte sizes, and SHA-256 metadata. The playground uses a fixed repository fixture and fixed environment allowlist; it does not accept arbitrary local source paths or expose environment values.
 
 ## Media library
 

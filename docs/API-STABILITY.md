@@ -40,6 +40,8 @@ Version 2 composition, player, React-authoring, Studio-browser, and web-renderer
 
 `@vexa-video/player` is a public browser-safe playback surface. Frame clamping, seek rounding, end/loop behavior, playback-rate progression, buffering, poster-frame presentation, volume/mute, responsive fit math, typed event ordering, and controller disposal semantics are public behavior. Browser DOM scheduling/fullscreen integration must remain an adapter over that deterministic controller rather than a second playback state machine.
 
+`@vexa-video/bundler` is a public Node-side build-tool surface. Bundle-manifest schema/version fields, portable path normalization, composition discovery ordering, environment allowlisting, public-asset collision behavior, and documented bundler error codes are public behavior. The `@vexa-video/bundler/entry` subpath is browser-safe metadata authoring support and must not acquire Node execution imports.
+
 ## Version 2 composition schemas
 
 Serializable composition/project/render contracts introduced for Version 2 must carry an explicit schema version when persisted or sent across a process/network boundary. The programmable-scene schema is part of that contract: node kinds, asset-source shapes, timing/z-order semantics, and deterministic serialization/lowering behavior must not be reinterpreted without an appropriate schema or major-version change.

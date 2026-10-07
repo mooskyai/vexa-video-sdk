@@ -9,7 +9,7 @@ A typed, modular media-processing SDK for Node.js and TypeScript.
 
 Vexa provides high-level APIs for video editing, timeline composition, audio processing, captions, adaptive streaming, hardware-accelerated encoding, remote media, background jobs, and browser-safe Angular integration while keeping FFmpeg behind a backend-neutral API.
 
-> **Project status:** active development. The seven public SDK packages are versioned together at 1.0.0; example workspaces remain private.
+> **Project status:** active development. The ten public packages are versioned together at 1.0.0; example workspaces remain private.
 
 ## Why Vexa?
 
@@ -45,6 +45,9 @@ Vexa keeps those concerns behind a typed SDK:
 | CLI | Probe, plan, render, hardware inspection, and adaptive streaming from the terminal |
 | Browser editor foundation | Framework-neutral timeline state, snapping, clip edits, viewport state, undo/redo |
 | Hosted rendering | Provider-neutral submit/get/cancel contract for cloud or hosted render services |
+| Programmable authoring | Deterministic composition metadata, frame/time math, scene graphs, and React authoring primitives |
+| Browser player | Framework-neutral playback state, seek/step/loop/rate/buffering, responsive host, events, and fullscreen |
+| Composition bundling | TypeScript/TSX browser bundles, CSS/assets, deterministic manifests/discovery, source maps, and environment allowlists |
 
 ## Requirements
 
@@ -496,7 +499,7 @@ Open:
 http://127.0.0.1:4173
 ```
 
-It exercises uploads, video edits, timeline composition, audio, captions, streaming, hardware selection, remote media, background jobs, progress, cancellation, and generated outputs. The playground uses a compact desktop-editor layout with a focused clip inspector, dense timeline, predictable truncation/wrapping, and an overlay control drawer for project/audio/captions/streaming/GPU/job settings so the preview canvas keeps more working space.
+It exercises uploads, video edits, timeline composition, audio, captions, streaming, hardware selection, remote media, background jobs, progress, cancellation, generated outputs, the first-class programmable Player workspace, and the V2 composition Bundles workspace. The playground uses a compact desktop-editor layout with a focused clip inspector, dense timeline, predictable truncation/wrapping, and an overlay control drawer for project/audio/captions/streaming/GPU/job settings so the preview canvas keeps more working space.
 
 See [docs/visual-playground.md](./docs/visual-playground.md).
 
@@ -512,6 +515,7 @@ See [docs/visual-playground.md](./docs/visual-playground.md).
 | `@vexa-video/editor` | Browser-safe, framework-neutral timeline-editor state/history foundations |
 | `@vexa-video/react` | Browser-safe React authoring adapter for programmable compositions, timing scopes, and scene/media components |
 | `@vexa-video/player` | Browser-safe framework-neutral playback controller, responsive DOM host, controls, events, and fullscreen integration |
+| `@vexa-video/bundler` | Node-side TypeScript/TSX composition bundling, deterministic manifests/discovery, CSS/assets, source maps, and environment filtering |
 | `@vexa-video/cli` | Node.js command-line interface for probing, planning, rendering, hardware, and streaming |
 
 ## Architecture

@@ -9,6 +9,7 @@ const releasePackages = [
   "packages/editor",
   "packages/react",
   "packages/player",
+  "packages/bundler",
   "packages/cli"
 ];
 

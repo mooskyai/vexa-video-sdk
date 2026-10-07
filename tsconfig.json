@@ -35,6 +35,9 @@
       "path": "./packages/player"
     },
     {
+      "path": "./packages/bundler"
+    },
+    {
       "path": "./packages/cli"
     },
     {
