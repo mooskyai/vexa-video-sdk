@@ -7,6 +7,7 @@ const releasePackages = [
   "packages/angular",
   "packages/ai",
   "packages/editor",
+  "packages/react",
   "packages/cli"
 ];
 

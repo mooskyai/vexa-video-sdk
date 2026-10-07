@@ -203,6 +203,21 @@ Assert duration, dimensions, audio presence, and expected visual checkpoints.
 
 ## V2.4 — React authoring adapter
 
+**Status:** Complete
+
+The implementation includes React authoring coverage for registration/cleanup, core-resolved props, frame/config hooks, nested sequence/series timing, loop/freeze semantics, media scene mapping, asset helpers, render-ready lifecycle and cleanup, invalid hook use, preview/render timing parity, and browser-package boundary enforcement.
+
+### Acceptance evidence
+
+- full repository test gate: **173/173 passed** and `tsc -b` completed successfully;
+- generated `packages/react/dist/index.js` and `packages/core/dist/browser.js` forbidden-import audits: clean;
+- deterministic preview/render compatibility vector: passed;
+- release metadata check: all **8** public packages ready;
+- dry-run package packing: successful, including `@vexa-video/react` runtime and declaration artifacts;
+- npm-generated lockfile update is part of V2.4 and must be committed with the package.
+
+React 19 emits a deprecation warning for `react-test-renderer`; the warning does not fail the suite but should be tracked as test-infrastructure migration work. `npm install` also reported dependency audit/install-script warnings that need separate security review before public release.
+
 ### Browser dependency audit
 
 Build/package inspection must prove no runtime import of:

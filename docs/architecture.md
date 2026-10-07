@@ -117,7 +117,9 @@ The second slice adds a pure programmable-timing runtime in the same shared pack
 
 The third slice adds the normalized programmable scene graph. Groups/layers establish parent-relative timing, transforms, opacity, and z-order; leaf intent covers fills, solids, text, image, video, audio, and serializable SVG/canvas surface registrations. Assets use static references or the existing Vexa storage-source contracts, with preload/readiness state and explicit policy gates. A deterministic flattening step produces stable scene render items, and the representable subset lowers into `VideoProjectAst`; unsupported crop/playback/surface/frame-render behavior fails with typed errors instead of leaking FFmpeg details or being silently approximated.
 
-`@vexa-video/core/browser` exposes serializable programmable-composition metadata plus the pure timing and scene runtimes. Composition definition/registry authoring remains on the normal core surface. The browser entry must remain free of Node execution, FFmpeg, Redis, filesystem, and SDK runtime imports so future React/player packages can evaluate the same scene/timing semantics directly.
+The fourth slice adds `@vexa-video/react` as a browser/shared authoring adapter. React components collect the same programmable-scene nodes used by non-React callers, while hooks derive frame/config/props from explicit shared runtime context. Sequence, series, loop, and freeze components delegate their timing math to `@vexa-video/core/browser`. A render-readiness controller tracks asynchronous authoring work without introducing player, bundler, SDK, or FFmpeg responsibilities into the React package.
+
+`@vexa-video/core/browser` exposes serializable programmable-composition metadata plus pure composition definition/resolution, timing, and scene runtimes. Composition definition/registry authoring remains on the normal core surface. The browser entry must remain free of Node execution, FFmpeg, Redis, filesystem, and SDK runtime imports so future React/player packages can evaluate the same scene/timing semantics directly.
 
 The intended boundary is:
 

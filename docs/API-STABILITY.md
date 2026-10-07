@@ -36,6 +36,8 @@ Browser-safe packages and entry points must remain free of Node execution import
 
 Version 2 composition, player, React-authoring, Studio-browser, and web-renderer surfaces must preserve this rule. Node-only bundling, rendering, process execution, and service code must live behind an explicit Node package or server boundary.
 
+`@vexa-video/react` is a public authoring adapter over `@vexa-video/core/browser`. Its frame/config/props hooks, sequence/series/loop/freeze timing behavior, scene-component prop mapping, registration lifecycle, and render-readiness semantics are public behavior. React-specific authoring must not reinterpret the underlying core timing or scene contracts.
+
 ## Version 2 composition schemas
 
 Serializable composition/project/render contracts introduced for Version 2 must carry an explicit schema version when persisted or sent across a process/network boundary. The programmable-scene schema is part of that contract: node kinds, asset-source shapes, timing/z-order semantics, and deterministic serialization/lowering behavior must not be reinterpreted without an appropriate schema or major-version change.

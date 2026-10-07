@@ -29,6 +29,9 @@
       "path": "./packages/editor"
     },
     {
+      "path": "./packages/react"
+    },
+    {
       "path": "./packages/cli"
     },
     {

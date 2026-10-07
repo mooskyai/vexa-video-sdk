@@ -275,6 +275,38 @@ A new execution path is justified only when a frame-rendered browser/DOM composi
 
 ## V2.4 — React authoring adapter
 
+**Status:** Complete
+
+Implemented in the current Version 2 branch slice with:
+
+- public `@vexa-video/react` package with React as a peer dependency and `@vexa-video/core` as its only Vexa runtime dependency;
+- React composition registration and deterministic sorted discovery around core programmable-composition definitions;
+- frame, absolute-frame, resolved composition-config, and input-props hooks;
+- sequence, series, loop, and freeze timing scopes backed by the shared core timing runtime;
+- group/layer/fill/solid/text/image/video/audio/surface authoring components that emit the shared programmable-scene model;
+- static/storage asset helpers that preserve core asset-policy semantics;
+- render-readiness controller plus delay/resume hooks with unmount cleanup for asynchronous authoring work;
+- browser-safe composition definition/resolution exports from `@vexa-video/core/browser` so framework code does not import the Node-oriented core entry point;
+- release/build wiring for the new public workspace.
+
+The adapter does not own player state, bundling, Node rendering, or FFmpeg execution. Those remain in their later Version 2 runtime boundaries.
+
+### Acceptance evidence
+
+Validated on Windows 11 with the supported repository toolchain:
+
+- React authoring tests pass as part of the full repository suite, including registration/cleanup, resolved props, frame/config hooks, nested sequence/series timing, loop/freeze semantics, media-to-scene mapping, asset helpers, render-ready lifecycle, invalid-hook behavior, preview/render parity, and package source boundary checks;
+- full `npm run verify`: **173/173 tests passed**, followed by a successful `tsc -b` build;
+- generated `packages/react/dist/index.js` and `packages/core/dist/browser.js` forbidden-import audits found no `node:*`, `child_process`, `@vexa-video/sdk`, `@vexa-video/ffmpeg`, or Redis references;
+- `npm run release:check`: all **8** public packages reported release-ready;
+- `npm run release:pack`: succeeded and included the `@vexa-video/react` runtime, declarations, maps, README, and package manifest;
+- the deterministic compatibility test confirms preview and render consumers observe identical timing and scene values for the same React composition;
+- `git diff --check`: clean apart from Git's Windows line-ending notice for the npm-generated lockfile.
+
+React 19 reports `react-test-renderer` as deprecated during tests; this is non-failing test-infrastructure debt and should be replaced before it becomes incompatible. `npm install` also reported audit advisories and unapproved install-script notices; those require separate dependency/security review and are not attributed to V2.4 without an `npm audit` dependency trace.
+
+V2.5 is the next implementation target.
+
 ### Goal
 
 Offer React-based code authoring while keeping React outside the deterministic media core.

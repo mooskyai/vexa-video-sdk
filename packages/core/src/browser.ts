@@ -98,19 +98,42 @@ export type {
   HostedRenderAdapter
 } from "./hosted.js";
 
+export {
+  defineComposition,
+  defineStill,
+  getProgrammableCompositionStaticMetadata,
+  InvalidProgrammableCompositionError,
+  InvalidProgrammableCompositionPropsError,
+  ProgrammableCompositionConflictError,
+  ProgrammableCompositionMetadataError,
+  ProgrammableCompositionNotFoundError,
+  ProgrammableCompositionRegistry,
+  resolveProgrammableComposition,
+  serializeProgrammableCompositionMetadata
+} from "./programmable-composition.js";
 export type {
+  DefineProgrammableCompositionOptions,
+  DefineProgrammableStillOptions,
   JsonObject,
   JsonPrimitive,
   JsonValue,
+  ProgrammableCompositionDefinition,
   ProgrammableCompositionDimensions,
   ProgrammableCompositionErrorCode,
   ProgrammableCompositionKind,
+  ProgrammableCompositionMetadataCalculator,
+  ProgrammableCompositionMetadataContext,
+  ProgrammableCompositionPropsValidator,
   ProgrammableCompositionSchemaVersion,
   ProgrammableCompositionStaticMetadata,
   ResolvedProgrammableComposition,
   ResolvedProgrammableCompositionMetadata,
+  StillProgrammableCompositionDefinition,
   StillProgrammableCompositionMetadata,
+  StillProgrammableCompositionMetadataOverride,
+  VideoProgrammableCompositionDefinition,
   VideoProgrammableCompositionMetadata,
+  VideoProgrammableCompositionMetadataOverride,
   VideoProgrammableCompositionTiming
 } from "./programmable-composition.js";
 
