@@ -82,8 +82,8 @@ The planned sequence is:
 | --- | --- | --- |
 | V2.1 | **Complete** | Composition contracts, registry, stills, dynamic metadata |
 | V2.2 | **Complete** | Frame/time semantics, interpolation, easing, springs, loops, deterministic random |
-| V2.3 | **Next** | Composition scene graph and media elements |
-| V2.4 | **Planned** | Browser-safe React authoring adapter |
+| V2.3 | **Complete** | Composition scene graph and media elements |
+| V2.4 | **Next** | Browser-safe React authoring adapter |
 | V2.5 | **Planned** | Browser player and framework-neutral playback state |
 | V2.6 | **Planned** | TypeScript/TSX bundling and composition discovery |
 | V2.7 | **Planned** | Node composition/still renderer using existing Vexa execution paths |
@@ -97,7 +97,7 @@ The planned sequence is:
 | V2.15 | **Planned** | Frame-level visual regression and runtime parity testing |
 | V2.16 | **Planned** | Version 2 release hardening |
 
-V2.1 and V2.2 are complete on the Version 2 branch. V2.2 acceptance evidence: the focused deterministic-timing suite passes **13/13** tests, the full repository gate passes **142/142** tests followed by a successful TypeScript build, the generated `@vexa-video/core/browser` artifact contains no forbidden Node/SDK/FFmpeg/Redis runtime references, and the real Microsoft Edge browser parity fixture reports `VEXA_TIMING_PARITY_PASS`. V2.3 is now the active implementation target.
+V2.1 through V2.3 are complete on the Version 2 branch. V2.3 acceptance evidence: the focused scene-graph suite passes **17/17** tests including explicit zero-coordinate lowering, the real SDK/FFmpeg scene-render integration passes **1/1**, the full repository gate passes **160/160** tests followed by a successful TypeScript build, browser/runtime forbidden-import audits are clean, `release:check` reports all seven public packages ready, and `release:pack` succeeds with the programmable-scene artifacts included. V2.4 is now the active implementation target.
 
 Detailed scope and acceptance:
 

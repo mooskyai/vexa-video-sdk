@@ -12,5 +12,6 @@ export * from "./storage.js";
 export * from "./plugins.js";
 export * from "./programmable-composition.js";
 export * from "./programmable-timing.js";
+export * from "./programmable-scene.js";
 
 export * from "./hosted.js";

@@ -38,9 +38,9 @@ Version 2 composition, player, React-authoring, Studio-browser, and web-renderer
 
 ## Version 2 composition schemas
 
-Serializable composition/project/render contracts introduced for Version 2 must carry an explicit schema version when persisted or sent across a process/network boundary.
+Serializable composition/project/render contracts introduced for Version 2 must carry an explicit schema version when persisted or sent across a process/network boundary. The programmable-scene schema is part of that contract: node kinds, asset-source shapes, timing/z-order semantics, and deterministic serialization/lowering behavior must not be reinterpreted without an appropriate schema or major-version change.
 
-The frame/time semantics of a published composition API are public behavior. A change that reinterprets frame offsets, sequence boundaries, interpolation, default props, or serialized render inputs may require a major version even when the TypeScript shape is unchanged.
+The frame/time semantics of a published composition API are public behavior. A change that reinterprets frame offsets, sequence boundaries, interpolation, default props, scene transforms/z-order, asset references, or serialized render inputs may require a major version even when the TypeScript shape is unchanged.
 
 ## Release verification
 

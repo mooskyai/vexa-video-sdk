@@ -201,7 +201,35 @@ const opacity = interpolate(frame, [0, 30], [0, 1], {
 
 ## V2.3 — Composition scene graph and media elements
 
-**Status:** Next
+**Status:** Complete
+
+Implemented in the current Version 2 branch slice with:
+
+- schema-versioned, browser-safe programmable scene contracts;
+- nested `group`/`layer` containers plus fill, solid, text, image, video, audio, and serializable SVG/canvas surface intent;
+- deterministic parent-relative timing, additive z-order, opacity propagation, transform chains, and stable declaration ordering;
+- asset manifests covering static paths and existing Vexa local/HTTP/object-storage references;
+- explicit asset-class policy gates plus immutable preload/readiness state;
+- crop/fit, trim, playback-rate, volume/mute, text-style, and transform validation;
+- deterministic scene serialization and flattened render-graph discovery;
+- typed `VideoProjectAst` lowering for the representable subset, with unsupported frame-render features rejected instead of approximated;
+- remote HTTP/object assets requiring SDK/storage resolution before project lowering;
+- a real SDK integration fixture that lowers and renders a Vexa-owned background/video/image/text/audio scene and checks output metadata plus visual luminance checkpoints.
+
+### Acceptance evidence
+
+Validated on Windows 11 with the supported repository toolchain:
+
+- focused programmable-scene suite: **17/17 passed**;
+- regression coverage confirms explicit `x: 0` / `y: 0` survives `VideoProjectAst` lowering instead of being reinterpreted as centered media;
+- real SDK/FFmpeg programmable-scene render integration: **1/1 passed** with background, image, video, text, and audio output checks;
+- full `npm run verify`: **160/160 tests passed**, followed by a successful `tsc -b` build;
+- generated `packages/core/dist/browser.js` and `packages/core/dist/programmable-scene.js` forbidden-import audits found no `node:*`, `child_process`, `@vexa-video/sdk`, `@vexa-video/ffmpeg`, or Redis references;
+- `npm run release:check`: all **7** public packages reported release-ready;
+- `npm run release:pack`: succeeded and included `programmable-scene` declarations/runtime artifacts in the packed core package;
+- `git diff --check`: clean before closure.
+
+V2.4 is the next implementation target.
 
 ### Goal
 

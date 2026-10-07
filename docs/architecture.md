@@ -115,7 +115,9 @@ The first implementation slice lives in `@vexa-video/core`. It introduces `defin
 
 The second slice adds a pure programmable-timing runtime in the same shared package. Frame context is explicit data rather than hidden global state: nested scopes derive local frames while preserving the root composition frame. The timing surface also owns frame/second conversion, frame ranges, numeric and color interpolation, easing, analytic spring motion, deterministic seeded random values, loop/freeze helpers, and series offsets.
 
-`@vexa-video/core/browser` exposes serializable programmable-composition metadata types plus the pure timing runtime. Composition definition/registry authoring remains on the normal core surface. The browser entry must remain free of Node execution, FFmpeg, Redis, filesystem, and SDK runtime imports so future React/player packages can evaluate the same timing semantics directly.
+The third slice adds the normalized programmable scene graph. Groups/layers establish parent-relative timing, transforms, opacity, and z-order; leaf intent covers fills, solids, text, image, video, audio, and serializable SVG/canvas surface registrations. Assets use static references or the existing Vexa storage-source contracts, with preload/readiness state and explicit policy gates. A deterministic flattening step produces stable scene render items, and the representable subset lowers into `VideoProjectAst`; unsupported crop/playback/surface/frame-render behavior fails with typed errors instead of leaking FFmpeg details or being silently approximated.
+
+`@vexa-video/core/browser` exposes serializable programmable-composition metadata plus the pure timing and scene runtimes. Composition definition/registry authoring remains on the normal core surface. The browser entry must remain free of Node execution, FFmpeg, Redis, filesystem, and SDK runtime imports so future React/player packages can evaluate the same scene/timing semantics directly.
 
 The intended boundary is:
 

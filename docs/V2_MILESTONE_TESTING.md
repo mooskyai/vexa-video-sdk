@@ -152,7 +152,20 @@ Run the same test vector multiple times and ensure output is identical.
 
 ## V2.3 — Scene graph and media elements
 
-**Status:** Next
+**Status:** Complete
+
+Focused coverage exercises deterministic asset ordering/serialization, nested timing and transforms, z-order ties, opacity propagation, crop/fit and media controls, missing/kind-mismatched assets, remote policy failures, duplicate identifiers, serializable SVG/canvas surface contracts, readiness state, `VideoProjectAst` lowering, remote-resolution requirements, typed unsupported-lowering failures, browser/core scene parity, and explicit zero-coordinate preservation.
+
+The SDK acceptance test builds Vexa-owned FFmpeg fixtures, lowers a scene containing background, video, image, text, and standalone audio through `VideoProject.fromAst()`, renders it, probes dimensions/duration/audio, and samples visual luminance regions.
+
+### Acceptance evidence
+
+- focused programmable-scene tests: **17/17 passed**;
+- real SDK/FFmpeg programmable-scene integration: **1/1 passed**;
+- full repository test gate: **160/160 passed** and `tsc -b` completed successfully;
+- browser entry and programmable-scene runtime forbidden-import audits: clean;
+- release metadata check: all **7** public packages ready;
+- dry-run package packing: successful, including programmable-scene runtime/type artifacts in `@vexa-video/core`.
 
 ### Validation tests
 

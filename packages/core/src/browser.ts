@@ -151,3 +151,5 @@ export type {
   TimingEasingFunction,
   TimingExtrapolationMode
 } from "./programmable-timing.js";
+
+export * from "./programmable-scene.js";
