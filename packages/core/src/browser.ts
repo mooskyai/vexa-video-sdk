@@ -175,4 +175,5 @@ export type {
   TimingExtrapolationMode
 } from "./programmable-timing.js";
 
+export * from "./programmable-execution.js";
 export * from "./programmable-scene.js";

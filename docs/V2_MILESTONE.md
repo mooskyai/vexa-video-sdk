@@ -455,6 +455,21 @@ Bundling user application code does not make that code trusted. Server render de
 
 ## V2.7 — Node composition renderer
 
+**Status:** In Progress
+
+The first renderer slice establishes the Node package and planning boundary before frame/video execution:
+
+- public `@vexa-video/renderer` package;
+- load deterministic `vexa.bundle.json` manifests;
+- list/select bundled compositions in stable ID order;
+- typed missing-composition, kind-mismatch, frame/range, output, and option errors;
+- still, single-frame, frame-range, and video render plans;
+- explicit exclusive-end frame ranges;
+- deterministic concurrency and timeout defaults/overrides;
+- normal Playground render-plan controls tied to the selected bundled composition.
+
+The execution boundary now loads `vexaExecutableCompositions`, resolves input props and dynamic metadata, materializes unresolved programmable-scene storage assets through Vexa `Storage`, lowers representable scenes into `VideoProjectAst`, and produces real still/single-frame PNG/JPEG/WebP output. It also materializes `[startFrame, endFrameExclusive)` image ranges with bounded concurrency and encodes MP4/WebM ranges by trimming the final composed video graph at exact frame indices while trimming audio by equivalent frame-derived seconds. Execution controls reuse Vexa hardware detection/selection, normalized FFmpeg progress, `AbortSignal` cancellation, and process timeouts with renderer-specific typed errors. Storage assets share one managed render workspace and are cleaned after all workers settle on success or failure; explicit `resolvedAssets` remain available for already-materialized inputs. Durable job orchestration remains outside the synchronous renderer surface.
+
 ### Goal
 
 Render a composition or still from Node while reusing existing Vexa infrastructure.

@@ -1,0 +1,48 @@
+{
+  "name": "@vexa-video/renderer",
+  "version": "1.0.0",
+  "type": "module",
+  "private": false,
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.map"
+  ],
+  "dependencies": {
+    "@vexa-video/bundler": "1.0.0",
+    "@vexa-video/core": "1.0.0",
+    "@vexa-video/ffmpeg": "1.0.0",
+    "@vexa-video/sdk": "1.0.0"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "description": "Node.js bundle-backed composition planning and still/frame/frame-range/video execution for Vexa programmable video.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mooskyai/vexa-video-sdk.git"
+  },
+  "homepage": "https://github.com/mooskyai/vexa-video-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/mooskyai/vexa-video-sdk/issues"
+  },
+  "keywords": [
+    "video",
+    "renderer",
+    "composition",
+    "nodejs",
+    "vexa"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

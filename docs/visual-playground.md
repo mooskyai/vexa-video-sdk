@@ -49,7 +49,8 @@ The UI provides one place to exercise the public media features:
 - background render jobs;
 - generated-output playback and download links;
 - the framework-neutral programmable Player workspace, including play/pause, frame stepping, seeking, looping, playback rate, volume/mute, responsive fit modes, buffering state, fullscreen, live state, and typed player events;
-- the V2 composition Bundles workspace, including deterministic composition discovery, development/production builds, source-map modes, emitted CSS/assets/chunks/public files, manifest inspection, and sanitized bundler failures.
+- the composition Bundles workspace, including deterministic composition discovery, development/production builds, source-map modes, emitted CSS/assets/chunks/public files, manifest inspection, and sanitized bundler failures;
+- Node render planning and execution for the selected bundled composition, including stills, single frames, bounded-concurrency image ranges, and MP4 video ranges with explicit exclusive-end frame semantics.
 
 ## Programmable player
 
@@ -62,6 +63,10 @@ The visual surface is a deterministic acceptance composition driven by `@vexa-vi
 Select **Bundles** from the left rail or **Compositions** from the preview tabs. This workspace exercises the real Node-side `@vexa-video/bundler` against the Vexa-owned fixture under `examples/visual-playground/compositions/`.
 
 Use **Discover** to verify stable composition ordering and metadata. Use **Build bundle** to switch between development/production output and none/external/inline source maps, then inspect the schema-versioned manifest, emitted JavaScript/CSS, dynamic-import chunks, fingerprinted assets, copied public files, byte sizes, and SHA-256 metadata. The playground uses a fixed repository fixture and fixed environment allowlist; it does not accept arbitrary local source paths or expose environment values.
+
+After building, choose a render target in **Selected composition**. **Plan** shows the serializable Node-side render plan; **Render** executes the same `@vexa-video/renderer` boundary. The execution row exposes **Hardware** (CPU/Auto/NVIDIA/Intel/AMD/Apple), a render timeout, live progress, and **Cancel**; cancellation aborts the same server-side renderer signal rather than starting a second control path. Still and single-frame targets show the generated image, frame ranges show the first generated frame plus links to the deterministic frame files, and video ranges show a muted looping preview with separate **Open** and **Download** links. Generated files use the playground's existing session-backed `/media/` and `/package/` serving paths rather than exposing arbitrary filesystem locations.
+
+The Player and Compositions workspaces are responsive independently of the surrounding editor panels. Their **Full screen** action expands the complete focused preview workspace (toolbar, content, diagnostics/output, and the Player's single transport) rather than creating a second demo page or duplicate playback controls. On narrower viewports, composition panels collapse into a vertical flow and Player diagnostics stack below the canvas.
 
 ## Media library
 

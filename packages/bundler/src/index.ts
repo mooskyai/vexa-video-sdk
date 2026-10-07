@@ -6,7 +6,6 @@ import {
   mkdtemp,
   readFile,
   readdir,
-  rename,
   rm,
   writeFile
 } from "node:fs/promises";
@@ -23,6 +22,7 @@ import {
   defineBundleCompositions,
   type VexaBundledCompositionDescriptor
 } from "./entry.js";
+import { renameDirectoryWithRetry } from "./fs-retry.js";
 
 export { VEXA_BUNDLE_DISCOVERY_EXPORT, defineBundleCompositions } from "./entry.js";
 export type {
@@ -538,7 +538,7 @@ export async function bundleCompositions(options: VexaBundleOptions): Promise<Ve
     await writeFile(join(stageDir, VEXA_BUNDLE_MANIFEST_FILE), stableManifestJson(manifest), "utf8");
 
     await rm(normalized.outDir, { recursive: true, force: true });
-    await rename(stageDir, normalized.outDir);
+    await renameDirectoryWithRetry(stageDir, normalized.outDir);
 
     return Object.freeze({
       outDir: normalized.outDir,

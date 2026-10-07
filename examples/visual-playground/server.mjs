@@ -1125,7 +1125,14 @@ async function route(req, res) {
   const url = new URL(req.url ?? "/", `http://${host}:${port}`);
 
   if (url.pathname.startsWith("/api/compositions/")) {
-    const handled = await handleBundlerPlaygroundRequest(req, res, { repositoryRoot, workspaceRoot, url });
+    const handled = await handleBundlerPlaygroundRequest(req, res, {
+      repositoryRoot,
+      workspaceRoot,
+      url,
+      createOutputSession: createProjectSession,
+      mediaUrl,
+      packageUrl
+    });
     if (handled) return;
   }
 

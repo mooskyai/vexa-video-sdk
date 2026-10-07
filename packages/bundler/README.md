@@ -2,7 +2,7 @@
 
 Node-side composition bundling and discovery tooling for Vexa programmable video.
 
-The package turns a TypeScript/TSX composition entry into a browser-executable ESM bundle plus a deterministic `vexa.bundle.json` manifest. It is development/build tooling: playback remains in `@vexa-video/player`, composition semantics remain in `@vexa-video/core` / `@vexa-video/react`, and rendering remains a later Node renderer concern.
+The package turns a TypeScript/TSX composition entry into a browser-executable ESM bundle plus a deterministic `vexa.bundle.json` manifest. It is development/build tooling: playback remains in `@vexa-video/player`, composition semantics remain in `@vexa-video/core` / `@vexa-video/react`, and Node rendering is owned by `@vexa-video/renderer`.
 
 ## Entry contract
 
@@ -61,6 +61,8 @@ A build can contain:
 ```
 
 The manifest contains normalized relative paths, sorted composition discovery, the allowlisted environment-variable names, and SHA-256/size metadata for emitted files. It intentionally contains no timestamps or machine-specific absolute paths.
+
+Bundle publication uses a staging directory and final directory promotion. On Windows, transient `EPERM`, `EACCES`, or `EBUSY` promotion failures are retried with a short bounded backoff so filesystem indexing or antivirus handles do not make otherwise successful builds flaky.
 
 ## Security boundary
 

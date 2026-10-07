@@ -333,6 +333,70 @@ Confirm environment variables not explicitly allowed are not exposed to browser 
 
 ## V2.7 — Node composition renderer
 
+**Status:** In Progress
+
+### Foundation tests
+
+Cover the first renderer slice with deterministic tests for:
+
+- manifest-backed composition listing/selection;
+- still/video target-kind validation;
+- frame bounds and exclusive-end frame ranges;
+- complete/subrange video planning;
+- concurrency and timeout defaults/overrides;
+- typed invalid-option and missing-composition errors;
+- persisted bundle-manifest loading;
+- Playground render-plan requests against the fixed composition fixture.
+
+### Still/frame execution tests
+
+Cover the executable-render slice with deterministic tests for:
+
+- browser-bundle `vexaExecutableCompositions` loading and validation;
+- input-prop and resolved-metadata evaluation before frame selection;
+- real PNG still output from a bundled still composition;
+- real single-frame PNG output from a bundled video composition;
+- shared `VideoProjectAst` lowering and FFmpeg frame extraction;
+- planning-only renderer instances rejecting execution when no bundle location is available.
+
+### Frame-range/video execution tests
+
+Cover the next executable-render slice with deterministic tests for:
+
+- exact `[startFrame, endFrameExclusive)` video-graph trimming;
+- audio trimming from the same frame-derived time range;
+- real bounded-concurrency PNG frame-range output with deterministic filenames;
+- real MP4 output from a bundled executable composition;
+- resolved dynamic FPS/duration driving execution rather than stale manifest timing;
+- invalid resolved ranges failing before FFmpeg execution.
+
+### Execution-control tests
+
+Cover the execution-control slice with deterministic tests for:
+
+- still and frame-range progress reaching a stable 100% terminal state;
+- FFmpeg video progress flowing through the shared progress parser;
+- CPU hardware selection plumbing without environment-dependent accelerator requirements;
+- pre-aborted `AbortSignal` execution mapping to `RENDER_ABORTED`;
+- FFmpeg process deadlines mapping to `RENDER_TIMEOUT`;
+- Playground progress streaming, timeout input, hardware selection, and cancellation controls using the existing composition render route;
+- a syntax-regression guard for the Compositions Playground client source.
+
+Manual Playground acceptance also verifies that renderer planning/execution controls never overlap in the Selected composition panel, the Bundles/Compositions layout collapses cleanly at narrower widths, the Player diagnostics stack responsively, and both focused workspaces can enter/exit full-screen mode while the Player keeps one visible playback transport.
+
+Storage/workspace acceptance additionally verifies that an executable scene containing a storage-backed asset is materialized through an injected `Storage` adapter into a `vexa-render-*` managed workspace, that FFmpeg consumes the managed path, and that the workspace is empty again after successful rendering and after typed asset-resolution failure. Caller-supplied `resolvedAssets` continue to bypass automatic acquisition for those asset IDs.
+
+For final Windows video acceptance, run the repository verification first and then execute:
+
+```powershell
+npm run verify
+node .\scripts\verify-v2-renderer.mjs
+```
+
+The acceptance script builds the real Playground composition bundle, renders `product-demo` frames `[0, 60)` to `.tmp/v2-renderer-acceptance/product-demo-0-60.mp4` with CPU H.264, invokes the configured `ffprobe`, and fails unless the output is 1920x1080, 30fps, exactly 60 decoded video frames, H.264, and approximately 2 seconds long.
+
+The shared responsive/full-screen controller is syntax-checked alongside the existing Compositions client source so UI integration failures are caught by `npm run verify` before browser acceptance.
+
 ### API tests
 
 Cover:

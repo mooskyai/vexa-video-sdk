@@ -10,6 +10,7 @@ const releasePackages = [
   "packages/react",
   "packages/player",
   "packages/bundler",
+  "packages/renderer",
   "packages/cli"
 ];
 

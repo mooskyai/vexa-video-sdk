@@ -86,7 +86,7 @@ The planned sequence is:
 | V2.4 | **Complete** | Browser-safe React authoring adapter |
 | V2.5 | **Complete** | Browser player and framework-neutral playback state |
 | V2.6 | **Complete** | TypeScript/TSX bundling and composition discovery |
-| V2.7 | **Next** | Node composition/still renderer using existing Vexa execution paths |
+| V2.7 | **In Progress** | Node composition/still renderer using existing Vexa execution paths |
 | V2.8 | **Planned** | Local Vexa Studio development environment |
 | V2.9 | **Planned** | Shapes, effects, transitions, fonts, and composition captions |
 | V2.10 | **Planned** | Optional extended programmable-media integrations |
@@ -97,7 +97,7 @@ The planned sequence is:
 | V2.15 | **Planned** | Frame-level visual regression and runtime parity testing |
 | V2.16 | **Planned** | Version 2 release hardening |
 
-V2.1 through V2.6 are complete on the Version 2 branch. V2.6 acceptance evidence includes the **14/14** focused bundler suite, **204/204** full repository tests, successful TypeScript build, deterministic TypeScript/TSX/CSS/assets/dynamic-import/source-map/environment fixtures on Windows, clean generated browser-entry dependency audit, **10** release-ready public packages, and successful release packing. V2.7 is the next implementation target.
+V2.1 through V2.6 are complete on the Version 2 branch. V2.7 is in final acceptance: bundle-backed execution resolves executable compositions and dynamic metadata, materializes real still/single-frame images, renders bounded-concurrency image frame ranges, and encodes exact exclusive-end MP4/WebM ranges through the existing project/FFmpeg graph. Renderer execution exposes normalized progress, `AbortSignal` cancellation, process timeouts, shared hardware selection/fallback controls, and automatic storage-backed scene-asset materialization through a per-render managed Vexa workspace with deterministic cleanup. Final Windows FFprobe acceptance and repository/release verification remain before the V2.7 commit; durable job orchestration stays on the existing job-contract path.
 
 Detailed scope and acceptance:
 

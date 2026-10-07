@@ -38,6 +38,9 @@
       "path": "./packages/bundler"
     },
     {
+      "path": "./packages/renderer"
+    },
+    {
       "path": "./packages/cli"
     },
     {

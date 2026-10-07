@@ -810,3 +810,270 @@ export function createProjectExecutionPlan(
     hardware
   };
 }
+
+export type ProjectFrameFormat = "png" | "jpeg" | "webp";
+
+export interface ProjectFrameRenderOptions {
+  readonly overwrite?: boolean;
+}
+
+export interface ProjectFrameExecutionPlan {
+  readonly schemaVersion: 1;
+  readonly backend: "ffmpeg";
+  readonly task: "project-frame-render";
+  readonly projectId: string;
+  readonly output: string;
+  readonly width: number;
+  readonly height: number;
+  readonly fps: number;
+  readonly frame: number;
+  readonly format: ProjectFrameFormat;
+  readonly inputs: readonly ProjectInputDescriptor[];
+  readonly filterComplex: string;
+  readonly videoMap: "frameout";
+  readonly args: readonly string[];
+}
+
+function detectProjectFrameFormat(output: string): ProjectFrameFormat {
+  const normalized = output.trim().toLowerCase();
+  if (!normalized) throw new InvalidProjectError("Project frame output path cannot be empty.");
+  if (normalized.endsWith(".png")) return "png";
+  if (normalized.endsWith(".jpg") || normalized.endsWith(".jpeg")) return "jpeg";
+  if (normalized.endsWith(".webp")) return "webp";
+  throw new InvalidProjectError("Project frame output must use png, jpeg, or webp.");
+}
+
+function withoutProjectAudio(project: VideoProjectAst): VideoProjectAst {
+  return {
+    ...project,
+    tracks: project.tracks
+      .filter((track) => track.type !== "audio")
+      .map((track) => ({
+        ...track,
+        clips: track.clips
+          .filter((clip) => clip.kind !== "audio")
+          .map((clip) => clip.kind === "video" ? { ...clip, includeAudio: false } : clip)
+      }))
+  };
+}
+
+function projectFrameInputArgs(plan: ProjectExecutionPlan): string[] {
+  const args: string[] = [];
+  for (const input of plan.inputs) {
+    if (input.kind === "image") {
+      args.push("-loop", "1", "-framerate", formatNumber(plan.fps), "-i", input.source);
+    } else {
+      args.push("-i", input.source);
+    }
+  }
+  return args;
+}
+
+function appendProjectFrameCodec(args: string[], format: ProjectFrameFormat): void {
+  if (format === "png") {
+    args.push("-c:v", "png");
+    return;
+  }
+  if (format === "jpeg") {
+    args.push("-c:v", "mjpeg", "-q:v", "2");
+    return;
+  }
+  args.push("-c:v", "libwebp", "-lossless", "1");
+}
+
+export function createProjectFrameExecutionPlan(
+  inputProject: VideoProjectAst,
+  output: string,
+  frame: number,
+  options: ProjectFrameRenderOptions = {}
+): ProjectFrameExecutionPlan {
+  const project = normalizeVideoProject(inputProject);
+  const durationSeconds = projectDurationSeconds(project);
+  const frameCount = Math.max(1, Math.round(durationSeconds * project.canvas.fps));
+  if (!Number.isSafeInteger(frame) || frame < 0 || frame >= frameCount) {
+    throw new InvalidProjectError(
+      `Frame ${frame} is outside project "${project.id}" (duration ${frameCount} frames).`
+    );
+  }
+
+  const format = detectProjectFrameFormat(output);
+  const visualProject = withoutProjectAudio(project);
+  const visualPlan = createProjectExecutionPlan(
+    visualProject,
+    "__vexa_project_frame__.mp4",
+    {
+      ...(options.overwrite !== undefined ? { overwrite: options.overwrite } : {}),
+      videoCodec: "h264",
+      audioCodec: "none",
+      hardwareAcceleration: "cpu"
+    },
+    {},
+    null
+  );
+  const filterComplex = `${visualPlan.filterComplex};[${visualPlan.videoMap}]trim=start_frame=${frame}:end_frame=${frame + 1},setpts=PTS-STARTPTS[frameout]`;
+  const args: string[] = [options.overwrite === false ? "-n" : "-y"];
+  args.push(...projectFrameInputArgs(visualPlan));
+  args.push(
+    "-filter_complex",
+    filterComplex,
+    "-map",
+    "[frameout]",
+    "-frames:v",
+    "1"
+  );
+  appendProjectFrameCodec(args, format);
+  args.push("-an", output);
+
+  return {
+    schemaVersion: 1,
+    backend: "ffmpeg",
+    task: "project-frame-render",
+    projectId: project.id,
+    output,
+    width: project.canvas.width,
+    height: project.canvas.height,
+    fps: project.canvas.fps,
+    frame,
+    format,
+    inputs: visualPlan.inputs,
+    filterComplex,
+    videoMap: "frameout",
+    args
+  };
+}
+
+export type ProjectRangeExecutionPlan = ProjectExecutionPlan & {
+  readonly startFrame: number;
+  readonly endFrameExclusive: number;
+  readonly frameCount: number;
+};
+
+function projectFrameCount(project: VideoProjectAst): number {
+  return Math.max(
+    1,
+    Math.round(projectDurationSeconds(project) * project.canvas.fps)
+  );
+}
+
+function assertProjectFrameRange(
+  project: VideoProjectAst,
+  startFrame: number,
+  endFrameExclusive: number
+): void {
+  const durationInFrames = projectFrameCount(project);
+  if (
+    !Number.isSafeInteger(startFrame) ||
+    !Number.isSafeInteger(endFrameExclusive) ||
+    startFrame < 0 ||
+    endFrameExclusive <= startFrame ||
+    endFrameExclusive > durationInFrames
+  ) {
+    throw new InvalidProjectError(
+      `Frame range [${startFrame}, ${endFrameExclusive}) must stay inside project "${project.id}" duration ${durationInFrames}.`
+    );
+  }
+}
+
+function replaceProjectRangeArgs(
+  inputArgs: readonly string[],
+  filterComplex: string,
+  videoMap: string,
+  previousVideoMap: string,
+  audioMap: string | null,
+  previousAudioMap: string | null,
+  durationSeconds: number
+): readonly string[] {
+  const args = [...inputArgs];
+  const filterIndex = args.indexOf("-filter_complex");
+  if (filterIndex < 0 || filterIndex + 1 >= args.length) {
+    throw new InvalidProjectError("Project execution plan is missing filter_complex.");
+  }
+  args[filterIndex + 1] = filterComplex;
+
+  const previousVideoToken = `[${previousVideoMap}]`;
+  const nextVideoToken = `[${videoMap}]`;
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === previousVideoToken) args[index] = nextVideoToken;
+  }
+
+  if (previousAudioMap && audioMap) {
+    const previousAudioToken = `[${previousAudioMap}]`;
+    const nextAudioToken = `[${audioMap}]`;
+    for (let index = 0; index < args.length; index += 1) {
+      if (args[index] === previousAudioToken) args[index] = nextAudioToken;
+    }
+  }
+
+  const durationIndex = args.lastIndexOf("-t");
+  if (durationIndex < 0 || durationIndex + 1 >= args.length) {
+    throw new InvalidProjectError("Project execution plan is missing output duration.");
+  }
+  args[durationIndex + 1] = formatNumber(durationSeconds);
+  return Object.freeze(args);
+}
+
+/**
+ * Compile an exact frame-bounded project render without changing the source
+ * project timeline. The composed video stream is trimmed by frame number after
+ * the shared project graph, while audio is trimmed by the equivalent seconds.
+ * The end frame is exclusive.
+ */
+export function createProjectRangeExecutionPlan(
+  inputProject: VideoProjectAst,
+  output: string,
+  startFrame: number,
+  endFrameExclusive: number,
+  options: ProjectRenderOptions = {},
+  probeMap: ProjectProbeMap = {},
+  hardwareCapabilities: HardwareAccelerationCapabilities | null = null
+): ProjectRangeExecutionPlan {
+  const project = normalizeVideoProject(inputProject);
+  assertProjectFrameRange(project, startFrame, endFrameExclusive);
+
+  const base = createProjectExecutionPlan(
+    project,
+    output,
+    options,
+    probeMap,
+    hardwareCapabilities
+  );
+  const frameCount = endFrameExclusive - startFrame;
+  const startSeconds = startFrame / project.canvas.fps;
+  const endSeconds = endFrameExclusive / project.canvas.fps;
+  const durationSeconds = frameCount / project.canvas.fps;
+  const videoMap = "vexa_range_v";
+  const hasMappedAudio = base.audioMap !== null && base.args.includes(`[${base.audioMap}]`);
+  const audioMap = hasMappedAudio ? "vexa_range_a" : null;
+  const filters = [
+    base.filterComplex,
+    `[${base.videoMap}]trim=start_frame=${startFrame}:end_frame=${endFrameExclusive},setpts=PTS-STARTPTS[${videoMap}]`
+  ];
+  if (base.audioMap && audioMap) {
+    filters.push(
+      `[${base.audioMap}]atrim=start=${formatNumber(startSeconds)}:end=${formatNumber(endSeconds)},asetpts=PTS-STARTPTS[${audioMap}]`
+    );
+  }
+  const filterComplex = filters.join(";");
+  const args = replaceProjectRangeArgs(
+    base.args,
+    filterComplex,
+    videoMap,
+    base.videoMap,
+    audioMap,
+    base.audioMap,
+    durationSeconds
+  );
+
+  return Object.freeze({
+    ...base,
+    durationSeconds,
+    filterComplex,
+    videoMap,
+    audioMap,
+    args,
+    optimizations: Object.freeze([...base.optimizations, "FRAME_RANGE_TRIM"]),
+    startFrame,
+    endFrameExclusive,
+    frameCount
+  });
+}
