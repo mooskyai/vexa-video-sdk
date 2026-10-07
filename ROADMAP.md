@@ -81,8 +81,8 @@ The planned sequence is:
 | Stage | Status | Focus |
 | --- | --- | --- |
 | V2.1 | **Complete** | Composition contracts, registry, stills, dynamic metadata |
-| V2.2 | **Next** | Frame/time semantics, interpolation, easing, springs, loops, deterministic random |
-| V2.3 | **Planned** | Composition scene graph and media elements |
+| V2.2 | **Complete** | Frame/time semantics, interpolation, easing, springs, loops, deterministic random |
+| V2.3 | **Next** | Composition scene graph and media elements |
 | V2.4 | **Planned** | Browser-safe React authoring adapter |
 | V2.5 | **Planned** | Browser player and framework-neutral playback state |
 | V2.6 | **Planned** | TypeScript/TSX bundling and composition discovery |
@@ -97,7 +97,7 @@ The planned sequence is:
 | V2.15 | **Planned** | Frame-level visual regression and runtime parity testing |
 | V2.16 | **Planned** | Version 2 release hardening |
 
-V2.1 is complete on the Version 2 branch. Acceptance evidence: the focused programmable-composition suite passes 10/10 tests, the full repository gate passes 129/129 tests plus TypeScript build, and the generated `@vexa-video/core/browser` artifact contains no forbidden Node/SDK/FFmpeg/Redis runtime references. V2.2 is now the active implementation target.
+V2.1 and V2.2 are complete on the Version 2 branch. V2.2 acceptance evidence: the focused deterministic-timing suite passes **13/13** tests, the full repository gate passes **142/142** tests followed by a successful TypeScript build, the generated `@vexa-video/core/browser` artifact contains no forbidden Node/SDK/FFmpeg/Redis runtime references, and the real Microsoft Edge browser parity fixture reports `VEXA_TIMING_PARITY_PASS`. V2.3 is now the active implementation target.
 
 Detailed scope and acceptance:
 

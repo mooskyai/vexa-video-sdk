@@ -133,7 +133,35 @@ The core contract must not depend on React, DOM APIs, Node.js, FFmpeg, or a brow
 
 ## V2.2 — Frame, time, animation, and deterministic math
 
-**Status:** Next
+**Status:** Complete
+
+Implemented in the current Version 2 branch slice with:
+
+- explicit immutable `FrameContext` values carrying local frame, root `absoluteFrame`, and fps;
+- nested local offsets that may become negative before a child sequence begins;
+- frame/second conversion with explicit rounding modes;
+- frame ranges with start, exclusive end, final frame, containment, local-frame, and clamp helpers;
+- piecewise numeric interpolation with `extend`, `clamp`, and `identity` extrapolation;
+- linear/quadratic easing primitives and custom easing callbacks;
+- deterministic color interpolation for hex and `rgb()`/`rgba()` input;
+- analytic under-damped, critically damped, and over-damped spring evaluation;
+- index-addressable seeded deterministic random values without `Math.random()`;
+- loop and frozen-frame context helpers;
+- deterministic sequential/series section resolution with explicit positive/negative offsets;
+- browser-safe runtime exports through `@vexa-video/core/browser`;
+- focused golden tests for timing boundaries and invalid input.
+
+### Acceptance evidence
+
+Validated on Windows 11 with the supported repository toolchain:
+
+- focused deterministic-timing suite: **13/13 passed**;
+- full `npm run verify`: **142/142 tests passed**, followed by a successful `tsc -b` build;
+- generated `packages/core/dist/browser.js` forbidden-import audit: no `node:*`, `child_process`, `@vexa-video/sdk`, `@vexa-video/ffmpeg`, or Redis references found;
+- Microsoft Edge headless browser execution of `packages/core/test/programmable-timing-browser.html` over HTTP returned `VEXA_TIMING_PARITY_PASS`;
+- `git diff --check`: clean.
+
+V2.3 is the next implementation target.
 
 ### Goal
 
@@ -172,6 +200,8 @@ const opacity = interpolate(frame, [0, 30], [0, 1], {
 - Node and browser produce the same values for the same inputs.
 
 ## V2.3 — Composition scene graph and media elements
+
+**Status:** Next
 
 ### Goal
 

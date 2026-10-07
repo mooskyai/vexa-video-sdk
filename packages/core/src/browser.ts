@@ -1,8 +1,8 @@
 /**
- * Browser-safe type surface shared by framework integrations.
+ * Browser-safe shared surface for framework integrations and deterministic timing.
  *
- * Keep this entry point free of Node runtime imports. It intentionally exports
- * only serializable/media-domain types needed across a browser-to-service boundary.
+ * Keep this entry point free of Node runtime imports. It exports serializable
+ * media-domain types plus pure deterministic helpers that are safe to evaluate in browsers.
  */
 export type {
   CaptionAnimation,
@@ -113,3 +113,41 @@ export type {
   VideoProgrammableCompositionMetadata,
   VideoProgrammableCompositionTiming
 } from "./programmable-composition.js";
+
+export {
+  clampFrameToRange,
+  createFrameContext,
+  createFrameRange,
+  easeInOutQuad,
+  easeInQuad,
+  easeOutQuad,
+  frameRangeContains,
+  frameRangeLocalFrame,
+  frameToSeconds,
+  freezeFrameContext,
+  interpolate,
+  interpolateColor,
+  InvalidProgrammableTimingError,
+  linearEasing,
+  loopFrame,
+  loopFrameContext,
+  offsetFrameContext,
+  resolveSeries,
+  secondsToFrame,
+  seededRandom,
+  seriesSectionAtFrame,
+  spring
+} from "./programmable-timing.js";
+export type {
+  DeterministicRandomSeed,
+  FrameContext,
+  FrameRange,
+  FrameRoundingMode,
+  InterpolateColorOptions,
+  InterpolateOptions,
+  ResolvedSeriesSection,
+  SeriesSectionInput,
+  SpringOptions,
+  TimingEasingFunction,
+  TimingExtrapolationMode
+} from "./programmable-timing.js";

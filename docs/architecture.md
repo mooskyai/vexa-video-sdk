@@ -113,7 +113,9 @@ Version 2 adds a programmable authoring/runtime layer above the existing project
 
 The first implementation slice lives in `@vexa-video/core`. It introduces `defineComposition()`, `defineStill()`, JSON-safe default/input props, runtime prop validation hooks, sync/async dynamic metadata calculation, deterministic static metadata serialization, and `ProgrammableCompositionRegistry`. The registry discovers definitions in stable ID order and rejects duplicate IDs before any render work begins.
 
-Only serializable programmable-composition metadata types are exposed through `@vexa-video/core/browser`; authoring/runtime functions stay on the normal core surface. This keeps the browser-service boundary explicit while later React/player packages can still depend on the shared backend-neutral contracts.
+The second slice adds a pure programmable-timing runtime in the same shared package. Frame context is explicit data rather than hidden global state: nested scopes derive local frames while preserving the root composition frame. The timing surface also owns frame/second conversion, frame ranges, numeric and color interpolation, easing, analytic spring motion, deterministic seeded random values, loop/freeze helpers, and series offsets.
+
+`@vexa-video/core/browser` exposes serializable programmable-composition metadata types plus the pure timing runtime. Composition definition/registry authoring remains on the normal core surface. The browser entry must remain free of Node execution, FFmpeg, Redis, filesystem, and SDK runtime imports so future React/player packages can evaluate the same timing semantics directly.
 
 The intended boundary is:
 
@@ -139,7 +141,7 @@ TypeScript / React / agent-authored composition
           planning / FFmpeg / storage
 ```
 
-The composition runtime owns deterministic frame/time semantics, composition metadata, sequences, animation math, input props, and browser-safe scene intent. It must not own Node process execution.
+The composition runtime owns deterministic frame/time semantics, composition metadata, sequences, animation math, input props, and browser-safe scene intent. Timing utilities must remain pure: no `Date`, wall-clock state, `Math.random()`, DOM state, or Node process execution may affect a frame result.
 
 Likely Version 2 runtime boundaries are:
 

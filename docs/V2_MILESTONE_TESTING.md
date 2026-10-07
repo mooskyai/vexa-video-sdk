@@ -111,7 +111,17 @@ V2.1 is complete when Node contract tests pass, serialized metadata remains dete
 
 ## V2.2 — Frame/time/animation semantics
 
-**Status:** Next
+**Status:** Complete
+
+Current focused coverage exercises root and nested frame contexts, negative local offsets, freeze semantics, exact frame/second conversion, frame zero/final-frame ranges, every defined extrapolation mode, easing endpoints, piecewise interpolation, color interpolation, spring convergence and clamping, loop boundaries, series gaps/overlaps, seeded-random repeatability, and invalid-input rejection.
+
+Acceptance recorded on Windows 11:
+
+- focused deterministic-timing suite: **13/13 passed**;
+- repository-wide `npm run verify`: **142/142 passed** and `tsc -b` completed successfully;
+- generated `@vexa-video/core/browser` artifact audit: no forbidden Node/SDK/FFmpeg/Redis runtime references;
+- real Microsoft Edge headless parity execution returned `VEXA_TIMING_PARITY_PASS`;
+- patch/worktree whitespace gate: `git diff --check` clean.
 
 ### Golden tests
 
@@ -132,13 +142,17 @@ Cover:
 
 ### Cross-runtime parity
 
-Generate a deterministic vector of animation results in Node and browser. Values must match within documented floating-point tolerance.
+Generate the same deterministic vector through the normal `@vexa-video/core` surface and the browser-safe `@vexa-video/core/browser` surface. The vector must cover interpolation, color interpolation, spring output, looped frame context, series offsets, and seeded random values. Values must match exactly where integer/string output is expected and within `1e-12` for floating-point animation values.
+
+A real Chromium/Edge execution of that vector is required before V2.2 is marked complete; Node-only import parity is useful coverage but is not a substitute for the browser acceptance run. The repository includes `packages/core/test/programmable-timing-browser.html` for this purpose. After `npm run build`, serve the repository root over HTTP and load that fixture; successful evaluation writes `VEXA_TIMING_PARITY_PASS` into the document.
 
 ### Repeatability
 
 Run the same test vector multiple times and ensure output is identical.
 
 ## V2.3 — Scene graph and media elements
+
+**Status:** Next
 
 ### Validation tests
 
