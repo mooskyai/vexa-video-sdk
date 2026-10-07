@@ -119,6 +119,8 @@ The third slice adds the normalized programmable scene graph. Groups/layers esta
 
 The fourth slice adds `@vexa-video/react` as a browser/shared authoring adapter. React components collect the same programmable-scene nodes used by non-React callers, while hooks derive frame/config/props from explicit shared runtime context. Sequence, series, loop, and freeze components delegate their timing math to `@vexa-video/core/browser`. A render-readiness controller tracks asynchronous authoring work without introducing player, bundler, SDK, or FFmpeg responsibilities into the React package.
 
+The fifth slice adds `@vexa-video/player` as a browser-safe, framework-neutral playback package. Its deterministic controller owns frame progression, seek/step/end/loop rules, volume/mute, rate, buffering, poster-frame state, resize math, errors, and typed events. A thin DOM host maps that state to requestAnimationFrame scheduling, ResizeObserver layout, fullscreen capability, and accessible native controls; React, Angular, and future adapters can bind the same controller rather than defining framework-specific playback semantics.
+
 `@vexa-video/core/browser` exposes serializable programmable-composition metadata plus pure composition definition/resolution, timing, and scene runtimes. Composition definition/registry authoring remains on the normal core surface. The browser entry must remain free of Node execution, FFmpeg, Redis, filesystem, and SDK runtime imports so future React/player packages can evaluate the same scene/timing semantics directly.
 
 The intended boundary is:
@@ -165,7 +167,7 @@ Browser-rendered or DOM/canvas compositions that cannot be lowered cleanly may u
 
 ### Independent implementation requirement
 
-Remotion is used only as a public capability reference for Version 2 planning. Vexa must not copy or port its source code, internal tests, fixtures, or implementation details. Vexa's composition contracts, package boundaries, tests, assets, and rendering integration must be designed independently around this repository's existing architecture.
+Version 2 is a Vexa-native design. Its composition contracts, package boundaries, tests, fixtures, assets, examples, browser behavior, and rendering integration must be designed from Vexa product requirements and this repository's existing architecture. Third-party source code, private implementation details, tests, fixtures, undocumented internals, and API-compatibility targets must not define Vexa runtime behavior.
 
 See `V2_MILESTONE.md` and `V2_MILESTONE_TESTING.md` for the implementation and acceptance sequence.
 

@@ -74,7 +74,7 @@ Release preparation now includes public package metadata, explicit exports/files
 
 ## Version 2 — programmable video creation
 
-Version 2 is the active product direction. It adds a code-defined composition layer inspired by the capability class demonstrated by projects such as Remotion, but implemented independently on top of Vexa's existing contracts.
+Version 2 is the active product direction. It adds a Vexa-native code-defined composition layer built directly on the repository's existing deterministic media, timeline, browser-safety, storage, job, and rendering contracts.
 
 The planned sequence is:
 
@@ -84,8 +84,8 @@ The planned sequence is:
 | V2.2 | **Complete** | Frame/time semantics, interpolation, easing, springs, loops, deterministic random |
 | V2.3 | **Complete** | Composition scene graph and media elements |
 | V2.4 | **Complete** | Browser-safe React authoring adapter |
-| V2.5 | **Next** | Browser player and framework-neutral playback state |
-| V2.6 | **Planned** | TypeScript/TSX bundling and composition discovery |
+| V2.5 | **Complete** | Browser player and framework-neutral playback state |
+| V2.6 | **Next** | TypeScript/TSX bundling and composition discovery |
 | V2.7 | **Planned** | Node composition/still renderer using existing Vexa execution paths |
 | V2.8 | **Planned** | Local Vexa Studio development environment |
 | V2.9 | **Planned** | Shapes, effects, transitions, fonts, and composition captions |
@@ -97,16 +97,16 @@ The planned sequence is:
 | V2.15 | **Planned** | Frame-level visual regression and runtime parity testing |
 | V2.16 | **Planned** | Version 2 release hardening |
 
-V2.1 through V2.4 are complete on the Version 2 branch. V2.4 acceptance evidence: the React authoring coverage passes as part of the **173/173** full repository test gate, `tsc -b` completes successfully, generated `@vexa-video/react` and `@vexa-video/core/browser` runtime audits contain no forbidden Node/SDK/FFmpeg/Redis imports, `release:check` reports all **8** public packages ready, and `release:pack` succeeds with the React runtime/declarations included. V2.5 is now the active implementation target.
+V2.1 through V2.5 are complete on the Version 2 branch. V2.5 acceptance evidence includes the **17/17** focused player suite, **190/190** full repository tests, successful TypeScript build, clean generated browser dependency audits, **9** release-ready public packages, successful release packing, and manual acceptance of the first-class Player workspace through the normal `npm run dev` visual playground. V2.6 is the next implementation target.
 
 Detailed scope and acceptance:
 
 - [Version 2 implementation plan](./docs/V2_MILESTONE.md)
 - [Version 2 testing plan](./docs/V2_MILESTONE_TESTING.md)
 
-### Clean-room reference policy
+### Independent implementation policy
 
-Remotion is a capability/product reference only. Vexa must not copy or port Remotion source, tests, fixtures, or internal implementation. New APIs, schemas, tests, assets, and runtime design must be Vexa-owned and fit the package boundaries documented in this repository.
+Version 2 capabilities must be designed and implemented as Vexa-native functionality. New APIs, schemas, tests, fixtures, assets, examples, and runtime behavior must be Vexa-owned, derived from Vexa product requirements, and fit the package boundaries documented in this repository. Third-party source code, private implementation details, tests, fixtures, and undocumented internals must not be copied or used as compatibility targets.
 
 ## Version 3 — production media platform
 

@@ -511,6 +511,7 @@ See [docs/visual-playground.md](./docs/visual-playground.md).
 | `@vexa-video/ai` | Optional Node-side AI/provider adapters plus deterministic media-planning helpers |
 | `@vexa-video/editor` | Browser-safe, framework-neutral timeline-editor state/history foundations |
 | `@vexa-video/react` | Browser-safe React authoring adapter for programmable compositions, timing scopes, and scene/media components |
+| `@vexa-video/player` | Browser-safe framework-neutral playback controller, responsive DOM host, controls, events, and fullscreen integration |
 | `@vexa-video/cli` | Node.js command-line interface for probing, planning, rendering, hardware, and streaming |
 
 ## Architecture
@@ -568,7 +569,7 @@ CI uses the repository's supported Node.js line and installs FFmpeg before runni
 
 Vexa 1.x establishes the deterministic media, timeline, storage, jobs, hardware, browser-integration, plugin, AI-adapter, and distribution foundations.
 
-Version 2 is focused on programmable video creation: code-defined compositions, deterministic frame animation, browser playback, a local Studio experience, Node and browser rendering, reusable motion primitives, parameterized templates, and agent-friendly composition workflows. The shared core now establishes backend-neutral composition definitions, deterministic timing, and a browser-safe programmable scene graph, while `@vexa-video/react` provides a React authoring adapter for registration, frame/config hooks, timing scopes, scene/media components, asset helpers, and asynchronous render readiness. React remains outside the deterministic media core, and representable scenes continue to lower into the existing `VideoProjectAst` path instead of creating a second media engine.
+Version 2 is focused on programmable video creation: code-defined compositions, deterministic frame animation, browser playback, a local Studio experience, Node and browser rendering, reusable motion primitives, parameterized templates, and agent-friendly composition workflows. The shared core now establishes backend-neutral composition definitions, deterministic timing, and a browser-safe programmable scene graph, while `@vexa-video/react` provides React authoring and `@vexa-video/player` provides framework-neutral browser playback state, deterministic frame advancement, responsive scaling, typed events, accessible default controls, and a thin DOM/fullscreen host. React and browser playback remain outside the deterministic media core, and representable scenes continue to lower into the existing `VideoProjectAst` path instead of creating a second media engine.
 
 Production scheduling, render caching, advanced GPU pipelines, professional editing, cloud-media adapters, collaboration, and larger hosted-render infrastructure are deferred to Version 3.
 

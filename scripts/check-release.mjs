@@ -8,6 +8,7 @@ const releasePackages = [
   "packages/ai",
   "packages/editor",
   "packages/react",
+  "packages/player",
   "packages/cli"
 ];
 

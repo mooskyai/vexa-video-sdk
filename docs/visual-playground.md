@@ -47,7 +47,14 @@ The UI provides one place to exercise the public media features:
 - HLS/DASH packaging and preview sprites;
 - hardware detection and benchmark diagnostics;
 - background render jobs;
-- generated-output playback and download links.
+- generated-output playback and download links;
+- the framework-neutral programmable Player workspace, including play/pause, frame stepping, seeking, looping, playback rate, volume/mute, responsive fit modes, buffering state, fullscreen, live state, and typed player events.
+
+## Programmable player
+
+Select **Player** from the left rail or the preview tabs in the normal playground at `http://127.0.0.1:4173/`. Player mode is part of the existing playground workspace: it hides unrelated media-editing inspector/timeline controls and gives playback, display, live-state, and event diagnostics their own focused layout. No separate demo URL is required.
+
+The visual surface is a deterministic acceptance composition driven by `@vexa-video/player`; it is not a second rendering engine. Use it to verify controller behavior and browser integration while V2.6/V2.7 add composition discovery and rendering paths.
 
 ## Media library
 

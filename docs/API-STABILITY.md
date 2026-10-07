@@ -38,6 +38,8 @@ Version 2 composition, player, React-authoring, Studio-browser, and web-renderer
 
 `@vexa-video/react` is a public authoring adapter over `@vexa-video/core/browser`. Its frame/config/props hooks, sequence/series/loop/freeze timing behavior, scene-component prop mapping, registration lifecycle, and render-readiness semantics are public behavior. React-specific authoring must not reinterpret the underlying core timing or scene contracts.
 
+`@vexa-video/player` is a public browser-safe playback surface. Frame clamping, seek rounding, end/loop behavior, playback-rate progression, buffering, poster-frame presentation, volume/mute, responsive fit math, typed event ordering, and controller disposal semantics are public behavior. Browser DOM scheduling/fullscreen integration must remain an adapter over that deterministic controller rather than a second playback state machine.
+
 ## Version 2 composition schemas
 
 Serializable composition/project/render contracts introduced for Version 2 must carry an explicit schema version when persisted or sent across a process/network boundary. The programmable-scene schema is part of that contract: node kinds, asset-source shapes, timing/z-order semantics, and deterministic serialization/lowering behavior must not be reinterpreted without an appropriate schema or major-version change.

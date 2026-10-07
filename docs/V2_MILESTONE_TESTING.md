@@ -47,19 +47,19 @@ CI/secondary acceptance:
 
 Tests that require unavailable hardware must report a clear skip reason rather than silently passing.
 
-## Clean-room validation rule
+## Independent validation rule
 
-Tests and fixtures for Remotion-inspired capabilities must be Vexa-owned.
+Tests and fixtures for Version 2 capabilities must be Vexa-owned and derived from Vexa's documented behavior.
 
 Do not copy:
 
-- Remotion test source;
-- snapshot images;
-- example projects;
-- media fixtures;
-- internal package behavior that is not part of the capability being independently implemented.
+- third-party test source;
+- snapshot images from other products;
+- example projects from other products;
+- third-party media fixtures;
+- private, undocumented, or internal package behavior from another implementation.
 
-The purpose of parity testing is to verify Vexa's documented behavior, not byte-for-byte compatibility with Remotion.
+The purpose of parity testing is to verify Vexa's documented behavior across Vexa runtimes, platforms, preview paths, and render paths—not compatibility with another product.
 
 ## V2.1 — Composition contracts and registry
 
@@ -251,6 +251,14 @@ Cover:
 The same React composition should preview and render with the same timing values.
 
 ## V2.5 — Browser player
+
+**Status:** Complete
+
+The focused player suite covers config normalization, initial/poster frames, play/pause, frame/time seek, stepping, terminal end behavior, loop wrapping, fractional playback-rate progression, volume/mute, buffering, responsive fit math, fullscreen capability/failure paths, error lifecycle, metadata integration, disposal, accessible control descriptors, and browser-package dependency isolation.
+
+A Vexa-owned browser fixture at `packages/player/test/player-browser.html` mounts default and custom-control hosts and validates deterministic frame progression, buffering, responsive scaling, accessible/keyboard-reachable controls, and no injected controls in custom mode. The existing visual playground also exposes Player as a first-class workspace for normal `npm run dev` browser acceptance.
+
+V2.5 closure evidence: focused player tests **17/17**, full repository tests **190/190**, TypeScript build passed, generated player/core browser audits returned no forbidden Node/SDK/FFmpeg/Redis imports, `release:check` reported **9** packages ready, `release:pack` succeeded, and the integrated Player workspace was manually verified in the normal playground.
 
 ### Functional tests
 

@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vexa Video — Editor Playground</title>
   <link rel="stylesheet" href="/styles.css">
+  <script type="importmap">
+    {"imports":{
+      "@vexa-video/core/browser":"/vexa-packages/core/browser.js",
+      "@vexa-video/player":"/vexa-packages/player/index.js"
+    }}
+  </script>
 </head>
 <body>
   <div class="editor-shell">
@@ -34,6 +40,7 @@
       <button class="rail-button" data-section="trimSection" title="Trim"><span>T</span><small>Trim</small></button>
       <button class="rail-button" data-section="transformSection" title="Transform"><span>X</span><small>Edit</small></button>
       <button class="rail-button" data-section="projectSection" data-drawer-title="Project" title="Timeline project"><span>P</span><small>Project</small></button>
+      <button id="playerRailButton" class="rail-button" type="button" title="Player"><span>▶</span><small>Player</small></button>
       <button class="rail-button" data-section="audioSection" data-drawer-title="Audio" title="Audio"><span>A</span><small>Audio</small></button>
       <button class="rail-button" data-section="captionsSection" data-drawer-title="Captions" title="Captions"><span>C</span><small>Captions</small></button>
       <button class="rail-button" data-section="streamingSection" data-drawer-title="Streaming" title="Streaming"><span>S</span><small>Stream</small></button>
@@ -115,6 +122,7 @@
         <div class="mode-tabs" role="tablist">
           <button id="sourceTab" class="mode-tab active" data-mode="source">Source</button>
           <button id="outputTab" class="mode-tab" data-mode="output" disabled>Rendered output</button>
+          <button id="playerTab" class="mode-tab" type="button">Player</button>
         </div>
         <div class="preview-info">
           <span id="previewBadge">No media</span>
@@ -143,9 +151,73 @@
             <button id="playbackFallbackButton" class="button secondary">Create H.264 preview</button>
           </div>
         </div>
+
+        <div id="playerDemoStage" class="player-demo-stage hidden" aria-label="Vexa Player workspace">
+          <div class="player-workspace-heading">
+            <div>
+              <span class="kicker">Browser playback</span>
+              <h1>Player</h1>
+              <p>Preview deterministic composition timing and interactive playback directly inside the Vexa playground.</p>
+            </div>
+            <div class="player-status-card">
+              <span>Status</span>
+              <strong id="playerDemoStatus">Idle</strong>
+            </div>
+          </div>
+          <div class="player-demo-layout">
+            <section class="player-canvas-panel">
+              <div class="player-canvas-toolbar">
+                <span>@vexa-video/player</span>
+                <strong id="playerDemoViewport">960×540 · 30fps</strong>
+              </div>
+              <div id="playerDemoMount" class="player-demo-mount"></div>
+            </section>
+            <aside class="player-demo-diagnostics" aria-label="Player controls and state">
+              <section class="player-control-section">
+                <div class="player-section-title"><span>Playback</span><small>Live state</small></div>
+                <div class="player-metrics-grid">
+                  <div class="player-demo-metric"><span>Frame</span><strong id="playerDemoFrame">0 / 299</strong></div>
+                  <div class="player-demo-metric"><span>Time</span><strong id="playerDemoTime">0.00s</strong></div>
+                  <div class="player-demo-metric"><span>Volume</span><strong id="playerDemoVolumeReadout">100%</strong></div>
+                  <div class="player-demo-metric"><span>Scale</span><strong id="playerDemoScale">1.000×</strong></div>
+                </div>
+                <label class="player-field">Playback rate
+                  <select id="playerDemoRate" class="compact-select">
+                    <option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option>
+                  </select>
+                </label>
+                <label class="player-field player-demo-volume">Volume
+                  <input id="playerDemoVolume" type="range" min="0" max="1" step="0.05" value="1">
+                </label>
+                <div class="player-toggle-row">
+                  <label class="player-demo-toggle"><input id="playerDemoLoop" type="checkbox"> Loop</label>
+                  <label class="player-demo-toggle"><input id="playerDemoBuffering" type="checkbox"> Simulate buffering</label>
+                </div>
+              </section>
+              <section class="player-control-section">
+                <div class="player-section-title"><span>Display</span><small>Browser host</small></div>
+                <label class="player-field">Fit
+                  <select id="playerDemoFit" class="compact-select">
+                    <option value="contain" selected>Contain</option><option value="cover">Cover</option><option value="actual">Actual size</option>
+                  </select>
+                </label>
+                <label class="player-field">Controls
+                  <select id="playerDemoControls" class="compact-select">
+                    <option value="default" selected>Default controls</option><option value="custom">Custom controls</option><option value="none">No injected controls</option>
+                  </select>
+                </label>
+              </section>
+              <section class="player-control-section player-events-section">
+                <div class="player-demo-event-heading"><span>Player events</span><button id="playerDemoClearEvents" type="button" class="text-button">Clear</button></div>
+                <pre id="playerDemoEvents" class="player-demo-events">Player ready. Open the Player workspace to begin.</pre>
+              </section>
+              <button id="playerDemoReset" class="button secondary full player-reset-button" type="button">Reset player</button>
+            </aside>
+          </div>
+        </div>
       </section>
 
-      <div class="transport-bar">
+      <div id="mediaTransportBar" class="transport-bar">
         <div class="transport-left">
           <button id="backFiveButton" class="transport-button" title="Back 5 seconds">−5</button>
           <button id="playButton" class="play-button" disabled>▶</button>
@@ -162,6 +234,18 @@
             <option value="1.5">1.5x</option>
             <option value="2">2x</option>
           </select>
+        </div>
+      </div>
+
+      <div id="playerDemoTransport" class="player-demo-transport hidden">
+        <div class="player-demo-primary-controls">
+          <button id="playerDemoStepBack" class="transport-button" type="button" title="Previous frame">−1f</button>
+          <button id="playerDemoPlay" class="play-button" type="button" aria-label="Play programmable player">▶</button>
+          <button id="playerDemoStepForward" class="transport-button" type="button" title="Next frame">+1f</button>
+          <input id="playerDemoSeek" class="seek-bar" type="range" min="0" max="299" step="1" value="0" aria-label="Seek player">
+          <span class="player-transport-hint">Frame accurate · Space to play/pause</span>
+          <button id="playerDemoMute" class="transport-button" type="button">Mute</button>
+          <button id="playerDemoFullscreen" class="transport-button" type="button">Fullscreen</button>
         </div>
       </div>
     </main>
@@ -561,5 +645,6 @@
   </div>
 
   <script type="module" src="/app.js"></script>
+  <script type="module" src="/player-demo.js"></script>
 </body>
 </html>

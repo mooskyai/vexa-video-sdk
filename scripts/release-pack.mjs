@@ -50,6 +50,7 @@ const workspaces = [
   ["@vexa-video/ai", "packages/ai"],
   ["@vexa-video/editor", "packages/editor"],
   ["@vexa-video/react", "packages/react"],
+  ["@vexa-video/player", "packages/player"],
   ["@vexa-video/cli", "packages/cli"]
 ];
 

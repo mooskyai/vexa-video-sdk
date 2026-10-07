@@ -2,22 +2,18 @@
 
 Version 2 adds a programmable video-composition layer on top of the existing Vexa 1.x media engine. The goal is to support code-defined video, interactive preview, local/server rendering, reusable motion primitives, templates, and agent-driven creation without replacing the deterministic FFmpeg, timeline, storage, job, hardware, or browser-safety foundations already present in the repository.
 
-Reference capability study: <https://github.com/remotion-dev/remotion>
+## Independent implementation rule
 
-## Clean-room implementation rule
+Vexa Version 2 is defined by Vexa's own product requirements and architecture. Its implementation must remain independent and Vexa-native:
 
-Remotion is used as a product and capability reference only.
-
-Vexa Version 2 must be implemented independently:
-
-- do not copy or port Remotion source code;
-- do not copy private/internal implementation details, tests, fixtures, or package internals;
-- do not make source-level or API-level compatibility with Remotion a requirement;
-- use Vexa-owned types, naming, schemas, tests, examples, and assets;
+- do not copy or port third-party source code;
+- do not copy private/internal implementation details, tests, fixtures, package internals, or undocumented behavior from other products;
+- do not make source-level or API-level compatibility with another product a requirement;
+- use Vexa-owned types, naming, schemas, tests, examples, fixtures, and assets;
 - reuse Vexa's existing `VideoProjectAst`, planning, FFmpeg, storage, jobs, hardware, cancellation, progress, and error contracts;
 - document any new public runtime boundary before creating a package for it.
 
-This is important both architecturally and because Remotion uses a special license with restrictions around derivative products. The Vexa implementation should be based on independently designed behavior and Vexa's own architecture.
+This keeps Version 2 aligned with Vexa's architecture and prevents Vexa's public contracts from becoming coupled to third-party implementation details, APIs, or licensing constraints.
 
 ## Version 2 product target
 
@@ -344,6 +340,28 @@ filesystem APIs
 React is an adapter, not the source of Vexa's media semantics.
 
 ## V2.5 — Browser player core and framework adapters
+
+**Status:** Complete
+
+Implemented in the current Version 2 branch slice with:
+
+- public `@vexa-video/player` package depending only on the browser-safe core contract at runtime;
+- deterministic programmatic controller for play/pause, frame/time seeking, stepping, end behavior, looping, volume/mute, playback rate, buffering, errors, and disposal;
+- exact fractional-frame carry so repeated small browser-clock deltas resolve to the same frame progression;
+- poster-frame presentation before first playback/seek interaction;
+- framework-neutral typed events and immutable snapshots;
+- responsive `contain`, `cover`, and `actual` scaling math;
+- fullscreen capability/request/exit helpers;
+- thin DOM host with requestAnimationFrame scheduling and ResizeObserver integration while controller semantics remain clock-independent;
+- accessible native default controls plus explicit `custom`/`none` modes that inject no unwanted controls;
+- Vexa-owned real-browser acceptance fixture for timing, resize, buffering, accessibility, and custom-controls behavior;
+- first-class Player workspace in the existing visual playground, reachable from normal playground navigation and isolated from unrelated clip-editing controls.
+
+The player does not own composition bundling or Node rendering. The render callback receives the selected frame and browser viewport; V2.6/V2.7 connect bundled compositions and Node frame/video rendering to the same timing contracts.
+
+### Acceptance evidence
+
+Validated with **17/17** focused player tests and **190/190** full repository tests, a successful `tsc -b` build, clean generated browser dependency audits, **9** release-ready public packages, successful release packing, and manual browser acceptance of the integrated Player workspace through `npm run dev`. V2.6 is the next implementation target.
 
 ### Goal
 
