@@ -333,7 +333,7 @@ Confirm environment variables not explicitly allowed are not exposed to browser 
 
 ## V2.7 — Node composition renderer
 
-**Status:** In Progress
+**Status:** Complete
 
 ### Foundation tests
 
@@ -436,6 +436,37 @@ On Windows 11 render a deterministic short composition and inspect it with ffpro
 
 ## V2.8 — Studio
 
+**Status:** Complete
+
+### Foundation tests
+
+Cover the browser-safe Studio runtime with deterministic tests for:
+
+- stable composition catalog ordering and selection;
+- Player/editor playhead synchronization;
+- frame stepping and playback progression;
+- draft props remaining separate from last resolved dynamic metadata;
+- resolved metadata updating fps/duration/canvas state while preserving or clamping the current frame;
+- same-composition reload preserving current frame and dirty props;
+- still compositions remaining on frame zero and rejecting playback;
+- typed missing/mismatched-composition errors;
+- browser-source boundary checks rejecting Node/SDK/renderer/FFmpeg imports;
+- transient `TimelineHistory.sync()` updates not creating undo entries.
+
+### Playground integration tests
+
+Cover the first visual Studio integration with deterministic checks for:
+
+- Studio client JavaScript syntax;
+- browser source importing Studio/Core browser contracts but no Node SDK/renderer/FFmpeg modules;
+- the local development host explicitly serving `@vexa-video/studio`, `@vexa-video/editor`, and generated composition-bundle files;
+- recursive source-watch path normalization and debounce behavior, including Windows `\\` path separators;
+- the `/api/studio/events` SSE boundary and browser `EventSource` hot-reload client;
+- automatic reload preserving the current legal frame plus an unapplied props draft;
+- build/evaluation/props/render failures surfacing through the Studio error overlay and console without crashing the workspace;
+- render requests carrying the Studio-resolved JSON props through the existing renderer execution options;
+- manual browser acceptance of selection, props, metadata, frame scrub/step/play, hot reload, render progress/output, responsive layout, and fullscreen.
+
 ### End-to-end tests
 
 Using browser automation:
@@ -446,12 +477,24 @@ Using browser automation:
 - play/pause preview;
 - scrub timeline;
 - change props;
-- surface validation error;
-- hot reload source;
-- preserve frame where expected;
-- start render;
-- show progress;
-- expose render failure.
+- surface validation errors through the Studio diagnostics overlay and recover with corrected props/source;
+- hot reload composition source automatically without a manual browser refresh;
+- preserve the current legal frame and unapplied props draft across safe source reloads;
+- run `npm run verify:studio` on Windows with Chrome/Edge available and require the child Playground to execute through a repository alias containing spaces;
+- render a current frame through the Studio UI and verify observable progress plus the generated output URL;
+- deliberately resolve a missing storage-backed asset, verify the renderer failure reaches the Studio diagnostics overlay, then recover with valid props;
+- keep frame-range/full-video execution coverage on the shared V2.7 renderer suite so Studio does not duplicate renderer semantics.
+
+### V2.8 closure evidence
+
+Windows 11 acceptance recorded for the completed Studio surface:
+
+- repository `npm run verify`: **253/253 passed** with TypeScript build success;
+- `release:check`: all **12** public packages release-ready;
+- `release:pack`: successful through `@vexa-video/studio` and the CLI;
+- real Chrome DevTools acceptance: three compositions loaded, composition switching and playback exercised, frame 50 plus an unapplied props draft preserved across automatic source reload, diagnostics recovered after invalid props, a current-frame render reached 100% with an output URL, and an intentional renderer failure surfaced through the Studio overlay;
+- Windows acceptance launches the Playground through a temporary repository junction whose path contains spaces;
+- Studio browser/runtime source remains free of Node/SDK/renderer/FFmpeg execution imports.
 
 ### Windows acceptance
 

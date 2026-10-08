@@ -83,6 +83,41 @@ V2.1 intentionally exposes browser-safe serializable metadata/types rather than 
 
 The implementation is intentionally separate from the existing `composition.ts` timeline/project model. Version 2 compositions will lower into the existing Vexa project/execution paths in later stages rather than redefining V1 timeline semantics.
 
+**Status:** Complete
+
+The first Studio slice establishes the browser-safe state/runtime boundary before adding development-host orchestration:
+
+- public `@vexa-video/studio` package;
+- deterministic composition catalog ordering and selection;
+- draft JSON props separate from last resolved metadata;
+- dynamic metadata application with frame clamping/preservation;
+- Player-backed play/pause/seek/step timing;
+- `@vexa-video/editor` timeline/playhead/viewport reuse rather than a second editor state model;
+- safe same-composition reload behavior that preserves the current frame and dirty draft props;
+- still-composition handling and typed Studio errors;
+- browser-boundary coverage preventing Node/SDK/renderer/FFmpeg imports.
+
+The second Studio slice connects that browser runtime to the existing Playground development host:
+
+- a dedicated responsive/full-screen Studio workspace in the normal Playground;
+- browser loading of the real `@vexa-video/bundler` development output through a restricted bundle-serving route;
+- executable-composition evaluation for JSON props and dynamic metadata;
+- normalized scene/background/node and asset inspection;
+- frame scrub/step/play controls plus keyboard shortcuts backed by the Studio session;
+- Node renderer execution with the selected resolved props, hardware choice, progress, cancellation, and output preview;
+- explicit `Reload bundle` behavior preserving composition/frame state through the Studio reload contract.
+
+The next Studio slice hardens the development loop:
+
+- recursive composition-source watching on the Node development host with debounced, path-normalized change events;
+- Server-Sent Events as the browser-safe hot-reload transport rather than filesystem access in `@vexa-video/studio`;
+- automatic bundle rebuild/re-import while preserving the selected composition, legal current frame, and unapplied JSON-props draft;
+- queued hot reload while a build or render is active so source changes are not lost;
+- a Studio error overlay plus console capture for props, composition evaluation, build, render, and browser-runtime failures;
+- a dependency-free Chromium/Edge DevTools acceptance harness covering real Studio load, source-watch reload, frame/draft preservation, diagnostics, and recovery.
+
+V2.8 is complete after Windows/browser closure acceptance. The final harness verifies composition switching, play/pause and scrubbing, hot-reload preservation, props diagnostics recovery, real current-frame render progress/output, deliberate renderer-failure surfacing/recovery, and the Windows repository-path-with-spaces case while keeping filesystem/build/render execution on the Node development host.
+
 ### Goal
 
 Define the backend-neutral composition model before building framework components or rendering.
@@ -455,7 +490,7 @@ Bundling user application code does not make that code trusted. Server render de
 
 ## V2.7 — Node composition renderer
 
-**Status:** In Progress
+**Status:** Complete
 
 The first renderer slice establishes the Node package and planning boundary before frame/video execution:
 

@@ -141,10 +141,22 @@ function rendererRuntimeOptions(payload, signal, onProgress) {
     );
   }
 
+  const inputProps = payload.inputProps;
+  if (
+    inputProps !== undefined &&
+    (inputProps === null || typeof inputProps !== "object" || Array.isArray(inputProps))
+  ) {
+    throw new VexaRendererError(
+      "Render inputProps must be a JSON object when provided.",
+      "INVALID_RENDERER_OPTIONS"
+    );
+  }
+
   return {
     timeoutMs,
     hardwareAcceleration,
     hardwareFallback: payload.hardwareFallback !== false,
+    ...(inputProps !== undefined ? { inputProps } : {}),
     signal,
     onProgress
   };

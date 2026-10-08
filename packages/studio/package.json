@@ -1,0 +1,48 @@
+{
+  "name": "@vexa-video/studio",
+  "version": "1.0.0",
+  "type": "module",
+  "private": false,
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.map"
+  ],
+  "dependencies": {
+    "@vexa-video/core": "1.0.0",
+    "@vexa-video/editor": "1.0.0",
+    "@vexa-video/player": "1.0.0"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "description": "Browser-safe Studio session runtime for Vexa programmable compositions.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mooskyai/vexa-video-sdk.git"
+  },
+  "homepage": "https://github.com/mooskyai/vexa-video-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/mooskyai/vexa-video-sdk/issues"
+  },
+  "keywords": [
+    "video",
+    "studio",
+    "browser",
+    "composition",
+    "typescript",
+    "vexa"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

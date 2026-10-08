@@ -1,8 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../fixtures/basic/styles.css"],
-  "sourceRoot": "vexa:///",
-  "sourcesContent": [".vexa-fixture { background-image: url(\"./logo.svg\"); color: rgb(32 96 220); }\r\n"],
-  "mappings": ";AAAA,CAAC;AAAe,oBAAkB;AAAmB,SAAO,IAAI,GAAG,GAAG;AAAM;",
-  "names": []
-}

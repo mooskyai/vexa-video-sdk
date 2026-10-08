@@ -42,6 +42,15 @@ test("timeline history supports undo and redo", () => {
   assert.equal(history.state.playheadSeconds, 4);
 });
 
+test("timeline history can synchronize transient state without changing undo history", () => {
+  const history = new TimelineHistory(createTimelineEditorState(project));
+  history.dispatch({ type: "playhead", seconds: 2 });
+  history.sync({ type: "playhead", seconds: 3 });
+  assert.equal(history.state.playheadSeconds, 3);
+  history.undo();
+  assert.equal(history.state.playheadSeconds, 0);
+});
+
 test("locked tracks reject editor mutations", () => {
   const locked: VideoProjectAst = {
     ...project,

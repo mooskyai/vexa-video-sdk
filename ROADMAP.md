@@ -86,8 +86,8 @@ The planned sequence is:
 | V2.4 | **Complete** | Browser-safe React authoring adapter |
 | V2.5 | **Complete** | Browser player and framework-neutral playback state |
 | V2.6 | **Complete** | TypeScript/TSX bundling and composition discovery |
-| V2.7 | **In Progress** | Node composition/still renderer using existing Vexa execution paths |
-| V2.8 | **Planned** | Local Vexa Studio development environment |
+| V2.7 | **Complete** | Node composition/still renderer using existing Vexa execution paths |
+| V2.8 | **Complete** | Local Vexa Studio development environment |
 | V2.9 | **Planned** | Shapes, effects, transitions, fonts, and composition captions |
 | V2.10 | **Planned** | Optional extended programmable-media integrations |
 | V2.11 | **Planned** | Browser/WebCodecs rendering with typed fallback |
@@ -97,7 +97,9 @@ The planned sequence is:
 | V2.15 | **Planned** | Frame-level visual regression and runtime parity testing |
 | V2.16 | **Planned** | Version 2 release hardening |
 
-V2.1 through V2.6 are complete on the Version 2 branch. V2.7 is in final acceptance: bundle-backed execution resolves executable compositions and dynamic metadata, materializes real still/single-frame images, renders bounded-concurrency image frame ranges, and encodes exact exclusive-end MP4/WebM ranges through the existing project/FFmpeg graph. Renderer execution exposes normalized progress, `AbortSignal` cancellation, process timeouts, shared hardware selection/fallback controls, and automatic storage-backed scene-asset materialization through a per-render managed Vexa workspace with deterministic cleanup. Final Windows FFprobe acceptance and repository/release verification remain before the V2.7 commit; durable job orchestration stays on the existing job-contract path.
+V2.1 through V2.7 are complete on the Version 2 branch. V2.7 bundle-backed execution resolves executable compositions and dynamic metadata, materializes still/single-frame images and bounded frame ranges, encodes exact exclusive-end MP4/WebM ranges, exposes progress/cancellation/timeouts/hardware selection, and resolves storage-backed scene assets through managed workspaces. Windows acceptance verified a 1920x1080 H.264 render at 30fps with exactly 60 frames over 2 seconds.
+
+V2.8 is complete. The public browser-safe `@vexa-video/studio` runtime composes the existing Player and Editor contracts for deterministic composition selection, props drafts, resolved metadata, preview/playhead state, timeline viewport state, and safe current-frame preservation. The normal Playground now provides the responsive Vexa Studio workspace, Node-hosted composition bundling/rendering, recursive source watching with SSE hot reload, diagnostics/log recovery, render progress/output/failure handling, and browser automation. Windows Chrome acceptance additionally verifies composition switching, play/pause/scrubbing, dirty-props/frame preservation across source reload, current-frame rendering, deliberate renderer failure/recovery, and execution through a repository alias containing spaces.
 
 Detailed scope and acceptance:
 

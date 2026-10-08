@@ -9,7 +9,7 @@ A typed, modular media-processing SDK for Node.js and TypeScript.
 
 Vexa provides high-level APIs for video editing, timeline composition, audio processing, captions, adaptive streaming, hardware-accelerated encoding, remote media, background jobs, and browser-safe Angular integration while keeping FFmpeg behind a backend-neutral API.
 
-> **Project status:** active development. The eleven public packages are versioned together at 1.0.0; example workspaces remain private.
+> **Project status:** active development. The twelve public packages are versioned together at 1.0.0; example workspaces remain private.
 
 ## Why Vexa?
 
@@ -48,6 +48,10 @@ Vexa keeps those concerns behind a typed SDK:
 | Programmable authoring | Deterministic composition metadata, frame/time math, scene graphs, and React authoring primitives |
 | Browser player | Framework-neutral playback state, seek/step/loop/rate/buffering, responsive host, events, and fullscreen |
 | Composition bundling | TypeScript/TSX browser bundles, CSS/assets, deterministic manifests/discovery, source maps, and environment allowlists |
+| Composition rendering | Bundle-backed still/frame/range/video rendering with progress, cancellation, hardware selection, and managed storage assets |
+| Studio runtime | Browser-safe composition session state that coordinates Player preview, Editor timeline state, draft props, resolved metadata, and hot-reload frame preservation |
+| Creative playground UI | Unified Vexa Editor and Vexa Studio dark creative-tool shell with media search/filtering, scene navigation, timeline visualization, inspector tooling, and responsive layouts |
+| Studio development host | Recursive composition-source watching, SSE hot reload, dirty-props/frame preservation, diagnostics overlay, and browser-driven render success/failure acceptance including Windows paths with spaces |
 
 ## Requirements
 

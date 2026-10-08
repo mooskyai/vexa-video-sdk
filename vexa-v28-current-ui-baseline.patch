@@ -1,0 +1,471 @@
+diff --git a/README.md b/README.md
+index 4063306..8c68a6e 100644
+--- a/README.md
++++ b/README.md
+@@ -9,7 +9,7 @@ A typed, modular media-processing SDK for Node.js and TypeScript.
+ 
+ Vexa provides high-level APIs for video editing, timeline composition, audio processing, captions, adaptive streaming, hardware-accelerated encoding, remote media, background jobs, and browser-safe Angular integration while keeping FFmpeg behind a backend-neutral API.
+ 
+-> **Project status:** active development. The eleven public packages are versioned together at 1.0.0; example workspaces remain private.
++> **Project status:** active development. The twelve public packages are versioned together at 1.0.0; example workspaces remain private.
+ 
+ ## Why Vexa?
+ 
+@@ -48,6 +48,8 @@ Vexa keeps those concerns behind a typed SDK:
+ | Programmable authoring | Deterministic composition metadata, frame/time math, scene graphs, and React authoring primitives |
+ | Browser player | Framework-neutral playback state, seek/step/loop/rate/buffering, responsive host, events, and fullscreen |
+ | Composition bundling | TypeScript/TSX browser bundles, CSS/assets, deterministic manifests/discovery, source maps, and environment allowlists |
++| Composition rendering | Bundle-backed still/frame/range/video rendering with progress, cancellation, hardware selection, and managed storage assets |
++| Studio runtime | Browser-safe composition session state that coordinates Player preview, Editor timeline state, draft props, resolved metadata, and hot-reload frame preservation |
+ 
+ ## Requirements
+ 
+diff --git a/ROADMAP.md b/ROADMAP.md
+index 99ef27f..1a41cbd 100644
+--- a/ROADMAP.md
++++ b/ROADMAP.md
+@@ -86,8 +86,8 @@ The planned sequence is:
+ | V2.4 | **Complete** | Browser-safe React authoring adapter |
+ | V2.5 | **Complete** | Browser player and framework-neutral playback state |
+ | V2.6 | **Complete** | TypeScript/TSX bundling and composition discovery |
+-| V2.7 | **In Progress** | Node composition/still renderer using existing Vexa execution paths |
+-| V2.8 | **Planned** | Local Vexa Studio development environment |
++| V2.7 | **Complete** | Node composition/still renderer using existing Vexa execution paths |
++| V2.8 | **In Progress** | Local Vexa Studio development environment |
+ | V2.9 | **Planned** | Shapes, effects, transitions, fonts, and composition captions |
+ | V2.10 | **Planned** | Optional extended programmable-media integrations |
+ | V2.11 | **Planned** | Browser/WebCodecs rendering with typed fallback |
+@@ -97,7 +97,9 @@ The planned sequence is:
+ | V2.15 | **Planned** | Frame-level visual regression and runtime parity testing |
+ | V2.16 | **Planned** | Version 2 release hardening |
+ 
+-V2.1 through V2.6 are complete on the Version 2 branch. V2.7 is in final acceptance: bundle-backed execution resolves executable compositions and dynamic metadata, materializes real still/single-frame images, renders bounded-concurrency image frame ranges, and encodes exact exclusive-end MP4/WebM ranges through the existing project/FFmpeg graph. Renderer execution exposes normalized progress, `AbortSignal` cancellation, process timeouts, shared hardware selection/fallback controls, and automatic storage-backed scene-asset materialization through a per-render managed Vexa workspace with deterministic cleanup. Final Windows FFprobe acceptance and repository/release verification remain before the V2.7 commit; durable job orchestration stays on the existing job-contract path.
++V2.1 through V2.7 are complete on the Version 2 branch. V2.7 bundle-backed execution resolves executable compositions and dynamic metadata, materializes still/single-frame images and bounded frame ranges, encodes exact exclusive-end MP4/WebM ranges, exposes progress/cancellation/timeouts/hardware selection, and resolves storage-backed scene assets through managed workspaces. Windows acceptance verified a 1920x1080 H.264 render at 30fps with exactly 60 frames over 2 seconds.
++
++V2.8 is now active. The first Studio slice adds a browser-safe `@vexa-video/studio` session runtime that composes the existing Player and Editor contracts for deterministic composition selection, props drafts, resolved metadata, preview/playhead state, timeline viewport state, and safe current-frame preservation across composition reloads. The development host, visual Studio workspace, hot-reload transport, render/progress wiring, console overlay, and browser automation follow in subsequent V2.8 slices.
+ 
+ Detailed scope and acceptance:
+ 
+diff --git a/docs/API-STABILITY.md b/docs/API-STABILITY.md
+index a62103a..27d9b15 100644
+--- a/docs/API-STABILITY.md
++++ b/docs/API-STABILITY.md
+@@ -44,6 +44,8 @@ Version 2 composition, player, React-authoring, Studio-browser, and web-renderer
+ 
+ `@vexa-video/renderer` is a public Node-side rendering surface. Render-plan schema fields, composition-selection behavior, executable bundle export validation, resolved frame-bound behavior, exclusive frame-range semantics, deterministic frame-range filenames, concurrency/timeout validation, `VexaRenderProgress`, hardware-selection/fallback behavior, storage injection/options, and typed renderer error codes are public behavior. Still/single-frame/frame-range/video execution delegates programmable-scene lowering, process cancellation/timeouts, FFmpeg progress parsing, hardware capability selection, and storage acquisition/workspace cleanup to existing Vexa contracts. Unresolved programmable-scene storage assets are materialized before lowering and cleaned after execution; caller-provided `resolvedAssets` remain an explicit override, while acquisition failures use `RENDER_ASSET_RESOLUTION_FAILED`. Exact video subranges are represented by final-graph video/audio trimming rather than a second intermediate render. Durable job integration must keep the same boundary instead of creating parallel execution semantics.
+ 
++`@vexa-video/studio` is a public browser-safe development-runtime surface. Composition ordering/selection, draft-props state, resolved-metadata application, frame preservation/clamping across reloads, Player/editor synchronization, and typed Studio errors are public behavior. Studio browser code may depend on `@vexa-video/core/browser`, `@vexa-video/editor`, and `@vexa-video/player`, but Node bundling/rendering/storage/process execution must stay behind a development-host boundary.
++
+ ## Version 2 composition schemas
+ 
+ Serializable composition/project/render contracts introduced for Version 2 must carry an explicit schema version when persisted or sent across a process/network boundary. The programmable-scene schema is part of that contract: node kinds, asset-source shapes, timing/z-order semantics, and deterministic serialization/lowering behavior must not be reinterpreted without an appropriate schema or major-version change.
+diff --git a/docs/V2_MILESTONE.md b/docs/V2_MILESTONE.md
+index 95db13b..93d72c0 100644
+--- a/docs/V2_MILESTONE.md
++++ b/docs/V2_MILESTONE.md
+@@ -83,6 +83,32 @@ V2.1 intentionally exposes browser-safe serializable metadata/types rather than
+ 
+ The implementation is intentionally separate from the existing `composition.ts` timeline/project model. Version 2 compositions will lower into the existing Vexa project/execution paths in later stages rather than redefining V1 timeline semantics.
+ 
++**Status:** In Progress
++
++The first Studio slice establishes the browser-safe state/runtime boundary before adding development-host orchestration:
++
++- public `@vexa-video/studio` package;
++- deterministic composition catalog ordering and selection;
++- draft JSON props separate from last resolved metadata;
++- dynamic metadata application with frame clamping/preservation;
++- Player-backed play/pause/seek/step timing;
++- `@vexa-video/editor` timeline/playhead/viewport reuse rather than a second editor state model;
++- safe same-composition reload behavior that preserves the current frame and dirty draft props;
++- still-composition handling and typed Studio errors;
++- browser-boundary coverage preventing Node/SDK/renderer/FFmpeg imports.
++
++The second Studio slice connects that browser runtime to the existing Playground development host:
++
++- a dedicated responsive/full-screen Studio workspace in the normal Playground;
++- browser loading of the real `@vexa-video/bundler` development output through a restricted bundle-serving route;
++- executable-composition evaluation for JSON props and dynamic metadata;
++- normalized scene/background/node and asset inspection;
++- frame scrub/step/play controls plus keyboard shortcuts backed by the Studio session;
++- Node renderer execution with the selected resolved props, hardware choice, progress, cancellation, and output preview;
++- explicit `Reload bundle` behavior preserving composition/frame state through the Studio reload contract.
++
++Automatic filesystem watching/hot-reload transport, richer browser scene presentation, console/error-overlay capture from composition evaluation, and browser-automation acceptance remain in later V2.8 slices.
++
+ ### Goal
+ 
+ Define the backend-neutral composition model before building framework components or rendering.
+@@ -455,7 +481,7 @@ Bundling user application code does not make that code trusted. Server render de
+ 
+ ## V2.7 — Node composition renderer
+ 
+-**Status:** In Progress
++**Status:** Complete
+ 
+ The first renderer slice establishes the Node package and planning boundary before frame/video execution:
+ 
+diff --git a/docs/V2_MILESTONE_TESTING.md b/docs/V2_MILESTONE_TESTING.md
+index 5414d1c..6aa7d59 100644
+--- a/docs/V2_MILESTONE_TESTING.md
++++ b/docs/V2_MILESTONE_TESTING.md
+@@ -333,7 +333,7 @@ Confirm environment variables not explicitly allowed are not exposed to browser
+ 
+ ## V2.7 — Node composition renderer
+ 
+-**Status:** In Progress
++**Status:** Complete
+ 
+ ### Foundation tests
+ 
+@@ -436,6 +436,33 @@ On Windows 11 render a deterministic short composition and inspect it with ffpro
+ 
+ ## V2.8 — Studio
+ 
++**Status:** In Progress
++
++### Foundation tests
++
++Cover the browser-safe Studio runtime with deterministic tests for:
++
++- stable composition catalog ordering and selection;
++- Player/editor playhead synchronization;
++- frame stepping and playback progression;
++- draft props remaining separate from last resolved dynamic metadata;
++- resolved metadata updating fps/duration/canvas state while preserving or clamping the current frame;
++- same-composition reload preserving current frame and dirty props;
++- still compositions remaining on frame zero and rejecting playback;
++- typed missing/mismatched-composition errors;
++- browser-source boundary checks rejecting Node/SDK/renderer/FFmpeg imports;
++- transient `TimelineHistory.sync()` updates not creating undo entries.
++
++### Playground integration tests
++
++Cover the first visual Studio integration with deterministic checks for:
++
++- Studio client JavaScript syntax;
++- browser source importing Studio/Core browser contracts but no Node SDK/renderer/FFmpeg modules;
++- the local development host explicitly serving `@vexa-video/studio`, `@vexa-video/editor`, and generated composition-bundle files;
++- render requests carrying the Studio-resolved JSON props through the existing renderer execution options;
++- manual browser acceptance of selection, props, metadata, frame scrub/step/play, reload preservation, render progress/output, responsive layout, and fullscreen.
++
+ ### End-to-end tests
+ 
+ Using browser automation:
+diff --git a/docs/architecture.md b/docs/architecture.md
+index 81b5a5d..cff81a4 100644
+--- a/docs/architecture.md
++++ b/docs/architecture.md
+@@ -22,6 +22,7 @@ The architecture has four primary goals:
+ | `@vexa-video/ai` | Node.js (optional) | Provider-neutral transcription/tracking/highlight adapters plus deterministic AI-assisted planning helpers |
+ | `@vexa-video/bundler` | Node.js development/build | TypeScript/TSX composition bundling, deterministic discovery/manifests, CSS/assets, source maps, and environment filtering |
+ | `@vexa-video/renderer` | Node.js | Bundle-backed composition planning plus executable still, single-frame, frame-range, and video rendering through shared core/FFmpeg contracts |
++| `@vexa-video/studio` | Browser | Local Studio session state coordinating composition selection, Player preview, Editor timeline state, props, resolved metadata, and reload preservation |
+ 
+ A browser-safe subpath, `@vexa-video/core/browser`, exposes serializable TypeScript contracts without exposing Node execution classes.
+ 
+@@ -125,6 +126,10 @@ The fifth slice adds `@vexa-video/player` as a browser-safe, framework-neutral p
+ 
+ The sixth slice adds `@vexa-video/bundler` as explicit Node-side development/build tooling. It uses an exported `vexaCompositions` metadata contract to discover compositions in stable ID order, emits browser ESM from TypeScript/TSX, extracts CSS, fingerprints imported assets, copies public assets, preserves dynamic-import chunking/source maps, and writes a schema-versioned deterministic bundle manifest. Only allowlisted environment values are embedded. Bundling/discovery is not a security sandbox; hosted processing of untrusted source must isolate the Node build process.
+ 
++The Studio browser runtime composes `@vexa-video/player` with `@vexa-video/editor` instead of owning another playback or timeline state machine. It keeps draft props distinct from the last resolved metadata, rebuilds preview timing when dynamic metadata changes, clamps/preserves the current frame deterministically, and uses transient editor synchronization for playback-driven playhead updates without adding undo entries. Node responsibilities such as bundle watching, metadata execution, rendering, filesystem access, and hot-reload transport remain behind the development-host boundary.
++
++The integrated Playground Studio workspace is the first concrete development-host adapter for that boundary. The Node host serves only the generated composition bundle and browser-safe package outputs through restricted local routes; Studio evaluates executable composition props/metadata/scene intent in the browser, while actual media rendering remains a request to the existing `@vexa-video/renderer` route. Render input props are forwarded through the renderer's existing `inputProps` option instead of creating Studio-specific execution semantics.
++
+ The renderer consumes deterministic bundle manifests for composition selection and target/range planning. Built bundles can also expose `vexaExecutableCompositions`; the Node renderer loads that executable surface, resolves input props and dynamic metadata through `@vexa-video/core`, resolves programmable-scene storage assets through the existing `@vexa-video/sdk` `Storage` layer, lowers representable scenes into `VideoProjectAst`, and uses the shared FFmpeg layer for real still/single-frame image output, bounded-concurrency frame-range materialization, and MP4/WebM encoding. One managed asset workspace is created per render only when unresolved storage assets are present; local/HTTP/object references are materialized there under the configured storage policy or adapters, then the workspace is removed after all active render workers settle on success or failure. Explicit `resolvedAssets` bypass acquisition for those asset IDs. Video subranges trim the final composed video graph by exact frame index and trim audio by the equivalent frame-derived seconds, preserving exclusive-end semantics without a second intermediate render. Video execution also delegates accelerator capability detection/selection to the shared hardware layer, feeds FFmpeg's progress protocol through the existing progress parser, and propagates the same process `AbortSignal` and timeout contracts; the renderer only maps those failures into its typed public boundary. Durable job orchestration remains on the shared job-contract path rather than being duplicated inside the synchronous renderer.
+ 
+ `@vexa-video/core/browser` exposes serializable programmable-composition metadata plus pure composition definition/resolution, timing, and scene runtimes. Composition definition/registry authoring remains on the normal core surface. The browser entry must remain free of Node execution, FFmpeg, Redis, filesystem, and SDK runtime imports so future React/player packages can evaluate the same scene/timing semantics directly.
+diff --git a/docs/visual-playground.md b/docs/visual-playground.md
+index 5bf345d..fd876c2 100644
+--- a/docs/visual-playground.md
++++ b/docs/visual-playground.md
+@@ -51,6 +51,7 @@ The UI provides one place to exercise the public media features:
+ - the framework-neutral programmable Player workspace, including play/pause, frame stepping, seeking, looping, playback rate, volume/mute, responsive fit modes, buffering state, fullscreen, live state, and typed player events;
+ - the composition Bundles workspace, including deterministic composition discovery, development/production builds, source-map modes, emitted CSS/assets/chunks/public files, manifest inspection, and sanitized bundler failures;
+ - Node render planning and execution for the selected bundled composition, including stills, single frames, bounded-concurrency image ranges, and MP4 video ranges with explicit exclusive-end frame semantics.
++- the Vexa Studio workspace, including bundle-backed composition selection, scene preview, frame-accurate playhead controls, JSON props, dynamic metadata, asset inspection, render progress/output, keyboard frame stepping, and reload-time frame preservation.
+ 
+ ## Programmable player
+ 
+@@ -68,6 +69,18 @@ After building, choose a render target in **Selected composition**. **Plan** sho
+ 
+ The Player and Compositions workspaces are responsive independently of the surrounding editor panels. Their **Full screen** action expands the complete focused preview workspace (toolbar, content, diagnostics/output, and the Player's single transport) rather than creating a second demo page or duplicate playback controls. On narrower viewports, composition panels collapse into a vertical flow and Player diagnostics stack below the canvas.
+ 
++## Vexa Studio
++
++Select **Studio** from the left rail or preview tabs. On first open, the Playground development host builds the Vexa-owned composition fixture and serves the emitted browser bundle from a restricted `.tmp/visual-playground/composition-bundle` route. Browser imports use `@vexa-video/studio`, `@vexa-video/player`, `@vexa-video/editor`, and the browser-safe core entry; filesystem access, bundling, FFmpeg, and rendering remain on the Node host.
++
++The Studio workspace uses the public Studio session as its source of composition/playhead state. Select a composition, scrub or step its frame, use **Space** to play/pause, and use **Left/Right** (or **Shift+Left/Right** for ten frames) while focus is outside an input. JSON props are evaluated through the executable browser bundle so dynamic metadata can update dimensions/fps/duration before preview timing is rebuilt.
++
++The scene preview is an inspection surface for the normalized programmable scene graph: backgrounds, text/solid/static visual nodes, asset declarations, and current frame visibility are shown without importing Node execution code. The Render card sends the selected composition, current resolved props, target frame/range, and hardware preference through the existing `/api/compositions/render` renderer stream and shows progress plus the generated image/video artifact.
++
++Use **Reload bundle** after changing the fixture source. The Studio session preserves the selected composition/current frame where the updated metadata still permits it. This is the explicit reload path for the current slice; automatic filesystem watching/hot reload is still under V2.8 development.
++
++Studio is responsive and can expand the complete preview workspace with **Full screen**. It does not create a second Player transport or a second timeline state implementation.
++
+ ## Media library
+ 
+ Uploaded or imported assets appear in the media library with normalized metadata.
+diff --git a/examples/visual-playground/bundler-playground.mjs b/examples/visual-playground/bundler-playground.mjs
+index 4d8c3ae..c6b3f3c 100644
+--- a/examples/visual-playground/bundler-playground.mjs
++++ b/examples/visual-playground/bundler-playground.mjs
+@@ -141,10 +141,22 @@ function rendererRuntimeOptions(payload, signal, onProgress) {
+     );
+   }
+ 
++  const inputProps = payload.inputProps;
++  if (
++    inputProps !== undefined &&
++    (inputProps === null || typeof inputProps !== "object" || Array.isArray(inputProps))
++  ) {
++    throw new VexaRendererError(
++      "Render inputProps must be a JSON object when provided.",
++      "INVALID_RENDERER_OPTIONS"
++    );
++  }
++
+   return {
+     timeoutMs,
+     hardwareAcceleration,
+     hardwareFallback: payload.hardwareFallback !== false,
++    ...(inputProps !== undefined ? { inputProps } : {}),
+     signal,
+     onProgress
+   };
+diff --git a/examples/visual-playground/public/index.html b/examples/visual-playground/public/index.html
+index 803feac..76050d6 100644
+--- a/examples/visual-playground/public/index.html
++++ b/examples/visual-playground/public/index.html
+@@ -7,11 +7,14 @@
+   <link rel="stylesheet" href="/styles.css">
+   <link rel="stylesheet" href="/player-workspace.css">
+   <link rel="stylesheet" href="/bundler-workspace.css">
++  <link rel="stylesheet" href="/studio-workspace.css">
+   <link rel="stylesheet" href="/workspace-responsive.css">
+   <script type="importmap">
+     {"imports":{
+       "@vexa-video/core/browser":"/vexa-packages/core/browser.js",
+-      "@vexa-video/player":"/vexa-packages/player/index.js"
++      "@vexa-video/editor":"/vexa-packages/editor/index.js",
++      "@vexa-video/player":"/vexa-packages/player/index.js",
++      "@vexa-video/studio":"/vexa-packages/studio/index.js"
+     }}
+   </script>
+ </head>
+@@ -650,6 +653,7 @@
+   <script type="module" src="/app.js"></script>
+   <script type="module" src="/player-demo.js"></script>
+   <script type="module" src="/bundler-workspace.js"></script>
++  <script type="module" src="/studio-workspace.js"></script>
+   <script type="module" src="/workspace-responsive.js"></script>
+ </body>
+ </html>
+diff --git a/examples/visual-playground/server.mjs b/examples/visual-playground/server.mjs
+index ee1d94e..2512108 100644
+--- a/examples/visual-playground/server.mjs
++++ b/examples/visual-playground/server.mjs
+@@ -15,9 +15,12 @@ const exampleDir = fileURLToPath(new URL(".", import.meta.url));
+ const publicDir = resolve(exampleDir, "public");
+ const repositoryRoot = resolve(exampleDir, "../..");
+ const workspaceRoot = resolve(exampleDir, "../../.tmp/visual-playground");
++const compositionBundleRoot = resolve(workspaceRoot, "composition-bundle");
+ const browserPackageRoots = new Map([
+   ["core", resolve(repositoryRoot, "packages/core/dist")],
+-  ["player", resolve(repositoryRoot, "packages/player/dist")]
++  ["editor", resolve(repositoryRoot, "packages/editor/dist")],
++  ["player", resolve(repositoryRoot, "packages/player/dist")],
++  ["studio", resolve(repositoryRoot, "packages/studio/dist")]
+ ]);
+ const maxUploadBytes = 2 * 1024 * 1024 * 1024;
+ const remoteStorage = new Storage({
+@@ -990,6 +993,7 @@ function contentType(path) {
+     case ".jpg":
+     case ".jpeg": return "image/jpeg";
+     case ".png": return "image/png";
++    case ".svg": return "image/svg+xml";
+     case ".webp": return "image/webp";
+     case ".gif": return "image/gif";
+     case ".wav": return "audio/wav";
+@@ -1095,7 +1099,7 @@ async function servePublic(res, requestPath, method) {
+ }
+ 
+ async function serveBrowserPackage(res, requestPath, method) {
+-  const match = /^\/vexa-packages\/(core|player)\/([a-z0-9._/-]+)$/iu.exec(requestPath);
++  const match = /^\/vexa-packages\/(core|editor|player|studio)\/([a-z0-9._/-]+)$/iu.exec(requestPath);
+   if (!match || match[2].includes("..")) {
+     json(res, 400, { error: "Invalid browser package path." });
+     return;
+@@ -1121,6 +1125,32 @@ async function serveBrowserPackage(res, requestPath, method) {
+   }
+ }
+ 
++async function serveCompositionBundle(res, requestPath, method) {
++  const prefix = "/composition-bundle/";
++  const encoded = requestPath.slice(prefix.length);
++  const parts = encoded.split("/").map((part) => decodeURIComponent(part));
++  if (
++    parts.length === 0 ||
++    parts.some((part) => !part || part === "." || part === ".." || !/^[a-z0-9._-]+$/iu.test(part))
++  ) {
++    json(res, 400, { error: "Invalid composition bundle path." });
++    return;
++  }
++
++  const path = resolve(compositionBundleRoot, ...parts);
++  if (!path.startsWith(`${compositionBundleRoot}${sep}`)) {
++    json(res, 403, { error: "Path is outside the composition bundle directory." });
++    return;
++  }
++
++  try {
++    await serveFile(res, path, undefined, method);
++  } catch (error) {
++    if (error?.code !== "ENOENT") throw error;
++    json(res, 404, { error: "Composition bundle file not found. Build the development bundle first." });
++  }
++}
++
+ async function route(req, res) {
+   const url = new URL(req.url ?? "/", `http://${host}:${port}`);
+ 
+@@ -1241,6 +1271,11 @@ async function route(req, res) {
+     return;
+   }
+ 
++  if ((req.method === "GET" || req.method === "HEAD") && url.pathname.startsWith("/composition-bundle/")) {
++    await serveCompositionBundle(res, url.pathname, req.method);
++    return;
++  }
++
+   if ((req.method === "GET" || req.method === "HEAD") && url.pathname.startsWith("/vexa-packages/")) {
+     await serveBrowserPackage(res, url.pathname, req.method);
+     return;
+diff --git a/package-lock.json b/package-lock.json
+index 65f9a6e..586d7fe 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -4295,6 +4295,10 @@
+       "resolved": "packages/sdk",
+       "link": true
+     },
++    "node_modules/@vexa-video/studio": {
++      "resolved": "packages/studio",
++      "link": true
++    },
+     "node_modules/@vitejs/plugin-basic-ssl": {
+       "version": "2.1.4",
+       "resolved": "https://registry.npmjs.org/@vitejs/plugin-basic-ssl/-/plugin-basic-ssl-2.1.4.tgz",
+@@ -8551,6 +8555,16 @@
+       "engines": {
+         "node": ">=24.21.0"
+       }
++    },
++    "packages/studio": {
++      "name": "@vexa-video/studio",
++      "version": "1.0.0",
++      "license": "MIT",
++      "dependencies": {
++        "@vexa-video/core": "1.0.0",
++        "@vexa-video/editor": "1.0.0",
++        "@vexa-video/player": "1.0.0"
++      }
+     }
+   }
+ }
+diff --git a/packages/editor/README.md b/packages/editor/README.md
+index 4b14fa7..d2dc0e6 100644
+--- a/packages/editor/README.md
++++ b/packages/editor/README.md
+@@ -1,3 +1,3 @@
+ # @vexa-video/editor
+ 
+-Framework-neutral browser timeline-editor foundations for Vexa Video SDK: immutable project state, selection, playhead, snapping, clip move/trim operations, viewport state, and undo/redo history.
++Framework-neutral browser timeline-editor foundations for Vexa Video SDK: immutable project state, selection, playhead, snapping, clip move/trim operations, viewport state, and undo/redo history. `TimelineHistory.sync()` lets Player/Studio update transient playhead or viewport state without polluting undo history.
+diff --git a/packages/editor/src/timeline.ts b/packages/editor/src/timeline.ts
+index 5809c6d..b5e692a 100644
+--- a/packages/editor/src/timeline.ts
++++ b/packages/editor/src/timeline.ts
+@@ -188,6 +188,12 @@ export class TimelineHistory {
+     return next;
+   }
+ 
++  /** Apply transient external state such as player playhead movement without creating an undo entry. */
++  sync(command: TimelineEditorCommand): TimelineEditorState {
++    this.#state = applyTimelineEditorCommand(this.#state, command);
++    return this.#state;
++  }
++
+   undo(): TimelineEditorState {
+     const previous = this.#undo.pop();
+     if (!previous) return this.#state;
+diff --git a/packages/editor/test/timeline.test.ts b/packages/editor/test/timeline.test.ts
+index d409cce..ec671ea 100644
+--- a/packages/editor/test/timeline.test.ts
++++ b/packages/editor/test/timeline.test.ts
+@@ -42,6 +42,15 @@ test("timeline history supports undo and redo", () => {
+   assert.equal(history.state.playheadSeconds, 4);
+ });
+ 
++test("timeline history can synchronize transient state without changing undo history", () => {
++  const history = new TimelineHistory(createTimelineEditorState(project));
++  history.dispatch({ type: "playhead", seconds: 2 });
++  history.sync({ type: "playhead", seconds: 3 });
++  assert.equal(history.state.playheadSeconds, 3);
++  history.undo();
++  assert.equal(history.state.playheadSeconds, 0);
++});
++
+ test("locked tracks reject editor mutations", () => {
+   const locked: VideoProjectAst = {
+     ...project,
+diff --git a/scripts/check-release.mjs b/scripts/check-release.mjs
+index c52231d..823d034 100644
+--- a/scripts/check-release.mjs
++++ b/scripts/check-release.mjs
+@@ -11,6 +11,7 @@ const releasePackages = [
+   "packages/player",
+   "packages/bundler",
+   "packages/renderer",
++  "packages/studio",
+   "packages/cli"
+ ];
+ 
+diff --git a/scripts/publish-workspaces.mjs b/scripts/publish-workspaces.mjs
+index e57287e..533368a 100644
+--- a/scripts/publish-workspaces.mjs
++++ b/scripts/publish-workspaces.mjs
+@@ -55,6 +55,7 @@ const workspaces = [
+   "@vexa-video/player",
+   "@vexa-video/bundler",
+   "@vexa-video/renderer",
++  "@vexa-video/studio",
+   "@vexa-video/cli"
+ ];
+ 
+diff --git a/scripts/release-pack.mjs b/scripts/release-pack.mjs
+index 59e8f79..0c3a2c5 100644
+--- a/scripts/release-pack.mjs
++++ b/scripts/release-pack.mjs
+@@ -53,6 +53,7 @@ const workspaces = [
+   ["@vexa-video/player", "packages/player"],
+   ["@vexa-video/bundler", "packages/bundler"],
+   ["@vexa-video/renderer", "packages/renderer"],
++  ["@vexa-video/studio", "packages/studio"],
+   ["@vexa-video/cli", "packages/cli"]
+ ];
+ 
+diff --git a/tsconfig.json b/tsconfig.json
+index 29d32a1..ba25057 100644
+--- a/tsconfig.json
++++ b/tsconfig.json
+@@ -4,6 +4,9 @@
+     {
+       "path": "./packages/core"
+     },
++    {
++      "path": "./packages/studio"
++    },
+     {
+       "path": "./packages/angular"
+     },

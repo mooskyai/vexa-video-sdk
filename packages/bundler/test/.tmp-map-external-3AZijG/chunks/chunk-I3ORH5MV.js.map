@@ -1,8 +1,0 @@
-{
-  "version": 3,
-  "sources": ["<define:process.env>"],
-  "sourceRoot": "vexa:///",
-  "sourcesContent": ["{}"],
-  "mappings": ";AAAA,kCAAC;",
-  "names": []
-}
