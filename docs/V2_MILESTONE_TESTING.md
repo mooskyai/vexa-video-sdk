@@ -506,6 +506,10 @@ Studio browser code must not directly execute FFmpeg or import Node process modu
 
 ## V2.9 — Shapes, effects, transitions, fonts, captions
 
+### Shape contract tests
+
+Before visual rendering is wired, cover deterministic shape normalization and serialization for rectangle, ellipse, line, polygon, star, path, and arc geometry. Validate finite coordinates, positive dimensions/radii/stroke widths, polygon/star point constraints, rounded-rectangle bounds, style defaults, invalid geometry failures, and stable SVG path conversion through both the normal core and browser-safe exports.
+
 ### Visual fixtures
 
 Create Vexa-owned frames for:
