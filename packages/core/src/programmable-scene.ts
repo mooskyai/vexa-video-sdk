@@ -1,6 +1,7 @@
 import type { ClipTransform, ProjectTrack, TextStyle, TimelineClip, VideoProjectAst } from "./composition.js";
 import type { ResizeFit } from "./editing.js";
 import type { JsonObject, JsonValue } from "./programmable-composition.js";
+import { InvalidProgrammableShapeError, normalizeProgrammableShape, type ProgrammableShape } from "./programmable-shapes.js";
 import { frameToSeconds } from "./programmable-timing.js";
 import type { MediaStorageSource } from "./storage.js";
 
@@ -153,6 +154,11 @@ export interface ProgrammableSceneSolidNode extends ProgrammableSceneNodeBase {
   readonly height: number;
 }
 
+export interface ProgrammableSceneShapeNode extends ProgrammableSceneNodeBase {
+  readonly kind: "shape";
+  readonly shape: ProgrammableShape;
+}
+
 export interface ProgrammableSceneTextStyle {
   readonly fontSize?: number;
   readonly color?: string;
@@ -211,6 +217,7 @@ export type ProgrammableSceneContainerNode = ProgrammableSceneGroupNode | Progra
 export type ProgrammableSceneLeafNode =
   | ProgrammableSceneFillNode
   | ProgrammableSceneSolidNode
+  | ProgrammableSceneShapeNode
   | ProgrammableSceneTextNode
   | ProgrammableSceneImageNode
   | ProgrammableSceneVideoNode
@@ -623,6 +630,21 @@ function normalizeNode(node: ProgrammableSceneNode, context: NormalizeContext): 
     });
   }
 
+  if (node.kind === "shape") {
+    try {
+      return Object.freeze({
+        ...base,
+        kind: "shape",
+        shape: normalizeProgrammableShape(node.shape)
+      });
+    } catch (error) {
+      if (error instanceof InvalidProgrammableShapeError) {
+        throw new InvalidProgrammableSceneError(`node ${id}.shape is invalid: ${error.message}`, { nodeId: id });
+      }
+      throw error;
+    }
+  }
+
   if (node.kind === "text") {
     const style = normalizeTextStyle(node.style, id);
     return Object.freeze({
@@ -968,7 +990,7 @@ function lowerTextStyle(style: ProgrammableSceneTextStyle | undefined): TextStyl
 
 function assertProjectRepresentable(item: ProgrammableSceneRenderItem): void {
   const node = item.node;
-  if (node.kind === "solid" || node.kind === "surface") {
+  if (node.kind === "solid" || node.kind === "shape" || node.kind === "surface") {
     throw new UnsupportedProgrammableSceneLoweringError(node.id, `${node.kind} nodes require the frame-render path.`);
   }
   if ((node.kind === "image" || node.kind === "video") && node.crop) {
@@ -1091,7 +1113,7 @@ export function lowerProgrammableSceneToVideoProject(
         volume: (node.muted ?? false) ? 0 : (node.volume ?? 1)
       };
       track = { id: `scene:${node.id}`, type: "audio", muted: node.muted ?? false, clips: [clip] };
-    } else if (node.kind === "solid" || node.kind === "surface") {
+    } else if (node.kind === "solid" || node.kind === "shape" || node.kind === "surface") {
       throw new UnsupportedProgrammableSceneLoweringError(node.id, `${node.kind} nodes require the frame-render path.`);
     } else {
       const exhaustive: never = node;

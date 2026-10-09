@@ -580,7 +580,7 @@ Reuse `@vexa-video/editor` state/history utilities instead of creating a second 
 
 **Status:** In progress.
 
-The first implementation slice establishes browser-safe, serializable shape geometry in `@vexa-video/core`: rectangle, ellipse, line, polygon, star, path, and arc descriptors; deterministic validation/defaulting; stable SVG path conversion; and JSON serialization. Scene-node/React authoring and renderer execution are layered on this shared geometry contract rather than creating a second shape model.
+The first implementation slice establishes browser-safe, serializable shape geometry in `@vexa-video/core`: rectangle, ellipse, line, polygon, star, path, and arc descriptors; deterministic validation/defaulting; stable SVG path conversion; and JSON serialization. The second slice integrates that same contract as a first-class programmable scene node and adds generic plus convenience React authoring components without introducing a duplicate geometry model. Shape nodes intentionally remain typed as unsupported for `VideoProjectAst` lowering until the renderer slice provides real visual execution.
 
 ### Goal
 

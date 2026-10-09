@@ -197,6 +197,56 @@ test("surface contracts stay serializable and renderer-id based", () => {
   assert.doesNotThrow(() => JSON.parse(serializeProgrammableScene(scene)));
 });
 
+test("shape nodes reuse the shared shape contract and enter the render graph", () => {
+  const options = {
+    id: "shape-scene",
+    width: 320,
+    height: 180,
+    fps: 30,
+    durationInFrames: 60,
+    children: [{
+      id: "badge",
+      kind: "shape" as const,
+      shape: {
+        geometry: { kind: "rectangle" as const, width: 40, height: 20, radiusX: 4 },
+        style: { fill: "#ff3366", stroke: { color: "#ffffff", width: 2 } }
+      }
+    }]
+  } as const;
+
+  const scene = defineProgrammableScene(options);
+  const browserScene = defineBrowserProgrammableScene(options);
+  const node = scene.children[0];
+  assert.equal(node?.kind, "shape");
+  if (node?.kind !== "shape") throw new Error("expected shape node");
+  assert.deepEqual(node.shape.geometry, {
+    kind: "rectangle",
+    x: 0,
+    y: 0,
+    width: 40,
+    height: 20,
+    radiusX: 4,
+    radiusY: 4
+  });
+  assert.deepEqual(node.shape.style, {
+    fill: "#ff3366",
+    fillRule: "nonzero",
+    stroke: { color: "#ffffff", width: 2, lineCap: "butt", lineJoin: "miter" }
+  });
+  assert.equal(Object.isFrozen(node.shape), true);
+  assert.equal(createProgrammableSceneRenderGraph(scene).items[0]?.node.kind, "shape");
+  assert.equal(serializeProgrammableScene(scene), serializeBrowserProgrammableScene(browserScene));
+
+  assert.throws(() => defineProgrammableScene({
+    id: "invalid-shape", width: 100, height: 100, fps: 30, durationInFrames: 30,
+    children: [{
+      id: "invalid",
+      kind: "shape",
+      shape: { geometry: { kind: "rectangle", width: 0, height: 10 } }
+    }]
+  }), InvalidProgrammableSceneError);
+});
+
 test("asset readiness state updates immutably", () => {
   const scene = defineProgrammableScene({
     id: "readiness", width: 10, height: 10, fps: 30, durationInFrames: 10,
@@ -310,6 +360,16 @@ test("unsupported scene features fail with typed lowering errors instead of appr
     children: [{ id: "surface", kind: "surface", surface: { kind: "svg", rendererId: "logo" } }]
   });
   assert.throws(() => lowerProgrammableSceneToVideoProject(surface), UnsupportedProgrammableSceneLoweringError);
+
+  const shape = defineProgrammableScene({
+    id: "shape", width: 100, height: 100, fps: 30, durationInFrames: 30,
+    children: [{
+      id: "shape",
+      kind: "shape",
+      shape: { geometry: { kind: "ellipse", cx: 50, cy: 50, radiusX: 20, radiusY: 10 } }
+    }]
+  });
+  assert.throws(() => lowerProgrammableSceneToVideoProject(shape), UnsupportedProgrammableSceneLoweringError);
 });
 
 test("nested translation-only transforms can lower without losing offsets", () => {

@@ -26,8 +26,14 @@ import {
 import type {
   FrameContext,
   JsonObject,
+  ProgrammableArcShape,
   ProgrammableCompositionDefinition,
   ProgrammableCompositionStaticMetadata,
+  ProgrammableEllipseShape,
+  ProgrammableLineShape,
+  ProgrammablePathShape,
+  ProgrammablePolygonShape,
+  ProgrammableRectangleShape,
   ProgrammableScene,
   ProgrammableSceneAsset,
   ProgrammableSceneAssetKind,
@@ -41,6 +47,7 @@ import type {
   ProgrammableSceneNode,
   ProgrammableSceneNodeBase,
   ProgrammableScenePreloadMode,
+  ProgrammableSceneShapeNode,
   ProgrammableSceneSolidNode,
   ProgrammableSceneSurfaceDescriptor,
   ProgrammableSceneSurfaceNode,
@@ -48,6 +55,10 @@ import type {
   ProgrammableSceneTextStyle,
   ProgrammableSceneTransform,
   ProgrammableSceneVideoNode,
+  ProgrammableShape,
+  ProgrammableShapeGeometry,
+  ProgrammableShapeStyle,
+  ProgrammableStarShape,
   ProgrammableStorageAssetSource,
   ResolvedProgrammableComposition,
   ResolvedProgrammableCompositionMetadata,
@@ -690,6 +701,145 @@ export function VexaSolid(props: VexaSolidProps): null {
   return leaf("VexaSolid", node);
 }
 
+export interface VexaShapeProps extends VexaLeafBaseProps {
+  readonly shape: ProgrammableShape;
+}
+
+function shapeValue(
+  geometry: ProgrammableShapeGeometry,
+  style: ProgrammableShapeStyle | undefined
+): ProgrammableShape {
+  return Object.freeze({
+    geometry,
+    ...(style !== undefined ? { style } : {})
+  });
+}
+
+function shapeLeaf(label: string, props: VexaLeafBaseProps, shape: ProgrammableShape): null {
+  const node: ProgrammableSceneShapeNode = Object.freeze({
+    kind: "shape",
+    id: props.id,
+    ...nodeBase(props),
+    shape
+  });
+  return leaf(label, node);
+}
+
+export function VexaShape(props: VexaShapeProps): null {
+  return shapeLeaf("VexaShape", props, props.shape);
+}
+
+export interface VexaShapePrimitiveBaseProps extends VexaLeafBaseProps {
+  readonly style?: ProgrammableShapeStyle;
+}
+
+export type VexaRectangleProps = VexaShapePrimitiveBaseProps &
+  Omit<ProgrammableRectangleShape, "kind">;
+
+export function VexaRectangle(props: VexaRectangleProps): null {
+  return shapeLeaf("VexaRectangle", props, shapeValue({
+    kind: "rectangle",
+    ...(props.x !== undefined ? { x: props.x } : {}),
+    ...(props.y !== undefined ? { y: props.y } : {}),
+    width: props.width,
+    height: props.height,
+    ...(props.radiusX !== undefined ? { radiusX: props.radiusX } : {}),
+    ...(props.radiusY !== undefined ? { radiusY: props.radiusY } : {})
+  }, props.style));
+}
+
+export type VexaEllipseProps = VexaShapePrimitiveBaseProps &
+  Omit<ProgrammableEllipseShape, "kind">;
+
+export function VexaEllipse(props: VexaEllipseProps): null {
+  return shapeLeaf("VexaEllipse", props, shapeValue({
+    kind: "ellipse",
+    cx: props.cx,
+    cy: props.cy,
+    radiusX: props.radiusX,
+    radiusY: props.radiusY
+  }, props.style));
+}
+
+export interface VexaCircleProps extends VexaShapePrimitiveBaseProps {
+  readonly cx: number;
+  readonly cy: number;
+  readonly radius: number;
+}
+
+export function VexaCircle(props: VexaCircleProps): null {
+  return shapeLeaf("VexaCircle", props, shapeValue({
+    kind: "ellipse",
+    cx: props.cx,
+    cy: props.cy,
+    radiusX: props.radius,
+    radiusY: props.radius
+  }, props.style));
+}
+
+export type VexaLineProps = VexaShapePrimitiveBaseProps &
+  Omit<ProgrammableLineShape, "kind">;
+
+export function VexaLine(props: VexaLineProps): null {
+  return shapeLeaf("VexaLine", props, shapeValue({
+    kind: "line",
+    from: props.from,
+    to: props.to
+  }, props.style));
+}
+
+export type VexaPolygonProps = VexaShapePrimitiveBaseProps &
+  Omit<ProgrammablePolygonShape, "kind">;
+
+export function VexaPolygon(props: VexaPolygonProps): null {
+  return shapeLeaf("VexaPolygon", props, shapeValue({
+    kind: "polygon",
+    points: props.points
+  }, props.style));
+}
+
+export type VexaStarProps = VexaShapePrimitiveBaseProps &
+  Omit<ProgrammableStarShape, "kind">;
+
+export function VexaStar(props: VexaStarProps): null {
+  return shapeLeaf("VexaStar", props, shapeValue({
+    kind: "star",
+    cx: props.cx,
+    cy: props.cy,
+    points: props.points,
+    innerRadius: props.innerRadius,
+    outerRadius: props.outerRadius,
+    ...(props.rotationDegrees !== undefined ? { rotationDegrees: props.rotationDegrees } : {})
+  }, props.style));
+}
+
+export type VexaPathProps = VexaShapePrimitiveBaseProps &
+  Omit<ProgrammablePathShape, "kind">;
+
+export function VexaPath(props: VexaPathProps): null {
+  return shapeLeaf("VexaPath", props, shapeValue({
+    kind: "path",
+    d: props.d
+  }, props.style));
+}
+
+export type VexaArcProps = VexaShapePrimitiveBaseProps &
+  Omit<ProgrammableArcShape, "kind">;
+
+export function VexaArc(props: VexaArcProps): null {
+  return shapeLeaf("VexaArc", props, shapeValue({
+    kind: "arc",
+    cx: props.cx,
+    cy: props.cy,
+    radiusX: props.radiusX,
+    radiusY: props.radiusY,
+    startDegrees: props.startDegrees,
+    endDegrees: props.endDegrees,
+    ...(props.rotationDegrees !== undefined ? { rotationDegrees: props.rotationDegrees } : {}),
+    ...(props.clockwise !== undefined ? { clockwise: props.clockwise } : {})
+  }, props.style));
+}
+
 export interface VexaTextProps extends VexaLeafBaseProps {
   readonly text: string;
   readonly style?: ProgrammableSceneTextStyle;
@@ -821,6 +971,9 @@ export type {
   ProgrammableSceneSurfaceDescriptor,
   ProgrammableSceneTextStyle,
   ProgrammableSceneTransform,
+  ProgrammableShape,
+  ProgrammableShapeGeometry,
+  ProgrammableShapeStyle,
   ResolvedProgrammableComposition,
   ResolvedProgrammableCompositionMetadata
 };

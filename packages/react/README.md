@@ -7,6 +7,7 @@ import { defineComposition, resolveProgrammableComposition } from "@vexa-video/c
 import {
   VexaCompositionRoot,
   VexaLayer,
+  VexaRectangle,
   VexaText,
   useVexaFrame,
   vexaStaticAsset
@@ -25,6 +26,15 @@ function TitleCard() {
   const frame = useVexaFrame();
   return (
     <VexaLayer id="title-layer" transform={{ x: frame * 2, y: 200 }}>
+      <VexaRectangle
+        id="accent"
+        x={80}
+        y={80}
+        width={240}
+        height={120}
+        radiusX={24}
+        style={{ fill: "#5b5df0" }}
+      />
       <VexaText id="title" text="Vexa Video" style={{ fontSize: 72, color: "white" }} />
     </VexaLayer>
   );
@@ -38,4 +48,4 @@ const logo = vexaStaticAsset("logo", "image", "/assets/logo.png");
 </VexaCompositionRoot>;
 ```
 
-The package also provides composition registration, sequence/series/loop/freeze timing scopes, media scene components, input/config hooks, and render-readiness coordination for asynchronous authoring work.
+The package also provides composition registration, sequence/series/loop/freeze timing scopes, media scene components, generic `VexaShape` authoring plus rectangle/ellipse/circle/line/polygon/star/path/arc convenience components, input/config hooks, and render-readiness coordination for asynchronous authoring work.

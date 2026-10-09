@@ -11,22 +11,31 @@ import {
 } from "@vexa-video/core/browser";
 import {
   InvalidVexaReactSeriesError,
+  VexaArc,
   VexaAudio,
+  VexaCircle,
   VexaCompositionRegistration,
   VexaCompositionRoot,
+  VexaEllipse,
   VexaFill,
   VexaFreeze,
   VexaImage,
   VexaLayer,
+  VexaLine,
   VexaLoop,
+  VexaPath,
+  VexaPolygon,
   VexaReactCompositionConflictError,
   VexaReactCompositionRegistry,
   VexaReactContextError,
   VexaReactRegistryProvider,
+  VexaRectangle,
   VexaRenderReadyController,
   VexaSequence,
   VexaSeries,
   VexaSeriesItem,
+  VexaShape,
+  VexaStar,
   VexaText,
   VexaVideo,
   useVexaAbsoluteFrame,
@@ -288,6 +297,60 @@ test("media components map React props into the browser-safe programmable scene 
     const video = layer.children.find((node) => node.kind === "video");
     assert.equal(video?.kind === "video" ? video.volume : undefined, 0.5);
   }
+  await act(async () => renderer.unmount());
+});
+
+test("shape components map through the shared programmable shape contract", async () => {
+  const child = createElement(
+    VexaLayer,
+    { id: "shapes" },
+    createElement(VexaShape, {
+      id: "generic",
+      shape: { geometry: { kind: "ellipse", cx: 10, cy: 10, radiusX: 8, radiusY: 4 }, style: { fill: "white" } }
+    }),
+    createElement(VexaRectangle, {
+      id: "rectangle", x: 5, y: 6, width: 40, height: 20, radiusX: 4, style: { fill: "#ff3366" }
+    }),
+    createElement(VexaEllipse, {
+      id: "ellipse", cx: 60, cy: 30, radiusX: 12, radiusY: 8, style: { fill: "#3366ff" }
+    }),
+    createElement(VexaCircle, {
+      id: "circle", cx: 90, cy: 30, radius: 10, style: { fill: "#33cc99" }
+    }),
+    createElement(VexaLine, {
+      id: "line", from: { x: 0, y: 0 }, to: { x: 100, y: 50 }, style: { stroke: { color: "white", width: 2 } }
+    }),
+    createElement(VexaPolygon, {
+      id: "polygon", points: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 10, y: 20 }], style: { fill: "yellow" }
+    }),
+    createElement(VexaStar, {
+      id: "star", cx: 130, cy: 40, points: 5, innerRadius: 6, outerRadius: 14, style: { fill: "orange" }
+    }),
+    createElement(VexaPath, {
+      id: "path", d: "M 0 0 L 20 0 L 10 20 Z", style: { fill: "purple" }
+    }),
+    createElement(VexaArc, {
+      id: "arc", cx: 160, cy: 40, radiusX: 20, radiusY: 10, startDegrees: 0, endDegrees: 180,
+      style: { stroke: { color: "cyan", width: 3 } }
+    })
+  );
+
+  const { renderer, scene } = await renderAndCapture(10, child);
+  const layer = scene.children[0];
+  assert.equal(layer?.kind, "layer");
+  if (layer?.kind !== "layer") throw new Error("expected shape layer");
+  assert.equal(layer.children.every((node) => node.kind === "shape"), true);
+  assert.deepEqual(layer.children.map((node) => node.kind === "shape" ? node.shape.geometry.kind : null), [
+    "ellipse", "rectangle", "ellipse", "ellipse", "line", "polygon", "star", "path", "arc"
+  ]);
+  const circle = layer.children[3];
+  if (circle?.kind !== "shape" || circle.shape.geometry.kind !== "ellipse") {
+    throw new Error("expected circle to normalize to ellipse geometry");
+  }
+  assert.equal(circle.shape.geometry.radiusX, 10);
+  assert.equal(circle.shape.geometry.radiusY, 10);
+  const rectangle = layer.children[1];
+  assert.equal(rectangle?.kind === "shape" ? rectangle.shape.style?.fillRule : undefined, "nonzero");
   await act(async () => renderer.unmount());
 });
 
