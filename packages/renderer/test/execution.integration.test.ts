@@ -72,9 +72,75 @@ test("bundled executable compositions resolve storage assets and render stills, 
   const storageFrameOutput = join(tempRoot, "product-demo-storage-frame.png");
   const rangeOutput = join(tempRoot, "product-demo-frames");
   const videoOutput = join(tempRoot, "product-demo.mp4");
+  const shapeFrameOutput = join(tempRoot, "shape-showcase-frame.png");
+  const shapeRangeOutput = join(tempRoot, "shape-showcase-frames");
+  const shapeVideoOutput = join(tempRoot, "shape-showcase.mp4");
 
   try {
     const renderer = await createBundledRenderer(tempRoot);
+
+    const shapeFrame = await renderer.renderFrame({
+      compositionId: "shape-showcase",
+      frame: 8,
+      output: shapeFrameOutput,
+      format: "png",
+      inputProps: { background: "#0f172a", unsupportedRotation: false }
+    });
+    const shapeInputs = shapeFrame.executionPlan.inputs.filter(
+      (input) => input.kind === "image" && input.source.toLowerCase().endsWith(".png")
+    );
+    assert.equal(shapeInputs.length, 7);
+    const shapeFramePng = await readFile(shapeFrameOutput);
+    assert.deepEqual([...shapeFramePng.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+    for (const input of shapeInputs) {
+      await assert.rejects(
+        () => readFile(input.source),
+        (error: unknown) =>
+          error instanceof Error &&
+          "code" in error &&
+          (error as NodeJS.ErrnoException).code === "ENOENT"
+      );
+    }
+
+    await assert.rejects(
+      () => renderer.renderFrame({
+        compositionId: "shape-showcase",
+        frame: 8,
+        output: join(tempRoot, "shape-showcase-unsupported.png"),
+        inputProps: { background: "#0f172a", unsupportedRotation: true }
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError && error.code === "RENDER_SHAPE_UNSUPPORTED"
+    );
+
+    const shapeRange = await renderer.renderFrameRange({
+      compositionId: "shape-showcase",
+      startFrame: 8,
+      endFrameExclusive: 10,
+      output: shapeRangeOutput,
+      concurrency: 2,
+      inputProps: { background: "#0f172a", unsupportedRotation: false }
+    });
+    assert.deepEqual(shapeRange.frames.map((item) => item.frame), [8, 9]);
+    for (const output of shapeRange.frames) {
+      const contents = await readFile(output.output);
+      assert.deepEqual([...contents.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+    }
+
+    const shapeVideo = await renderer.renderVideo({
+      compositionId: "shape-showcase",
+      startFrame: 0,
+      endFrameExclusive: 12,
+      output: shapeVideoOutput,
+      hardwareAcceleration: "cpu",
+      inputProps: { background: "#0f172a", unsupportedRotation: false }
+    });
+    assert.equal(shapeVideo.executionPlan.inputs.filter(
+      (input) => input.kind === "image" && input.source.toLowerCase().endsWith(".png")
+    ).length, 7);
+    assert.equal(shapeVideo.executionPlan.durationSeconds, 1);
+    const shapeMp4 = await readFile(shapeVideoOutput);
+    assert.equal(shapeMp4.subarray(4, 8).toString("ascii"), "ftyp");
 
     const stillProgress: VexaRenderProgress[] = [];
     const still = await renderer.renderStill({

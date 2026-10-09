@@ -48,7 +48,7 @@ Vexa keeps those concerns behind a typed SDK:
 | Programmable authoring | Deterministic composition metadata, frame/time math, scene graphs, serializable shape geometry, scene shape nodes, and React shape authoring primitives |
 | Browser player | Framework-neutral playback state, seek/step/loop/rate/buffering, responsive host, events, and fullscreen |
 | Composition bundling | TypeScript/TSX browser bundles, CSS/assets, deterministic manifests/discovery, source maps, and environment allowlists |
-| Composition rendering | Bundle-backed still/frame/range/video rendering with progress, cancellation, hardware selection, and managed storage assets |
+| Composition rendering | Bundle-backed still/frame/range/video rendering with progress, cancellation, hardware selection, managed storage assets, and renderer-owned programmable shape SVG materialization |
 | Studio runtime | Browser-safe composition session state that coordinates Player preview, Editor timeline state, draft props, resolved metadata, and hot-reload frame preservation |
 | Creative playground UI | Unified Vexa Editor and Vexa Studio dark creative-tool shell with media search/filtering, scene navigation, timeline visualization, inspector tooling, and responsive layouts |
 | Studio development host | Recursive composition-source watching, SSE hot reload, dirty-props/frame preservation, diagnostics overlay, and browser-driven render success/failure acceptance including Windows paths with spaces |

@@ -1,6 +1,7 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
+import { Resvg } from "@resvg/resvg-js";
 import { readBundleManifest } from "@vexa-video/bundler";
 import type {
   VexaBundleManifest,
@@ -11,15 +12,25 @@ import {
   ProcessAbortedError,
   ProcessTimeoutError,
   collectProgrammableSceneAssets,
+  createProgrammableSceneRenderGraph,
+  defineProgrammableScene,
   evaluateExecutableComposition,
   getExecutableCompositionStaticMetadata,
   lowerProgrammableSceneToVideoProject,
+  programmableShapeToSvgPath,
   type ExecutableProgrammableComposition,
   type HardwareAccelerationPreference,
   type JsonObject,
   type MediaProgress,
   type MediaStorageSource,
   type ProgrammableScene,
+  type ProgrammableSceneAsset,
+  type ProgrammableSceneNode,
+  type ProgrammableSceneRenderItem,
+  type ProgrammableSceneShapeNode,
+  type ProgrammableSceneTransform,
+  type ProgrammableShape,
+  type ProgrammableShapeStyle,
   type ResolvedProgrammableCompositionMetadata,
   type StorageResolveOptions
 } from "@vexa-video/core";
@@ -55,6 +66,7 @@ export type VexaRendererErrorCode =
   | "RENDER_TIMEOUT"
   | "RENDER_HARDWARE_UNAVAILABLE"
   | "RENDER_ASSET_RESOLUTION_FAILED"
+  | "RENDER_SHAPE_UNSUPPORTED"
   | "RENDER_EXECUTION_FAILED";
 
 export class VexaRendererError extends Error {
@@ -389,8 +401,207 @@ function imageExtension(format: VexaImageFormat): string {
 }
 
 interface VexaRenderAssetWorkspace {
+  readonly scene: ProgrammableScene;
   readonly resolvedAssets: Readonly<Record<string, string>>;
   cleanup(): Promise<void>;
+}
+
+type ProgrammableShapeRenderItem = ProgrammableSceneRenderItem & {
+  readonly node: ProgrammableSceneShapeNode;
+};
+
+function collectShapeRenderItems(scene: ProgrammableScene): readonly ProgrammableShapeRenderItem[] {
+  const items = createProgrammableSceneRenderGraph(scene).items.filter(
+    (item): item is ProgrammableShapeRenderItem => item.node.kind === "shape"
+  );
+  items.sort((left, right) => left.declarationOrder - right.declarationOrder);
+  return Object.freeze(items);
+}
+
+function assertShapeTransformSupported(item: ProgrammableShapeRenderItem): void {
+  const unsupported = new Set<string>();
+  const check = (transform: ProgrammableSceneTransform): void => {
+    if (transform.width !== undefined) unsupported.add("width");
+    if (transform.height !== undefined) unsupported.add("height");
+    if (transform.rotation !== undefined) unsupported.add("rotation");
+    if (transform.scaleX !== undefined) unsupported.add("scaleX");
+    if (transform.scaleY !== undefined) unsupported.add("scaleY");
+    if (transform.anchorX !== undefined) unsupported.add("anchorX");
+    if (transform.anchorY !== undefined) unsupported.add("anchorY");
+  };
+  for (const transform of item.transformChain) check(transform);
+  if (unsupported.size === 0) return;
+  throw new VexaRendererError(
+    `Shape node "${item.node.id}" currently supports translation-only scene transforms; unsupported transform fields: ${[...unsupported].sort(compareText).join(", ")}.`,
+    "RENDER_SHAPE_UNSUPPORTED"
+  );
+}
+
+function formatShapeNumber(value: number): string {
+  const normalized = Object.is(value, -0) ? 0 : value;
+  return Number.isInteger(normalized)
+    ? String(normalized)
+    : String(Number(normalized.toFixed(6)));
+}
+
+function escapeXmlAttribute(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function safeShapePaint(value: string, label: string): string {
+  if (/url\s*\(/iu.test(value) || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(value)) {
+    throw new VexaRendererError(
+      `${label} contains a paint value that is not supported by the renderer-owned SVG path.`,
+      "RENDER_SHAPE_UNSUPPORTED"
+    );
+  }
+  return escapeXmlAttribute(value);
+}
+
+function shapeSvgDocument(shape: ProgrammableShape, width: number, height: number): string {
+  const style: ProgrammableShapeStyle | undefined = shape.style;
+  const isOpenGeometry = shape.geometry.kind === "line" || shape.geometry.kind === "arc";
+  const fill = style?.fill ?? (style === undefined && !isOpenGeometry ? "#000000" : "none");
+  const defaultStroke: ProgrammableShapeStyle["stroke"] = style === undefined && isOpenGeometry
+    ? Object.freeze({
+        color: "#000000",
+        width: 1,
+        lineCap: "butt" as const,
+        lineJoin: "miter" as const
+      })
+    : undefined;
+  const stroke = style?.stroke ?? defaultStroke;
+  const attributes = [
+    `d="${escapeXmlAttribute(programmableShapeToSvgPath(shape))}"`,
+    `fill="${safeShapePaint(fill, "shape fill")}"`,
+    `fill-rule="${style?.fillRule ?? "nonzero"}"`
+  ];
+
+  if (stroke) {
+    attributes.push(
+      `stroke="${safeShapePaint(stroke.color, "shape stroke")}"`,
+      `stroke-width="${formatShapeNumber(stroke.width)}"`,
+      `stroke-linecap="${stroke.lineCap ?? "butt"}"`,
+      `stroke-linejoin="${stroke.lineJoin ?? "miter"}"`
+    );
+    if (stroke.dash?.length) {
+      attributes.push(`stroke-dasharray="${stroke.dash.map(formatShapeNumber).join(" ")}"`);
+    }
+  } else {
+    attributes.push('stroke="none"');
+  }
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
+    `  <path ${attributes.join(" ")} />`,
+    "</svg>",
+    ""
+  ].join("\n");
+}
+
+function renderShapeFileName(index: number, nodeId: string): string {
+  const safeId = nodeId.replace(/[^a-zA-Z0-9._-]/gu, "-").slice(0, 96) || `shape-${index}`;
+  return join("shapes", `${String(index).padStart(3, "0")}-${safeId}.png`);
+}
+
+function allocateShapeAssetId(index: number, usedAssetIds: Set<string>): string {
+  let candidate = `__vexa_renderer_shape_${String(index).padStart(4, "0")}`;
+  while (usedAssetIds.has(candidate)) candidate = `_${candidate}`;
+  usedAssetIds.add(candidate);
+  return candidate;
+}
+
+function replaceShapeNodes(
+  nodes: readonly ProgrammableSceneNode[],
+  shapeAssetIds: ReadonlyMap<string, string>
+): readonly ProgrammableSceneNode[] {
+  return Object.freeze(nodes.map((node) => {
+    if (node.kind === "group" || node.kind === "layer") {
+      return Object.freeze({
+        ...node,
+        children: replaceShapeNodes(node.children, shapeAssetIds)
+      });
+    }
+    if (node.kind !== "shape") return node;
+
+    const assetId = shapeAssetIds.get(node.id);
+    if (!assetId) {
+      throw new VexaRendererError(
+        `Renderer shape asset was not materialized for node "${node.id}".`,
+        "RENDER_EXECUTION_FAILED"
+      );
+    }
+    return Object.freeze({
+      kind: "image",
+      id: node.id,
+      ...(node.startFrame !== undefined ? { startFrame: node.startFrame } : {}),
+      ...(node.durationInFrames !== undefined ? { durationInFrames: node.durationInFrames } : {}),
+      ...(node.zIndex !== undefined ? { zIndex: node.zIndex } : {}),
+      ...(node.opacity !== undefined ? { opacity: node.opacity } : {}),
+      ...(node.transform !== undefined ? { transform: node.transform } : {}),
+      assetId
+    });
+  }));
+}
+
+async function materializeProgrammableSceneShapes(
+  scene: ProgrammableScene,
+  items: readonly ProgrammableShapeRenderItem[],
+  fileFor: (relativePath: string) => string,
+  reservedAssetIds: readonly string[],
+  signal?: AbortSignal
+): Promise<ProgrammableScene> {
+  if (items.length === 0) return scene;
+  for (const item of items) assertShapeTransformSupported(item);
+
+  const usedAssetIds = new Set<string>([
+    ...scene.assets.map((asset) => asset.id),
+    ...reservedAssetIds
+  ]);
+  const shapeAssetIds = new Map<string, string>();
+  const generatedAssets: ProgrammableSceneAsset[] = [];
+
+  for (let index = 0; index < items.length; index += 1) {
+    if (signal?.aborted) throw new ProcessAbortedError();
+    const item = items[index]!;
+    const assetId = allocateShapeAssetId(index, usedAssetIds);
+    const target = fileFor(renderShapeFileName(index, item.node.id));
+    await mkdir(dirname(target), { recursive: true });
+    const png = new Resvg(
+      shapeSvgDocument(item.node.shape, scene.width, scene.height),
+      { font: { loadSystemFonts: false } }
+    ).render().asPng();
+    await writeFile(
+      target,
+      png,
+      {
+        ...(signal ? { signal } : {})
+      }
+    );
+    shapeAssetIds.set(item.node.id, assetId);
+    generatedAssets.push(Object.freeze({
+      id: assetId,
+      kind: "image",
+      source: Object.freeze({ kind: "static", src: target })
+    }));
+  }
+
+  return defineProgrammableScene({
+    schemaVersion: scene.schemaVersion,
+    id: scene.id,
+    width: scene.width,
+    height: scene.height,
+    fps: scene.fps,
+    durationInFrames: scene.durationInFrames,
+    ...(scene.background !== undefined ? { background: scene.background } : {}),
+    assets: Object.freeze([...scene.assets, ...generatedAssets]),
+    children: replaceShapeNodes(scene.children, shapeAssetIds)
+  });
 }
 
 function storageSourceExtension(source: MediaStorageSource): string {
@@ -425,9 +636,11 @@ async function createRenderAssetWorkspace(
     asset.source.kind === "storage" &&
     !Object.prototype.hasOwnProperty.call(callerResolvedAssets, asset.id)
   );
+  const shapeItems = collectShapeRenderItems(scene);
   const resolvedAssets: Record<string, string> = { ...callerResolvedAssets };
-  if (unresolvedStorageAssets.length === 0) {
+  if (unresolvedStorageAssets.length === 0 && shapeItems.length === 0) {
     return Object.freeze({
+      scene,
       resolvedAssets: Object.freeze(resolvedAssets),
       async cleanup() {}
     });
@@ -468,7 +681,28 @@ async function createRenderAssetWorkspace(
     );
   }
 
+  let renderScene = scene;
+  try {
+    renderScene = await materializeProgrammableSceneShapes(
+      scene,
+      shapeItems,
+      (relativePath) => workspace.file(relativePath),
+      Object.keys(resolvedAssets),
+      signal
+    );
+  } catch (cause) {
+    await workspace.cleanup().catch(() => undefined);
+    if (signal?.aborted || cause instanceof ProcessAbortedError) throw new ProcessAbortedError();
+    if (cause instanceof VexaRendererError) throw cause;
+    throw new VexaRendererError(
+      `Failed to materialize programmable shapes for composition "${compositionId}": ${cause instanceof Error ? cause.message : String(cause)}.`,
+      "RENDER_EXECUTION_FAILED",
+      { compositionId, cause }
+    );
+  }
+
   return Object.freeze({
+    scene: renderScene,
     resolvedAssets: Object.freeze(resolvedAssets),
     cleanup: () => workspace.cleanup()
   });
@@ -479,11 +713,14 @@ async function withRenderAssetWorkspace<T>(
   compositionId: string,
   options: VexaRenderExecutionOptions,
   timeoutMs: number,
-  callback: (resolvedAssets: Readonly<Record<string, string>>) => Promise<T>
+  callback: (
+    renderScene: ProgrammableScene,
+    resolvedAssets: Readonly<Record<string, string>>
+  ) => Promise<T>
 ): Promise<T> {
   const workspace = await createRenderAssetWorkspace(scene, compositionId, options, timeoutMs);
   try {
-    const result = await callback(workspace.resolvedAssets);
+    const result = await callback(workspace.scene, workspace.resolvedAssets);
     try {
       await workspace.cleanup();
     } catch (cause) {
@@ -796,8 +1033,8 @@ export class VexaCompositionRenderer {
         composition.id,
         options,
         plan.timeoutMs,
-        async (resolvedAssets) => {
-          const project = lowerProgrammableSceneToVideoProject(evaluated.scene, { resolvedAssets });
+        async (renderScene, resolvedAssets) => {
+          const project = lowerProgrammableSceneToVideoProject(renderScene, { resolvedAssets });
           const outputDirectory = resolve(plan.output);
           await mkdir(outputDirectory, { recursive: true });
           const binaries = await resolveMediaBinaries({
@@ -891,8 +1128,8 @@ export class VexaCompositionRenderer {
         composition.id,
         options,
         plan.timeoutMs,
-        async (resolvedAssets) => {
-          const project = lowerProgrammableSceneToVideoProject(evaluated.scene, { resolvedAssets });
+        async (renderScene, resolvedAssets) => {
+          const project = lowerProgrammableSceneToVideoProject(renderScene, { resolvedAssets });
 
           await mkdir(dirname(resolve(plan.output)), { recursive: true });
           const binaries = await resolveMediaBinaries({
@@ -1017,8 +1254,8 @@ export class VexaCompositionRenderer {
         composition.id,
         options,
         plan.timeoutMs,
-        async (resolvedAssets) => {
-          const project = lowerProgrammableSceneToVideoProject(evaluated.scene, { resolvedAssets });
+        async (renderScene, resolvedAssets) => {
+          const project = lowerProgrammableSceneToVideoProject(renderScene, { resolvedAssets });
           const executionPlan = createProjectFrameExecutionPlan(project, plan.output, frame, {
             ...(options.overwrite !== undefined ? { overwrite: options.overwrite } : {})
           });

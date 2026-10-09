@@ -16,6 +16,7 @@
     "dist/**/*.map"
   ],
   "dependencies": {
+    "@resvg/resvg-js": "2.6.2",
     "@vexa-video/bundler": "1.0.0",
     "@vexa-video/core": "1.0.0",
     "@vexa-video/ffmpeg": "1.0.0",

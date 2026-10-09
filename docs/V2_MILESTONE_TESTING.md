@@ -510,7 +510,11 @@ Studio browser code must not directly execute FFmpeg or import Node process modu
 
 Before visual rendering is wired, cover deterministic shape normalization and serialization for rectangle, ellipse, line, polygon, star, path, and arc geometry. Validate finite coordinates, positive dimensions/radii/stroke widths, polygon/star point constraints, rounded-rectangle bounds, style defaults, invalid geometry failures, and stable SVG path conversion through both the normal core and browser-safe exports.
 
-Cover shape-node normalization and render-graph participation through the programmable scene contract, browser-entry parity, typed rejection from `VideoProjectAst` lowering before renderer support exists, and React mapping for generic shapes plus rectangle/ellipse/circle/line/polygon/star/path/arc convenience components.
+Cover shape-node normalization and render-graph participation through the programmable scene contract, browser-entry parity, typed rejection from direct `VideoProjectAst` lowering, and React mapping for generic shapes plus rectangle/ellipse/circle/line/polygon/star/path/arc convenience components.
+
+### Renderer shape execution
+
+Render a Vexa-owned shape showcase containing rectangle, ellipse, line, polygon, star, path, and arc primitives through the real Node renderer. Acceptance must prove generated SVG shape inputs are managed-workspace assets, FFmpeg produces valid frame/range/video outputs, generated shape files are cleaned after rendering, translation-only transforms preserve the shared scene semantics, and width/height/rotation/scale/anchor transforms fail with `RENDER_SHAPE_UNSUPPORTED` instead of being approximated. Renderer-owned SVG paint values must not permit external `url(...)` references.
 
 ### Visual fixtures
 
