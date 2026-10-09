@@ -14,6 +14,7 @@ export * from "./programmable-composition.js";
 export * from "./programmable-execution.js";
 export * from "./programmable-timing.js";
 export * from "./programmable-shapes.js";
+export * from "./programmable-effects.js";
 export * from "./programmable-scene.js";
 
 export * from "./hosted.js";

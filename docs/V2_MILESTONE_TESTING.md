@@ -514,7 +514,11 @@ Cover shape-node normalization and render-graph participation through the progra
 
 ### Renderer shape execution
 
-Render a Vexa-owned shape showcase containing rectangle, ellipse, line, polygon, star, path, and arc primitives through the real Node renderer. Acceptance must prove generated SVG shape inputs are managed-workspace assets, FFmpeg produces valid frame/range/video outputs, generated shape files are cleaned after rendering, translation-only transforms preserve the shared scene semantics, and width/height/rotation/scale/anchor transforms fail with `RENDER_SHAPE_UNSUPPORTED` instead of being approximated. Renderer-owned SVG paint values must not permit external `url(...)` references.
+Render a Vexa-owned shape showcase containing rectangle, ellipse, line, polygon, star, path, and arc primitives through the real Node renderer. Acceptance must prove renderer-owned SVG markup is rasterized to managed-workspace PNG assets before FFmpeg, valid frame/range/video outputs are produced, generated shape PNG files are cleaned after rendering, translation-only transforms preserve the shared scene semantics, and width/height/rotation/scale/anchor transforms fail with `RENDER_SHAPE_UNSUPPORTED` instead of being approximated. Renderer-owned SVG paint values must not permit external `url(...)` references.
+
+### Effect contract tests
+
+Cover every programmable effect kind through deterministic core normalization and serialization: blur, brightness, contrast, saturation, hue, grayscale, sepia, shadow, glow, noise, and vignette. Validate finite/ranged values, hue canonicalization, deterministic noise seeding, optional opacity/softness defaults, declaration-order preservation, immutable normalized chains, typed invalid-value failures, and parity through the normal and browser-safe core exports. Scene/React mapping and real render execution are separate acceptance slices.
 
 ### Visual fixtures
 
