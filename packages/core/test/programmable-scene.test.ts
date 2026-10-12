@@ -247,6 +247,57 @@ test("shape nodes reuse the shared shape contract and enter the render graph", (
   }), InvalidProgrammableSceneError);
 });
 
+test("visual effect chains normalize, preserve order, and stay out of direct project lowering", () => {
+  const options = {
+    id: "effects-scene",
+    width: 320,
+    height: 180,
+    fps: 30,
+    durationInFrames: 60,
+    assets: [{
+      id: "image",
+      kind: "image" as const,
+      source: { kind: "static" as const, src: "assets/card.png" }
+    }],
+    children: [{
+      id: "card",
+      kind: "image" as const,
+      assetId: "image",
+      effects: [
+        { kind: "blur" as const, radius: 3 },
+        { kind: "hue" as const, degrees: -30 },
+        { kind: "noise" as const, amount: 0.2 }
+      ]
+    }]
+  } as const;
+
+  const scene = defineProgrammableScene(options);
+  const browserScene = defineBrowserProgrammableScene(options);
+  const node = scene.children[0];
+  if (node?.kind !== "image") throw new Error("expected effect-bearing image node");
+  assert.deepEqual(node.effects, [
+    { kind: "blur", radius: 3 },
+    { kind: "hue", degrees: 330 },
+    { kind: "noise", amount: 0.2, seed: 0, monochrome: false }
+  ]);
+  assert.equal(Object.isFrozen(node.effects), true);
+  assert.equal(Object.isFrozen(node.effects?.[0]), true);
+  assert.deepEqual(createProgrammableSceneRenderGraph(scene).items[0]?.node, node);
+  assert.equal(serializeProgrammableScene(scene), serializeBrowserProgrammableScene(browserScene));
+  assert.throws(
+    () => lowerProgrammableSceneToVideoProject(scene),
+    UnsupportedProgrammableSceneLoweringError
+  );
+
+  assert.throws(() => defineProgrammableScene({
+    id: "invalid-effects", width: 100, height: 100, fps: 30, durationInFrames: 30,
+    children: [{
+      id: "title", kind: "text", text: "Vexa",
+      effects: [{ kind: "grayscale", amount: 2 }]
+    }]
+  }), /effects is invalid/);
+});
+
 test("asset readiness state updates immutably", () => {
   const scene = defineProgrammableScene({
     id: "readiness", width: 10, height: 10, fps: 30, durationInFrames: 10,

@@ -354,6 +354,47 @@ test("shape components map through the shared programmable shape contract", asyn
   await act(async () => renderer.unmount());
 });
 
+test("visual components attach ordered effects through the shared programmable effect contract", async () => {
+  const assets = [vexaStaticAsset("photo", "image", "/photo.png")] as const;
+  const child = createElement(
+    VexaLayer,
+    { id: "effects" },
+    createElement(VexaRectangle, {
+      id: "glow-card",
+      width: 80,
+      height: 40,
+      style: { fill: "#5b5df0" },
+      effects: [
+        { kind: "glow", radius: 12, color: "#8b5cf6", opacity: 0.6 },
+        { kind: "hue", degrees: -45 }
+      ]
+    }),
+    createElement(VexaImage, {
+      id: "photo-node",
+      assetId: "photo",
+      effects: [
+        { kind: "brightness", amount: 1.1 },
+        { kind: "vignette", amount: 0.4 }
+      ]
+    })
+  );
+
+  const { renderer, scene } = await renderAndCapture(10, child, { assets });
+  const layer = scene.children[0];
+  if (layer?.kind !== "layer") throw new Error("expected effects layer");
+  const shape = layer.children[0];
+  const image = layer.children[1];
+  assert.deepEqual(shape?.kind === "shape" ? shape.effects : undefined, [
+    { kind: "glow", radius: 12, color: "#8b5cf6", opacity: 0.6 },
+    { kind: "hue", degrees: 315 }
+  ]);
+  assert.deepEqual(image?.kind === "image" ? image.effects : undefined, [
+    { kind: "brightness", amount: 1.1 },
+    { kind: "vignette", amount: 0.4, softness: 0.5 }
+  ]);
+  await act(async () => renderer.unmount());
+});
+
 test("asset helpers preserve static and storage references for core policy validation", () => {
   const local = vexaStorageAsset("local", "video", { kind: "local", path: "C:/media/a.mp4" });
   const remote = vexaStorageAsset("remote", "image", { kind: "http", url: "https://example.com/a.png" });

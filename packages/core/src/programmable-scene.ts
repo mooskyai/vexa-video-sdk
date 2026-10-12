@@ -1,6 +1,11 @@
 import type { ClipTransform, ProjectTrack, TextStyle, TimelineClip, VideoProjectAst } from "./composition.js";
 import type { ResizeFit } from "./editing.js";
 import type { JsonObject, JsonValue } from "./programmable-composition.js";
+import {
+  InvalidProgrammableEffectError,
+  normalizeProgrammableEffects,
+  type ProgrammableEffect
+} from "./programmable-effects.js";
 import { InvalidProgrammableShapeError, normalizeProgrammableShape, type ProgrammableShape } from "./programmable-shapes.js";
 import { frameToSeconds } from "./programmable-timing.js";
 import type { MediaStorageSource } from "./storage.js";
@@ -132,6 +137,10 @@ export interface ProgrammableSceneNodeBase {
   readonly transform?: ProgrammableSceneTransform;
 }
 
+export interface ProgrammableSceneVisualNodeBase extends ProgrammableSceneNodeBase {
+  readonly effects?: readonly ProgrammableEffect[];
+}
+
 export interface ProgrammableSceneGroupNode extends ProgrammableSceneNodeBase {
   readonly kind: "group";
   readonly children: readonly ProgrammableSceneNode[];
@@ -142,19 +151,19 @@ export interface ProgrammableSceneLayerNode extends ProgrammableSceneNodeBase {
   readonly children: readonly ProgrammableSceneNode[];
 }
 
-export interface ProgrammableSceneFillNode extends ProgrammableSceneNodeBase {
+export interface ProgrammableSceneFillNode extends ProgrammableSceneVisualNodeBase {
   readonly kind: "fill";
   readonly color: string;
 }
 
-export interface ProgrammableSceneSolidNode extends ProgrammableSceneNodeBase {
+export interface ProgrammableSceneSolidNode extends ProgrammableSceneVisualNodeBase {
   readonly kind: "solid";
   readonly color: string;
   readonly width: number;
   readonly height: number;
 }
 
-export interface ProgrammableSceneShapeNode extends ProgrammableSceneNodeBase {
+export interface ProgrammableSceneShapeNode extends ProgrammableSceneVisualNodeBase {
   readonly kind: "shape";
   readonly shape: ProgrammableShape;
 }
@@ -167,20 +176,20 @@ export interface ProgrammableSceneTextStyle {
   readonly boxPadding?: number;
 }
 
-export interface ProgrammableSceneTextNode extends ProgrammableSceneNodeBase {
+export interface ProgrammableSceneTextNode extends ProgrammableSceneVisualNodeBase {
   readonly kind: "text";
   readonly text: string;
   readonly style?: ProgrammableSceneTextStyle;
 }
 
-export interface ProgrammableSceneImageNode extends ProgrammableSceneNodeBase {
+export interface ProgrammableSceneImageNode extends ProgrammableSceneVisualNodeBase {
   readonly kind: "image";
   readonly assetId: string;
   readonly fit?: ResizeFit;
   readonly crop?: ProgrammableSceneCrop;
 }
 
-export interface ProgrammableSceneVideoNode extends ProgrammableSceneNodeBase {
+export interface ProgrammableSceneVideoNode extends ProgrammableSceneVisualNodeBase {
   readonly kind: "video";
   readonly assetId: string;
   readonly fit?: ResizeFit;
@@ -208,21 +217,21 @@ export interface ProgrammableSceneSurfaceDescriptor {
   readonly data?: JsonObject;
 }
 
-export interface ProgrammableSceneSurfaceNode extends ProgrammableSceneNodeBase {
+export interface ProgrammableSceneSurfaceNode extends ProgrammableSceneVisualNodeBase {
   readonly kind: "surface";
   readonly surface: ProgrammableSceneSurfaceDescriptor;
 }
 
 export type ProgrammableSceneContainerNode = ProgrammableSceneGroupNode | ProgrammableSceneLayerNode;
-export type ProgrammableSceneLeafNode =
+export type ProgrammableSceneVisualLeafNode =
   | ProgrammableSceneFillNode
   | ProgrammableSceneSolidNode
   | ProgrammableSceneShapeNode
   | ProgrammableSceneTextNode
   | ProgrammableSceneImageNode
   | ProgrammableSceneVideoNode
-  | ProgrammableSceneAudioNode
   | ProgrammableSceneSurfaceNode;
+export type ProgrammableSceneLeafNode = ProgrammableSceneVisualLeafNode | ProgrammableSceneAudioNode;
 export type ProgrammableSceneNode = ProgrammableSceneContainerNode | ProgrammableSceneLeafNode;
 
 export interface ProgrammableScene {
@@ -522,6 +531,28 @@ function normalizeTransform(
   return Object.keys(normalized).length ? Object.freeze(normalized) as ProgrammableSceneTransform : undefined;
 }
 
+function normalizeEffects(
+  effects: readonly ProgrammableEffect[] | undefined,
+  nodeId: string
+): readonly ProgrammableEffect[] | undefined {
+  if (effects === undefined || effects.length === 0) return undefined;
+  try {
+    return normalizeProgrammableEffects(effects);
+  } catch (error) {
+    if (error instanceof InvalidProgrammableEffectError) {
+      throw new InvalidProgrammableSceneError(
+        `node ${nodeId}.effects is invalid: ${error.message}`,
+        { nodeId }
+      );
+    }
+    throw error;
+  }
+}
+
+function isVisualLeafNode(node: ProgrammableSceneNode): node is ProgrammableSceneVisualLeafNode {
+  return node.kind !== "group" && node.kind !== "layer" && node.kind !== "audio";
+}
+
 function normalizeTextStyle(
   style: ProgrammableSceneTextStyle | undefined,
   nodeId: string
@@ -595,6 +626,7 @@ function normalizeNode(node: ProgrammableSceneNode, context: NormalizeContext): 
     throw new InvalidProgrammableSceneError(`node ${id}.opacity must be between 0 and 1.`, { nodeId: id });
   }
   const transform = normalizeTransform(node.transform, id);
+  const effects = isVisualLeafNode(node) ? normalizeEffects(node.effects, id) : undefined;
   const base = {
     id,
     startFrame,
@@ -603,6 +635,10 @@ function normalizeNode(node: ProgrammableSceneNode, context: NormalizeContext): 
     opacity,
     ...(transform ? { transform } : {})
   };
+
+  const visualBase = effects === undefined
+    ? base
+    : { ...base, effects };
 
   if (node.kind === "group" || node.kind === "layer") {
     const children = node.children.map((child) => normalizeNode(child, {
@@ -615,14 +651,14 @@ function normalizeNode(node: ProgrammableSceneNode, context: NormalizeContext): 
   }
 
   if (node.kind === "fill") {
-    return Object.freeze({ ...base, kind: "fill", color: assertNonEmpty(node.color, `node ${id}.color`) });
+    return Object.freeze({ ...visualBase, kind: "fill", color: assertNonEmpty(node.color, `node ${id}.color`) });
   }
 
   if (node.kind === "solid") {
     assertFinitePositive(node.width, `node ${id}.width`);
     assertFinitePositive(node.height, `node ${id}.height`);
     return Object.freeze({
-      ...base,
+      ...visualBase,
       kind: "solid",
       color: assertNonEmpty(node.color, `node ${id}.color`),
       width: node.width,
@@ -633,7 +669,7 @@ function normalizeNode(node: ProgrammableSceneNode, context: NormalizeContext): 
   if (node.kind === "shape") {
     try {
       return Object.freeze({
-        ...base,
+        ...visualBase,
         kind: "shape",
         shape: normalizeProgrammableShape(node.shape)
       });
@@ -648,7 +684,7 @@ function normalizeNode(node: ProgrammableSceneNode, context: NormalizeContext): 
   if (node.kind === "text") {
     const style = normalizeTextStyle(node.style, id);
     return Object.freeze({
-      ...base,
+      ...visualBase,
       kind: "text",
       text: assertNonEmpty(node.text, `node ${id}.text`),
       ...(style ? { style } : {})
@@ -661,7 +697,7 @@ function normalizeNode(node: ProgrammableSceneNode, context: NormalizeContext): 
     const crop = normalizeCrop(node.crop, id);
     const fit = normalizeFit(node.fit, id);
     return Object.freeze({
-      ...base,
+      ...visualBase,
       kind: "image",
       assetId,
       ...(fit !== undefined ? { fit } : {}),
@@ -695,7 +731,7 @@ function normalizeNode(node: ProgrammableSceneNode, context: NormalizeContext): 
     const crop = normalizeCrop(node.crop, id);
     const fit = normalizeFit(node.fit, id);
     return Object.freeze({
-      ...base,
+      ...visualBase,
       kind: "video",
       assetId,
       ...(fit !== undefined ? { fit } : {}),
@@ -713,7 +749,7 @@ function normalizeNode(node: ProgrammableSceneNode, context: NormalizeContext): 
       throw new InvalidProgrammableSceneError(`node ${id}.surface.kind is not supported.`, { nodeId: id });
     }
     return Object.freeze({
-      ...base,
+      ...visualBase,
       kind: "surface",
       surface: Object.freeze({
         kind: node.surface.kind,
@@ -990,6 +1026,12 @@ function lowerTextStyle(style: ProgrammableSceneTextStyle | undefined): TextStyl
 
 function assertProjectRepresentable(item: ProgrammableSceneRenderItem): void {
   const node = item.node;
+  if (isVisualLeafNode(node) && node.effects?.length) {
+    throw new UnsupportedProgrammableSceneLoweringError(
+      node.id,
+      "programmable effects require renderer effect execution before VideoProjectAst lowering."
+    );
+  }
   if (node.kind === "solid" || node.kind === "shape" || node.kind === "surface") {
     throw new UnsupportedProgrammableSceneLoweringError(node.id, `${node.kind} nodes require the frame-render path.`);
   }

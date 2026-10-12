@@ -584,6 +584,8 @@ The first implementation slice establishes browser-safe, serializable shape geom
 
 The fourth implementation slice establishes backend-neutral, browser-safe effect contracts in `@vexa-video/core` for blur, brightness, contrast, saturation, hue, grayscale, sepia, shadow, glow, deterministic noise, and vignette. Normalization validates finite/ranged values, canonicalizes hue, applies deterministic defaults, freezes normalized values, preserves effect-chain declaration order, and provides stable JSON serialization. Scene/React attachment and renderer execution remain later V2.9 slices so the contract can stabilize before backend wiring.
 
+The fifth implementation slice attaches ordered programmable effect chains to visual scene leaves (fill, solid, shape, text, image, video, and surface) while keeping audio and group/layer containers effect-free. `@vexa-video/react` exposes the same typed `effects` prop on visual authoring components, and scene normalization reuses the shared effect contract so Node and browser authoring stay identical. Direct `VideoProjectAst` lowering rejects effect-bearing visuals until renderer execution is implemented, and shape rasterization preserves the effect chain so unsupported execution fails closed instead of silently dropping intent.
+
 ### Goal
 
 Provide a Vexa-owned motion-graphics component library.

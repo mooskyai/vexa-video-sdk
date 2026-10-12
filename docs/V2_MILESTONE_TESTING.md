@@ -520,6 +520,10 @@ Render a Vexa-owned shape showcase containing rectangle, ellipse, line, polygon,
 
 Cover every programmable effect kind through deterministic core normalization and serialization: blur, brightness, contrast, saturation, hue, grayscale, sepia, shadow, glow, noise, and vignette. Validate finite/ranged values, hue canonicalization, deterministic noise seeding, optional opacity/softness defaults, declaration-order preservation, immutable normalized chains, typed invalid-value failures, and parity through the normal and browser-safe core exports. Scene/React mapping and real render execution are separate acceptance slices.
 
+### Effect scene and React authoring tests
+
+Cover ordered effect attachment on visual scene leaves, normalization/defaulting through the shared effect contract, render-graph preservation, browser-entry serialization parity, React visual-component mapping, and typed rejection from direct `VideoProjectAst` lowering before renderer effect execution exists. Audio nodes and group/layer containers must remain effect-free at the type boundary. Shape rasterization must preserve effect metadata so the pre-execution boundary cannot silently discard requested effects.
+
 ### Visual fixtures
 
 Create Vexa-owned frames for:

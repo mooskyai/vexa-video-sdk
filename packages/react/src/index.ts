@@ -27,6 +27,7 @@ import type {
   FrameContext,
   JsonObject,
   ProgrammableArcShape,
+  ProgrammableEffect,
   ProgrammableCompositionDefinition,
   ProgrammableCompositionStaticMetadata,
   ProgrammableEllipseShape,
@@ -54,6 +55,7 @@ import type {
   ProgrammableSceneTextNode,
   ProgrammableSceneTextStyle,
   ProgrammableSceneTransform,
+  ProgrammableSceneVisualNodeBase,
   ProgrammableSceneVideoNode,
   ProgrammableShape,
   ProgrammableShapeGeometry,
@@ -659,6 +661,19 @@ export interface VexaLeafBaseProps extends Omit<ProgrammableSceneNodeBase, "id">
   readonly id: string;
 }
 
+export interface VexaVisualLeafBaseProps extends VexaLeafBaseProps {
+  readonly effects?: readonly ProgrammableEffect[];
+}
+
+function visualNodeBase(
+  props: VexaVisualLeafBaseProps
+): Omit<ProgrammableSceneVisualNodeBase, "id"> {
+  return {
+    ...nodeBase(props),
+    ...(props.effects !== undefined ? { effects: props.effects } : {})
+  };
+}
+
 function nodeBase(props: VexaLeafBaseProps): Omit<ProgrammableSceneNodeBase, "id"> {
   return {
     ...(props.startFrame !== undefined ? { startFrame: props.startFrame } : {}),
@@ -669,7 +684,7 @@ function nodeBase(props: VexaLeafBaseProps): Omit<ProgrammableSceneNodeBase, "id
   };
 }
 
-export interface VexaFillProps extends VexaLeafBaseProps {
+export interface VexaFillProps extends VexaVisualLeafBaseProps {
   readonly color: string;
 }
 
@@ -677,13 +692,13 @@ export function VexaFill(props: VexaFillProps): null {
   const node: ProgrammableSceneFillNode = Object.freeze({
     kind: "fill",
     id: props.id,
-    ...nodeBase(props),
+    ...visualNodeBase(props),
     color: props.color
   });
   return leaf("VexaFill", node);
 }
 
-export interface VexaSolidProps extends VexaLeafBaseProps {
+export interface VexaSolidProps extends VexaVisualLeafBaseProps {
   readonly color: string;
   readonly width: number;
   readonly height: number;
@@ -693,7 +708,7 @@ export function VexaSolid(props: VexaSolidProps): null {
   const node: ProgrammableSceneSolidNode = Object.freeze({
     kind: "solid",
     id: props.id,
-    ...nodeBase(props),
+    ...visualNodeBase(props),
     color: props.color,
     width: props.width,
     height: props.height
@@ -701,7 +716,7 @@ export function VexaSolid(props: VexaSolidProps): null {
   return leaf("VexaSolid", node);
 }
 
-export interface VexaShapeProps extends VexaLeafBaseProps {
+export interface VexaShapeProps extends VexaVisualLeafBaseProps {
   readonly shape: ProgrammableShape;
 }
 
@@ -715,11 +730,11 @@ function shapeValue(
   });
 }
 
-function shapeLeaf(label: string, props: VexaLeafBaseProps, shape: ProgrammableShape): null {
+function shapeLeaf(label: string, props: VexaVisualLeafBaseProps, shape: ProgrammableShape): null {
   const node: ProgrammableSceneShapeNode = Object.freeze({
     kind: "shape",
     id: props.id,
-    ...nodeBase(props),
+    ...visualNodeBase(props),
     shape
   });
   return leaf(label, node);
@@ -729,7 +744,7 @@ export function VexaShape(props: VexaShapeProps): null {
   return shapeLeaf("VexaShape", props, props.shape);
 }
 
-export interface VexaShapePrimitiveBaseProps extends VexaLeafBaseProps {
+export interface VexaShapePrimitiveBaseProps extends VexaVisualLeafBaseProps {
   readonly style?: ProgrammableShapeStyle;
 }
 
@@ -840,7 +855,7 @@ export function VexaArc(props: VexaArcProps): null {
   }, props.style));
 }
 
-export interface VexaTextProps extends VexaLeafBaseProps {
+export interface VexaTextProps extends VexaVisualLeafBaseProps {
   readonly text: string;
   readonly style?: ProgrammableSceneTextStyle;
 }
@@ -849,14 +864,14 @@ export function VexaText(props: VexaTextProps): null {
   const node: ProgrammableSceneTextNode = Object.freeze({
     kind: "text",
     id: props.id,
-    ...nodeBase(props),
+    ...visualNodeBase(props),
     text: props.text,
     ...(props.style !== undefined ? { style: props.style } : {})
   });
   return leaf("VexaText", node);
 }
 
-export interface VexaImageProps extends VexaLeafBaseProps {
+export interface VexaImageProps extends VexaVisualLeafBaseProps {
   readonly assetId: string;
   readonly fit?: ResizeFit;
   readonly crop?: ProgrammableSceneCrop;
@@ -866,7 +881,7 @@ export function VexaImage(props: VexaImageProps): null {
   const node: ProgrammableSceneImageNode = Object.freeze({
     kind: "image",
     id: props.id,
-    ...nodeBase(props),
+    ...visualNodeBase(props),
     assetId: props.assetId,
     ...(props.fit !== undefined ? { fit: props.fit } : {}),
     ...(props.crop !== undefined ? { crop: props.crop } : {})
@@ -874,7 +889,7 @@ export function VexaImage(props: VexaImageProps): null {
   return leaf("VexaImage", node);
 }
 
-interface VexaPlayableMediaProps extends VexaLeafBaseProps {
+interface VexaPlayableMediaFields {
   readonly assetId: string;
   readonly sourceStartSeconds?: number;
   readonly playbackRate?: number;
@@ -882,7 +897,7 @@ interface VexaPlayableMediaProps extends VexaLeafBaseProps {
   readonly muted?: boolean;
 }
 
-export interface VexaVideoProps extends VexaPlayableMediaProps {
+export interface VexaVideoProps extends VexaVisualLeafBaseProps, VexaPlayableMediaFields {
   readonly fit?: ResizeFit;
   readonly crop?: ProgrammableSceneCrop;
 }
@@ -891,7 +906,7 @@ export function VexaVideo(props: VexaVideoProps): null {
   const node: ProgrammableSceneVideoNode = Object.freeze({
     kind: "video",
     id: props.id,
-    ...nodeBase(props),
+    ...visualNodeBase(props),
     assetId: props.assetId,
     ...(props.fit !== undefined ? { fit: props.fit } : {}),
     ...(props.crop !== undefined ? { crop: props.crop } : {}),
@@ -903,7 +918,7 @@ export function VexaVideo(props: VexaVideoProps): null {
   return leaf("VexaVideo", node);
 }
 
-export type VexaAudioProps = VexaPlayableMediaProps;
+export interface VexaAudioProps extends VexaLeafBaseProps, VexaPlayableMediaFields {}
 
 export function VexaAudio(props: VexaAudioProps): null {
   const node: ProgrammableSceneAudioNode = Object.freeze({
@@ -919,7 +934,7 @@ export function VexaAudio(props: VexaAudioProps): null {
   return leaf("VexaAudio", node);
 }
 
-export interface VexaSurfaceProps extends VexaLeafBaseProps {
+export interface VexaSurfaceProps extends VexaVisualLeafBaseProps {
   readonly surface: ProgrammableSceneSurfaceDescriptor;
 }
 
@@ -927,7 +942,7 @@ export function VexaSurface(props: VexaSurfaceProps): null {
   const node: ProgrammableSceneSurfaceNode = Object.freeze({
     kind: "surface",
     id: props.id,
-    ...nodeBase(props),
+    ...visualNodeBase(props),
     surface: props.surface
   });
   return leaf("VexaSurface", node);
@@ -963,6 +978,7 @@ export function vexaStorageAsset(
 
 export type {
   JsonObject,
+  ProgrammableEffect,
   ProgrammableCompositionDefinition,
   ProgrammableScene,
   ProgrammableSceneAsset,

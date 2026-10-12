@@ -544,6 +544,7 @@ function replaceShapeNodes(
       ...(node.zIndex !== undefined ? { zIndex: node.zIndex } : {}),
       ...(node.opacity !== undefined ? { opacity: node.opacity } : {}),
       ...(node.transform !== undefined ? { transform: node.transform } : {}),
+      ...(node.effects !== undefined ? { effects: node.effects } : {}),
       assetId
     });
   }));
