@@ -546,7 +546,11 @@ Cover fade, slide, wipe, push, zoom, and circular iris transition normalization;
 
 ### Programmable fade execution tests
 
-Cover scene-to-project preservation of the shared fade contract, frame-to-second conversion from the actual project FPS, fade-in/fade-out boundary expressions, all four easing modes, effect -> opacity -> transition ordering, isolated text execution, renderer-materialized primitives, and the `PROGRAMMABLE_TRANSITION_GRAPH` marker. Programmable visual transitions must not implicitly change audio fades. Slide, wipe, push, zoom, iris, and unsupported combinations remain explicit fail-closed paths until their execution semantics land.
+Cover scene-to-project preservation of the shared fade contract, frame-to-second conversion from the actual project FPS, fade-in/fade-out boundary expressions, all four easing modes, effect -> opacity -> transition ordering, isolated text execution, renderer-materialized primitives, and the `PROGRAMMABLE_TRANSITION_GRAPH` marker. Programmable visual transitions must not implicitly change audio fades.
+
+### Programmable slide and wipe execution tests
+
+Cover scene-to-project preservation of slide/wipe contracts, all four directions, in/out timing, frame-to-second conversion, easing, slide composition with authored x/y placement, wipe alpha ordering after effects and opacity, isolated text execution, and renderer-materialized shapes/fills/solids. Real FFmpeg integration must exercise both transition kinds and expose `PROGRAMMABLE_SLIDE_TRANSITION_GRAPH` plus `PROGRAMMABLE_WIPE_TRANSITION_GRAPH`. Non-normal blend-mode combinations and push/zoom/iris remain explicit fail-closed paths rather than approximations.
 
 ### Visual fixtures
 

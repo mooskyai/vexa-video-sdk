@@ -88,7 +88,7 @@ The planned sequence is:
 | V2.6 | **Complete** | TypeScript/TSX bundling and composition discovery |
 | V2.7 | **Complete** | Node composition/still renderer using existing Vexa execution paths |
 | V2.8 | **Complete** | Local Vexa Studio development environment |
-| V2.9 | **Next** | Shapes, effects, transitions, fonts, and composition captions; Vexa-owned effects execute through FFmpeg and the shared transition contract now has easing-aware fade execution, while slide/wipe/push/zoom/iris remain explicit fail-closed execution work |
+| V2.9 | **Next** | Shapes, effects, transitions, fonts, and composition captions; Vexa-owned effects plus easing-aware fade/slide/wipe transitions execute through FFmpeg, while push/zoom/iris remain explicit fail-closed execution work |
 | V2.10 | **Planned** | Optional extended programmable-media integrations |
 | V2.11 | **Planned** | Browser/WebCodecs rendering with typed fallback |
 | V2.12 | **Planned** | Parameterized templates and validated input schemas |

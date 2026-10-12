@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createVideoProjectAst, normalizeVideoProject, type ProbeResult, type VideoProjectAst } from "@vexa-video/core";
+import { InvalidProjectError, createVideoProjectAst, normalizeVideoProject, type ProbeResult, type VideoProjectAst } from "@vexa-video/core";
 import { createProjectExecutionPlan } from "../src/composition.js";
 
 const probe = (source: string): ProbeResult => ({
@@ -231,6 +231,121 @@ test("programmable text fade uses an isolated transparent layer", () => {
   assert.match(plan.filterComplex, /alpha\(X,Y\)\*/u);
   assert.ok(plan.optimizations.includes("PROGRAMMABLE_TRANSITION_GRAPH"));
   assert.ok(plan.optimizations.includes("TEXT_ISOLATED_TRANSITION_GRAPH"));
+});
+
+test("project compiler executes programmable slide positioning with easing and direction", () => {
+  const sliding = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "images",
+      type: "image",
+      clips: [{
+        id: "card",
+        kind: "image",
+        source: "card.png",
+        start: 0.5,
+        duration: 2,
+        transform: { x: 20, y: 10, width: 120, height: 80, fit: "fill" },
+        transitions: {
+          in: { kind: "slide", durationInFrames: 15, easing: "ease-in", direction: "right" },
+          out: { kind: "slide", durationInFrames: 15, easing: "ease-out", direction: "up" }
+        }
+      }]
+    }]
+  });
+
+  const plan = createProjectExecutionPlan(sliding, "output.mp4");
+  assert.match(plan.filterComplex, /overlay=x='[^']*640\*\(1-/u);
+  assert.match(plan.filterComplex, /:y='[^']*-360\*\(1-/u);
+  assert.match(plan.filterComplex, /min\(1,max\(0,/u);
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_TRANSITION_GRAPH"));
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_SLIDE_TRANSITION_GRAPH"));
+});
+
+test("project compiler executes programmable wipe masks after clip opacity", () => {
+  const wiped = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "images",
+      type: "image",
+      clips: [{
+        id: "card",
+        kind: "image",
+        source: "card.png",
+        start: 0,
+        duration: 2,
+        opacity: 0.75,
+        transitions: {
+          in: { kind: "wipe", durationInFrames: 10, easing: "ease-out", direction: "right" },
+          out: { kind: "wipe", durationInFrames: 10, easing: "ease-in", direction: "down" }
+        }
+      }]
+    }]
+  });
+
+  const plan = createProjectExecutionPlan(wiped, "output.mp4");
+  const opacityIndex = plan.filterComplex.indexOf("colorchannelmixer=aa=0.75");
+  const wipeIndex = plan.filterComplex.indexOf("if(gte(X,W*(1-");
+  assert.ok(opacityIndex >= 0 && wipeIndex > opacityIndex);
+  assert.match(plan.filterComplex, /if\(gte\(X,W\*\(1-/u);
+  assert.match(plan.filterComplex, /if\(gte\(Y,H\*\(1-/u);
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_TRANSITION_GRAPH"));
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_WIPE_TRANSITION_GRAPH"));
+});
+
+test("programmable text slide and wipe reuse the isolated transparent layer", () => {
+  const transitionedText = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "titles",
+      type: "text",
+      clips: [{
+        id: "title",
+        kind: "text",
+        text: "Vexa",
+        start: 0.5,
+        duration: 1,
+        style: { fontSize: 36, color: "white" },
+        transitions: {
+          in: { kind: "slide", durationInFrames: 10, easing: "ease-out", direction: "left" },
+          out: { kind: "wipe", durationInFrames: 10, easing: "ease-in", direction: "right" }
+        }
+      }]
+    }]
+  });
+
+  const plan = createProjectExecutionPlan(transitionedText, "output.mp4");
+  assert.match(plan.filterComplex, /color=c=black@0:s=640x360:r=30:d=1,format=rgba,drawtext=/u);
+  assert.match(plan.filterComplex, /\[base0\]\[tclip0\]overlay=x='[^']*-640\*\(1-/u);
+  assert.match(plan.filterComplex, /if\(gte\(X,W\*\(1-/u);
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_SLIDE_TRANSITION_GRAPH"));
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_WIPE_TRANSITION_GRAPH"));
+  assert.ok(plan.optimizations.includes("TEXT_ISOLATED_TRANSITION_GRAPH"));
+});
+
+test("programmable push remains fail-closed until its paired-motion graph lands", () => {
+  const pushed = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "images",
+      type: "image",
+      clips: [{
+        id: "card",
+        kind: "image",
+        source: "card.png",
+        start: 0,
+        duration: 2,
+        transitions: {
+          in: { kind: "push", durationInFrames: 10, direction: "left" }
+        }
+      }]
+    }]
+  });
+
+  assert.throws(
+    () => createProjectExecutionPlan(pushed, "output.mp4"),
+    (error: unknown) => error instanceof InvalidProjectError && /programmable push/u.test(error.message)
+  );
 });
 
 test("project compiler supports full-canvas blend modes", () => {

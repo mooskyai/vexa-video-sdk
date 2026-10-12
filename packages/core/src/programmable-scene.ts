@@ -1069,7 +1069,11 @@ function assertProjectRepresentable(item: ProgrammableSceneRenderItem): void {
   const node = item.node;
   if (isVisualLeafNode(node) && node.transitions !== undefined) {
     const unsupported = [node.transitions.in, node.transitions.out].find(
-      (transition) => transition !== undefined && transition.kind !== "fade"
+      (transition) =>
+        transition !== undefined &&
+        transition.kind !== "fade" &&
+        transition.kind !== "slide" &&
+        transition.kind !== "wipe"
     );
     if (unsupported) {
       throw new UnsupportedProgrammableSceneLoweringError(

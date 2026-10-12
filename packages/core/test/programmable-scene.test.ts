@@ -311,7 +311,7 @@ test("image effect chains normalize, preserve order, and lower into project clip
   }), /effects is invalid/);
 });
 
-test("visual transitions normalize, serialize, and fail closed before execution wiring", () => {
+test("visual transitions normalize, serialize, and keep unsupported transition families fail closed", () => {
   const options = {
     id: "transition-scene",
     width: 320,
@@ -396,6 +396,39 @@ test("programmable fade transitions lower into project clips without changing th
   assert.deepEqual(clip?.transitions, {
     in: { kind: "fade", durationInFrames: 12, easing: "ease-in" },
     out: { kind: "fade", durationInFrames: 8, easing: "ease-out" }
+  });
+  assert.equal(clip?.duration, 1);
+});
+
+test("programmable slide and wipe transitions lower into project clips without changing the shared contract", () => {
+  const scene = defineProgrammableScene({
+    id: "spatial-transition-lowering",
+    width: 320,
+    height: 180,
+    fps: 30,
+    durationInFrames: 60,
+    assets: [{
+      id: "image",
+      kind: "image",
+      source: { kind: "static", src: "assets/card.png" }
+    }],
+    children: [{
+      id: "card",
+      kind: "image",
+      assetId: "image",
+      durationInFrames: 30,
+      transitions: {
+        in: { kind: "slide", durationInFrames: 12, easing: "ease-in", direction: "right" },
+        out: { kind: "wipe", durationInFrames: 8, easing: "ease-out", direction: "down" }
+      }
+    }]
+  });
+
+  const project = lowerProgrammableSceneToVideoProject(scene);
+  const clip = project.tracks[0]?.clips[0];
+  assert.deepEqual(clip?.transitions, {
+    in: { kind: "slide", durationInFrames: 12, easing: "ease-in", direction: "right" },
+    out: { kind: "wipe", durationInFrames: 8, easing: "ease-out", direction: "down" }
   });
   assert.equal(clip?.duration, 1);
 });

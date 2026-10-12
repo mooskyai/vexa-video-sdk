@@ -121,6 +121,11 @@ function shapeShowcaseScene(
         id: "shape-ellipse",
         kind: "shape",
         zIndex: 1,
+        durationInFrames: 12,
+        transitions: {
+          in: { kind: "slide", durationInFrames: 4, easing: "ease-out", direction: "right" },
+          out: { kind: "slide", durationInFrames: 4, easing: "ease-in", direction: "up" }
+        },
         shape: {
           geometry: { kind: "ellipse", cx: 114, cy: 38, radiusX: 24, radiusY: 15 },
           style: { fill: "#3b82f6" }
@@ -180,6 +185,11 @@ function shapeShowcaseScene(
         id: "shape-path",
         kind: "shape",
         zIndex: 5,
+        durationInFrames: 12,
+        transitions: {
+          in: { kind: "wipe", durationInFrames: 4, easing: "ease-out", direction: "left" },
+          out: { kind: "wipe", durationInFrames: 4, easing: "ease-in-out", direction: "down" }
+        },
         shape: {
           geometry: { kind: "path", d: "M 158 82 C 184 60 210 132 238 98" },
           style: {

@@ -49,6 +49,8 @@ interface IndexedClip {
   inputIndex: number | null;
 }
 
+type ProgrammableTimelineTransition = Extract<TimelineTransition, { kind: string }>;
+
 function formatNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(6)));
 }
@@ -182,6 +184,22 @@ function legacyTransitionDuration(clip: TimelineClip, edge: "in" | "out"): numbe
   return transition && "type" in transition ? transition.duration : 0;
 }
 
+function programmableTransitionVisibilityExpression(
+  transition: ProgrammableTimelineTransition,
+  edge: "in" | "out",
+  clipDuration: number,
+  fps: number,
+  timeExpression: string
+): string {
+  const duration = transition.durationInFrames / fps;
+  const rawProgress = edge === "in"
+    ? `((${timeExpression})/${formatNumber(duration)})`
+    : `(((${timeExpression})-${formatNumber(clipDuration - duration)})/${formatNumber(duration)})`;
+  const progress = `min(1,max(0,${rawProgress}))`;
+  const eased = easingExpression(progress, transition.easing ?? "linear");
+  return edge === "in" ? `(${eased})` : `(1-(${eased}))`;
+}
+
 function programmableFadeAlphaExpression(
   clip: TimelineClip,
   canvas: VideoProjectAst["canvas"],
@@ -191,22 +209,101 @@ function programmableFadeAlphaExpression(
   for (const edge of ["in", "out"] as const) {
     const transition = clip.transitions?.[edge];
     if (!transition || !("kind" in transition) || transition.kind !== "fade") continue;
-    const duration = transition.durationInFrames / canvas.fps;
-    const rawProgress = edge === "in"
-      ? `((${timeExpression})/${formatNumber(duration)})`
-      : `(((${timeExpression})-${formatNumber(clip.duration - duration)})/${formatNumber(duration)})`;
-    const progress = `min(1,max(0,${rawProgress}))`;
-    const eased = easingExpression(progress, transition.easing ?? "linear");
-    factors.push(edge === "in" ? `(${eased})` : `(1-(${eased}))`);
+    factors.push(programmableTransitionVisibilityExpression(
+      transition,
+      edge,
+      clip.duration,
+      canvas.fps,
+      timeExpression
+    ));
   }
   return factors.length ? factors.join("*") : null;
 }
 
+function programmableWipeAlphaExpression(
+  clip: TimelineClip,
+  canvas: VideoProjectAst["canvas"],
+  timeExpression: string
+): string | null {
+  const masks: string[] = [];
+  for (const edge of ["in", "out"] as const) {
+    const transition = clip.transitions?.[edge];
+    if (!transition || !("kind" in transition) || transition.kind !== "wipe") continue;
+    const visibility = programmableTransitionVisibilityExpression(
+      transition,
+      edge,
+      clip.duration,
+      canvas.fps,
+      timeExpression
+    );
+    switch (transition.direction ?? "left") {
+      case "left":
+        masks.push(`if(lt(X,W*(${visibility})),1,0)`);
+        break;
+      case "right":
+        masks.push(`if(gte(X,W*(1-(${visibility}))),1,0)`);
+        break;
+      case "up":
+        masks.push(`if(lt(Y,H*(${visibility})),1,0)`);
+        break;
+      case "down":
+        masks.push(`if(gte(Y,H*(1-(${visibility}))),1,0)`);
+        break;
+    }
+  }
+  return masks.length ? masks.map((mask) => `(${mask})`).join("*") : null;
+}
+
+function programmableSlideOffsetExpression(
+  clip: TimelineClip,
+  canvas: VideoProjectAst["canvas"],
+  axis: "x" | "y",
+  timeExpression: string
+): string | null {
+  const offsets: string[] = [];
+  for (const edge of ["in", "out"] as const) {
+    const transition = clip.transitions?.[edge];
+    if (!transition || !("kind" in transition) || transition.kind !== "slide") continue;
+    const direction = transition.direction ?? "left";
+    const horizontal = direction === "left" || direction === "right";
+    if ((axis === "x") !== horizontal) continue;
+    const visibility = programmableTransitionVisibilityExpression(
+      transition,
+      edge,
+      clip.duration,
+      canvas.fps,
+      timeExpression
+    );
+    const distance = axis === "x" ? canvas.width : canvas.height;
+    const negative = direction === "left" || direction === "up";
+    offsets.push(`${negative ? "-" : ""}${formatNumber(distance)}*(1-(${visibility}))`);
+  }
+  return offsets.length ? offsets.map((offset) => `(${offset})`).join("+") : null;
+}
+
+function programmableTransitionOptimizationMarkers(clip: TimelineClip): string[] {
+  const kinds: string[] = [];
+  for (const transition of [clip.transitions?.in, clip.transitions?.out]) {
+    if (transition && "kind" in transition) kinds.push(transition.kind);
+  }
+  if (!kinds.length) return [];
+  const markers = ["PROGRAMMABLE_TRANSITION_GRAPH"];
+  if (kinds.includes("slide")) markers.push("PROGRAMMABLE_SLIDE_TRANSITION_GRAPH");
+  if (kinds.includes("wipe")) markers.push("PROGRAMMABLE_WIPE_TRANSITION_GRAPH");
+  return markers;
+}
+
 function assertExecutableProgrammableTransitions(clip: TimelineClip): void {
   for (const transition of [clip.transitions?.in, clip.transitions?.out]) {
-    if (transition && "kind" in transition && transition.kind !== "fade") {
+    if (
+      transition &&
+      "kind" in transition &&
+      transition.kind !== "fade" &&
+      transition.kind !== "slide" &&
+      transition.kind !== "wipe"
+    ) {
       throw new InvalidProjectError(
-        `Clip "${clip.id}" uses programmable ${transition.kind}, but only programmable fade execution is wired in this transition slice.`
+        `Clip "${clip.id}" uses programmable ${transition.kind}, but only programmable fade, slide, and wipe execution is wired in this transition slice.`
       );
     }
   }
@@ -331,6 +428,13 @@ function clipVisualFilters(
     );
   }
 
+  const programmableWipeAlpha = programmableWipeAlphaExpression(clip, canvas, "T");
+  if (programmableWipeAlpha) {
+    filters.push(
+      `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${programmableWipeAlpha})'`
+    );
+  }
+
   const transitionIn = clip.transitions?.in;
   const fadeIn = legacyTransitionDuration(clip, "in");
   if (fadeIn > 0 && transitionIn && "type" in transitionIn && transitionIn.type === "fade") {
@@ -349,7 +453,8 @@ function clipVisualFilters(
 
 function clipPosition(
   clip: Extract<TimelineClip, { kind: "video" | "image" }>,
-  padding: ProgrammableEffectPadding
+  padding: ProgrammableEffectPadding,
+  canvas: VideoProjectAst["canvas"]
 ): { x: string; y: string } {
   const localTime = `(t-${formatNumber(clip.start)})`;
   const authoredX = clip.transform?.x === undefined
@@ -376,7 +481,12 @@ function clipPosition(
   const y = authoredY === null
     ? (hasVerticalPadding ? `(H-h-${padding.top}+${padding.bottom})/2` : "(H-h)/2")
     : padding.top === 0 ? authoredY : `((${authoredY})-${padding.top})`;
-  return { x, y };
+  const slideX = programmableSlideOffsetExpression(clip, canvas, "x", localTime);
+  const slideY = programmableSlideOffsetExpression(clip, canvas, "y", localTime);
+  return {
+    x: slideX ? `((${x})+(${slideX}))` : x,
+    y: slideY ? `((${y})+(${slideY}))` : y
+  };
 }
 
 function buildInputArgs(
@@ -540,7 +650,12 @@ function textIsolatedClipFilter(
 
   for (const transition of [clip.transitions?.in, clip.transitions?.out]) {
     if (!transition) continue;
-    if ("kind" in transition && transition.kind !== "fade") {
+    if (
+      "kind" in transition &&
+      transition.kind !== "fade" &&
+      transition.kind !== "slide" &&
+      transition.kind !== "wipe"
+    ) {
       throw new InvalidProjectError(
         `Text clip "${clip.id}" cannot execute programmable ${transition.kind} yet.`
       );
@@ -582,6 +697,13 @@ function textIsolatedClipFilter(
     );
   }
 
+  const programmableWipeAlpha = programmableWipeAlphaExpression(clip, project.canvas, "T");
+  if (programmableWipeAlpha) {
+    filters.push(
+      `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${programmableWipeAlpha})'`
+    );
+  }
+
   const transitionIn = clip.transitions?.in;
   const fadeIn = legacyTransitionDuration(clip, "in");
   if (fadeIn > 0 && transitionIn && "type" in transitionIn && transitionIn.type === "fade") {
@@ -597,6 +719,19 @@ function textIsolatedClipFilter(
 
   filters.push(`setpts=PTS-STARTPTS+${formatNumber(clip.start)}/TB`);
   return `${filters.join(",")}[${outputLabel}]`;
+}
+
+function textIsolatedOverlayPosition(
+  project: VideoProjectAst,
+  clip: Extract<TimelineClip, { kind: "text" }>
+): { x: string; y: string } {
+  const localTime = `(t-${formatNumber(clip.start)})`;
+  const slideX = programmableSlideOffsetExpression(clip, project.canvas, "x", localTime);
+  const slideY = programmableSlideOffsetExpression(clip, project.canvas, "y", localTime);
+  return {
+    x: slideX ? `(${slideX})` : "0",
+    y: slideY ? `(${slideY})` : "0"
+  };
 }
 
 function transitionChainForTrack(
@@ -726,14 +861,16 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
           filters.push(textIsolatedClipFilter(project, clip, clipLabel));
           const start = formatNumber(clip.start);
           const end = formatNumber(clip.start + clip.duration);
+          const position = textIsolatedOverlayPosition(project, clip);
+          const overlayX = position.x === "0" ? "0" : quotedExpression(position.x);
+          const overlayY = position.y === "0" ? "0" : quotedExpression(position.y);
           filters.push(
-            `[${current}][${clipLabel}]overlay=x=0:y=0:eof_action=pass:shortest=0:format=auto:enable='between(t,${start},${end})'[${next}]`
+            `[${current}][${clipLabel}]overlay=x=${overlayX}:y=${overlayY}:eof_action=pass:shortest=0:format=auto:enable='between(t,${start},${end})'[${next}]`
           );
           if (clip.effects?.length) optimizations.push("TEXT_ISOLATED_EFFECT_GRAPH");
-          if ([clip.transitions?.in, clip.transitions?.out].some(
-            (transition) => transition !== undefined && "kind" in transition
-          )) {
-            optimizations.push("PROGRAMMABLE_TRANSITION_GRAPH", "TEXT_ISOLATED_TRANSITION_GRAPH");
+          const transitionMarkers = programmableTransitionOptimizationMarkers(clip);
+          if (transitionMarkers.length) {
+            optimizations.push(...transitionMarkers, "TEXT_ISOLATED_TRANSITION_GRAPH");
           }
         } else {
           filters.push(textFilter(current, next, clip));
@@ -776,11 +913,8 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
           `Clip "${clip.id}" uses an advanced outgoing transition. Put crossfade/wipe on the incoming clip instead.`
         );
       }
-      if ([clip.transitions?.in, clip.transitions?.out].some(
-        (transition) => transition !== undefined && "kind" in transition
-      )) {
-        optimizations.push("PROGRAMMABLE_TRANSITION_GRAPH");
-      }
+      const transitionMarkers = programmableTransitionOptimizationMarkers(clip);
+      if (transitionMarkers.length) optimizations.push(...transitionMarkers);
 
       const clipLabel = `vclip${visualIndex}`;
       filters.push(videoClipFilter(item, project, clipLabel));
@@ -791,6 +925,22 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
       const effectPadding = programmableEffectPadding(clip.effects, clip.id);
       const hasEffectPadding = effectPadding.left > 0 || effectPadding.right > 0 ||
         effectPadding.top > 0 || effectPadding.bottom > 0;
+      const programmableSpatialTransition = [clip.transitions?.in, clip.transitions?.out].find(
+        (transition) =>
+          transition !== undefined &&
+          "kind" in transition &&
+          (transition.kind === "slide" || transition.kind === "wipe")
+      );
+
+      if (
+        blendMode !== "normal" &&
+        programmableSpatialTransition &&
+        "kind" in programmableSpatialTransition
+      ) {
+        throw new InvalidProjectError(
+          `Clip "${clip.id}" cannot combine programmable ${programmableSpatialTransition.kind} with blendMode "${blendMode}" yet.`
+        );
+      }
 
       if (blendMode !== "normal") {
         if (hasEffectPadding) {
@@ -808,7 +958,7 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
         );
         optimizations.push("BLEND_MODE_GRAPH");
       } else {
-        const { x, y } = clipPosition(clip, effectPadding);
+        const { x, y } = clipPosition(clip, effectPadding, project.canvas);
         filters.push(
           `[${current}][${clipLabel}]overlay=x=${quotedExpression(x)}:y=${quotedExpression(y)}:eof_action=pass:shortest=0:format=auto:enable='between(t,${start},${end})'[${next}]`
         );
