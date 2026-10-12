@@ -247,7 +247,7 @@ test("shape nodes reuse the shared shape contract and enter the render graph", (
   }), InvalidProgrammableSceneError);
 });
 
-test("visual effect chains normalize, preserve order, and stay out of direct project lowering", () => {
+test("image effect chains normalize, preserve order, and lower into project clips", () => {
   const options = {
     id: "effects-scene",
     width: 320,
@@ -284,8 +284,21 @@ test("visual effect chains normalize, preserve order, and stay out of direct pro
   assert.equal(Object.isFrozen(node.effects?.[0]), true);
   assert.deepEqual(createProgrammableSceneRenderGraph(scene).items[0]?.node, node);
   assert.equal(serializeProgrammableScene(scene), serializeBrowserProgrammableScene(browserScene));
+
+  const project = lowerProgrammableSceneToVideoProject(scene);
+  const clip = project.tracks[0]?.clips[0];
+  assert.equal(clip?.kind, "image");
+  assert.deepEqual(clip?.kind === "image" ? clip.effects : undefined, node.effects);
+
+  const textEffects = defineProgrammableScene({
+    id: "text-effects", width: 100, height: 100, fps: 30, durationInFrames: 30,
+    children: [{
+      id: "title", kind: "text", text: "Vexa",
+      effects: [{ kind: "blur", radius: 2 }]
+    }]
+  });
   assert.throws(
-    () => lowerProgrammableSceneToVideoProject(scene),
+    () => lowerProgrammableSceneToVideoProject(textEffects),
     UnsupportedProgrammableSceneLoweringError
   );
 

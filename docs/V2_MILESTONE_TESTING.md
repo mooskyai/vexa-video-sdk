@@ -524,6 +524,10 @@ Cover every programmable effect kind through deterministic core normalization an
 
 Cover ordered effect attachment on visual scene leaves, normalization/defaulting through the shared effect contract, render-graph preservation, browser-entry serialization parity, React visual-component mapping, and typed rejection from direct `VideoProjectAst` lowering before renderer effect execution exists. Audio nodes and group/layer containers must remain effect-free at the type boundary. Shape rasterization must preserve effect metadata so the pre-execution boundary cannot silently discard requested effects.
 
+### Effect execution tests
+
+Cover project-level normalization for image/video effect chains, deterministic FFmpeg filter ordering, effect-before-opacity ordering, and the `PROGRAMMABLE_EFFECT_GRAPH` execution-plan marker. Real integration must render effect-bearing programmable image/video nodes and verify changed pixel/luminance output; the renderer shape fixture must prove a rasterized shape effect reaches the same FFmpeg path. Blur, brightness, contrast, saturation, hue, grayscale, sepia, deterministic noise, and vignette are accepted in this linear/raster slice. Text/fill/solid/surface effects and compositor-only shadow/glow must fail explicitly rather than being dropped or approximated.
+
 ### Visual fixtures
 
 Create Vexa-owned frames for:

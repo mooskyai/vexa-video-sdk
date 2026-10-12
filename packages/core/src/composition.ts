@@ -8,6 +8,11 @@ import type {
   VideoCodec
 } from "./editing.js";
 import type { HardwareAccelerationDecision, HardwareAccelerationOptions } from "./hardware.js";
+import {
+  InvalidProgrammableEffectError,
+  normalizeProgrammableEffects,
+  type ProgrammableEffect
+} from "./programmable-effects.js";
 
 export type ProjectTrackType = "video" | "audio" | "image" | "text";
 export type ClipKind = ProjectTrackType;
@@ -76,6 +81,7 @@ export interface VideoTimelineClip extends TimelineClipBase {
   sourceStart?: number;
   includeAudio?: boolean;
   volume?: NumericProperty;
+  effects?: readonly ProgrammableEffect[];
 }
 
 export interface AudioTimelineClip extends Omit<TimelineClipBase, "transform" | "blendMode"> {
@@ -88,6 +94,7 @@ export interface AudioTimelineClip extends Omit<TimelineClipBase, "transform" | 
 export interface ImageTimelineClip extends TimelineClipBase {
   kind: "image";
   source: string;
+  effects?: readonly ProgrammableEffect[];
 }
 
 export interface TextStyle {
@@ -387,11 +394,33 @@ function normalizeClip(clip: TimelineClip, track: ProjectTrack): TimelineClip {
     ? { ...(transitionIn ? { in: transitionIn } : {}), ...(transitionOut ? { out: transitionOut } : {}) }
     : undefined;
 
+  let effects: readonly ProgrammableEffect[] | undefined;
+  if (clip.kind === "video" || clip.kind === "image") {
+    if (clip.effects !== undefined) {
+      if (!Array.isArray(clip.effects)) {
+        throw new InvalidProjectError(`clip ${clip.id}.effects must be an array.`);
+      }
+      try {
+        effects = normalizeProgrammableEffects(clip.effects);
+      } catch (error) {
+        if (error instanceof InvalidProgrammableEffectError) {
+          throw new InvalidProjectError(`clip ${clip.id}.effects is invalid: ${error.message}`);
+        }
+        throw error;
+      }
+    }
+  } else if ("effects" in clip && clip.effects !== undefined) {
+    throw new InvalidProjectError(
+      `clip ${clip.id} (${clip.kind}) does not support programmable effects.`
+    );
+  }
+
   const base = {
     ...clip,
     enabled,
     opacity,
     ...(transform ? { transform } : {}),
+    ...(effects !== undefined ? { effects } : {}),
     ...(transitions && (transitions.in || transitions.out) ? { transitions } : {})
   } as TimelineClip;
 

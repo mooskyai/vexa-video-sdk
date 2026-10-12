@@ -27,6 +27,7 @@ import {
   detectOutputContainer
 } from "./compatibility.js";
 import { appendVideoEncoderOptions, hardwareOptimizationMarkers, resolveHardwareAcceleration } from "./hardware.js";
+import { compileProgrammableEffectFilters } from "./programmable-effects.js";
 
 const AUDIO_CODECS: Record<Exclude<AudioCodec, "copy" | "none">, string> = {
   aac: "aac",
@@ -247,6 +248,9 @@ function clipVisualFilters(
   }
 
   filters.push("format=rgba");
+
+  const effectFilters = compileProgrammableEffectFilters(clip.effects, clip.id);
+  if (effectFilters.length) filters.push(...effectFilters, "format=rgba");
 
   if (numericPropertyHasKeyframes(clip.opacity)) {
     const opacityExpression = numericPropertyExpression(
@@ -786,6 +790,13 @@ export function createProjectExecutionPlan(
     )
   )) {
     optimizations.push("AUDIO_KEYFRAME_EXPRESSION_GRAPH");
+  }
+  if (project.tracks.some((track) => track.clips.some((clip) =>
+    (clip.kind === "video" || clip.kind === "image") &&
+    clip.enabled !== false &&
+    Boolean(clip.effects?.length)
+  ))) {
+    optimizations.push("PROGRAMMABLE_EFFECT_GRAPH");
   }
   if (project.tracks.some((track) => track.clips.some((clip) => clip.kind === "text" && clip.enabled !== false))) {
     optimizations.push("TEXT_IN_FILTER_GRAPH");

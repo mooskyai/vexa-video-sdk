@@ -1026,10 +1026,15 @@ function lowerTextStyle(style: ProgrammableSceneTextStyle | undefined): TextStyl
 
 function assertProjectRepresentable(item: ProgrammableSceneRenderItem): void {
   const node = item.node;
-  if (isVisualLeafNode(node) && node.effects?.length) {
+  if (
+    isVisualLeafNode(node) &&
+    node.effects?.length &&
+    node.kind !== "image" &&
+    node.kind !== "video"
+  ) {
     throw new UnsupportedProgrammableSceneLoweringError(
       node.id,
-      "programmable effects require renderer effect execution before VideoProjectAst lowering."
+      "programmable effects currently lower through VideoProjectAst only for image/video nodes."
     );
   }
   if (node.kind === "solid" || node.kind === "shape" || node.kind === "surface") {
@@ -1127,7 +1132,8 @@ export function lowerProgrammableSceneToVideoProject(
         ...common,
         kind: "image",
         source: resolveAssetForProject(asset, options),
-        ...(transform ? { transform } : {})
+        ...(transform ? { transform } : {}),
+        ...(node.effects !== undefined ? { effects: node.effects } : {})
       };
       track = { id: `scene:${node.id}`, type: "image", clips: [clip] };
     } else if (node.kind === "video") {
@@ -1140,7 +1146,8 @@ export function lowerProgrammableSceneToVideoProject(
         sourceStart: node.sourceStartSeconds ?? 0,
         includeAudio: !(node.muted ?? false),
         volume: (node.muted ?? false) ? 0 : (node.volume ?? 1),
-        ...(transform ? { transform } : {})
+        ...(transform ? { transform } : {}),
+        ...(node.effects !== undefined ? { effects: node.effects } : {})
       };
       track = { id: `scene:${node.id}`, type: "video", clips: [clip] };
     } else if (node.kind === "audio") {

@@ -73,7 +73,11 @@ test("programmable scene lowers through VideoProject and renders background, ima
           durationInFrames: 60,
           muted: true,
           fit: "fill",
-          transform: { x: 0, y: 0, width: 120, height: 100 }
+          transform: { x: 0, y: 0, width: 120, height: 100 },
+          effects: [
+            { kind: "brightness", amount: 0.25 },
+            { kind: "grayscale", amount: 1 }
+          ]
         },
         {
           id: "image-layer",
@@ -82,7 +86,18 @@ test("programmable scene lowers through VideoProject and renders background, ima
           durationInFrames: 60,
           zIndex: 2,
           fit: "fill",
-          transform: { x: 200, y: 100, width: 60, height: 60 }
+          transform: { x: 200, y: 100, width: 60, height: 60 },
+          effects: [
+            { kind: "blur", radius: 1 },
+            { kind: "brightness", amount: 0.35 },
+            { kind: "contrast", amount: 1.1 },
+            { kind: "saturation", amount: 0.8 },
+            { kind: "hue", degrees: 15 },
+            { kind: "grayscale", amount: 0.2 },
+            { kind: "sepia", amount: 0.2 },
+            { kind: "noise", amount: 0.05, seed: 42, monochrome: true },
+            { kind: "vignette", amount: 0.2, softness: 0.5 }
+          ]
         },
         {
           id: "title-layer",
@@ -118,8 +133,8 @@ test("programmable scene lowers through VideoProject and renders background, ima
     const yellowRegion = await sampleYAverage(output, 0.5, { x: 210, y: 110, width: 20, height: 20 });
     const backgroundRegion = await sampleYAverage(output, 0.5, { x: 290, y: 160, width: 20, height: 15 });
 
-    assert.ok(redRegion > 50 && redRegion < 120, `expected red video luminance, got ${redRegion}`);
-    assert.ok(yellowRegion > 160, `expected bright yellow image luminance, got ${yellowRegion}`);
+    assert.ok(redRegion > 10 && redRegion < 50, `expected darkened grayscale video luminance, got ${redRegion}`);
+    assert.ok(yellowRegion > 20 && yellowRegion < 140, `expected effected image luminance, got ${yellowRegion}`);
     assert.ok(backgroundRegion < 45, `expected dark background luminance, got ${backgroundRegion}`);
   } finally {
     await rm(workspace, { recursive: true, force: true });

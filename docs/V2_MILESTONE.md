@@ -586,6 +586,8 @@ The fourth implementation slice establishes backend-neutral, browser-safe effect
 
 The fifth implementation slice attaches ordered programmable effect chains to visual scene leaves (fill, solid, shape, text, image, video, and surface) while keeping audio and group/layer containers effect-free. `@vexa-video/react` exposes the same typed `effects` prop on visual authoring components, and scene normalization reuses the shared effect contract so Node and browser authoring stay identical. Direct `VideoProjectAst` lowering rejects effect-bearing visuals until renderer execution is implemented, and shape rasterization preserves the effect chain so unsupported execution fails closed instead of silently dropping intent.
 
+The sixth implementation slice extends the existing `VideoProjectAst` image/video clip model with ordered programmable effects and compiles the representable linear/raster subset through the normal FFmpeg composition graph: blur, brightness, contrast, saturation, hue, grayscale, sepia, deterministic noise, and vignette. Renderer-rasterized shapes inherit that same image path. Effects run before existing opacity/fade handling, execution plans expose a `PROGRAMMABLE_EFFECT_GRAPH` marker, and real SDK/renderer integration coverage exercises FFmpeg output. Text/fill/solid/surface effects remain fail-closed because those nodes do not yet lower to an isolated visual clip, while shadow/glow remain fail-closed until compositor-branch execution can represent them without approximation.
+
 ### Goal
 
 Provide a Vexa-owned motion-graphics component library.

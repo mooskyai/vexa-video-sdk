@@ -90,6 +90,7 @@ test("bundled executable compositions resolve storage assets and render stills, 
       (input) => input.kind === "image" && input.source.toLowerCase().endsWith(".png")
     );
     assert.equal(shapeInputs.length, 7);
+    assert.match(shapeFrame.executionPlan.filterComplex, /lutrgb=/u);
     const shapeFramePng = await readFile(shapeFrameOutput);
     assert.deepEqual([...shapeFramePng.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
     for (const input of shapeInputs) {
@@ -138,6 +139,7 @@ test("bundled executable compositions resolve storage assets and render stills, 
     assert.equal(shapeVideo.executionPlan.inputs.filter(
       (input) => input.kind === "image" && input.source.toLowerCase().endsWith(".png")
     ).length, 7);
+    assert.ok(shapeVideo.executionPlan.optimizations.includes("PROGRAMMABLE_EFFECT_GRAPH"));
     assert.equal(shapeVideo.executionPlan.durationSeconds, 1);
     const shapeMp4 = await readFile(shapeVideoOutput);
     assert.equal(shapeMp4.subarray(4, 8).toString("ascii"), "ftyp");
