@@ -590,6 +590,8 @@ The sixth implementation slice extends the existing `VideoProjectAst` image/vide
 
 The seventh implementation slice adds ordered shadow/glow execution for image/video clips and renderer-rasterized shapes through explicit FFmpeg split/mask/blur/overlay compositor branches. Transparent bounds padding plus overlay-position compensation prevents spatial effects from clipping or shifting authored placement, declaration order remains stable when linear and compositor effects are interleaved, and execution plans expose `PROGRAMMABLE_EFFECT_COMPOSITOR_GRAPH`. Effect-bearing advanced wipes and spatial effects combined with non-normal blend modes fail explicitly until those graphs can preserve the same semantics. Text/fill/solid/surface effects remain fail-closed pending isolated visual-layer execution.
 
+The eighth implementation slice lets programmable text effects lower into `VideoProjectAst` and renders effect-bearing text on a transparent full-canvas layer before compositing it back into the project. The isolated layer reuses the same ordered FFmpeg effect compiler as image/video/shape, applies clip opacity and fade transitions after effects, preserves text position/font-size keyframes and default-font resolution, exposes `TEXT_ISOLATED_EFFECT_GRAPH`, and rejects effect-bearing text wipes/crossfades until an advanced text-transition graph exists. Fill/solid/surface effects remain fail-closed.
+
 ### Goal
 
 Provide a Vexa-owned motion-graphics component library.

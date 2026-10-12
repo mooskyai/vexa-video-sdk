@@ -532,6 +532,10 @@ Cover project-level normalization for image/video effect chains, deterministic F
 
 Cover shadow/glow branch construction, declaration-order preservation when compositor and linear effects are interleaved, deterministic transparent bounds padding, and position compensation for both explicit and centered placement. Real FFmpeg integration must verify visible shadow/glow pixels outside the source image bounds and the `PROGRAMMABLE_EFFECT_COMPOSITOR_GRAPH` marker. Unsafe compositor color tokens, excessive padding, effect-bearing advanced wipes, and spatial effects combined with non-normal blend modes must fail explicitly instead of bypassing or approximating the effect chain.
 
+### Isolated text effect execution tests
+
+Cover text effect normalization at the project boundary, programmable-scene text lowering, isolated transparent-layer construction, effect-before-opacity/fade ordering, text position/font-size keyframes, and `TEXT_ISOLATED_EFFECT_GRAPH`. Real FFmpeg integration must render effect-bearing text without modifying background pixels outside the text layer. Linear and compositor effects must reuse the shared effect compiler; effect-bearing text wipes/crossfades must fail explicitly until the advanced transition graph supports isolated text.
+
 ### Visual fixtures
 
 Create Vexa-owned frames for:

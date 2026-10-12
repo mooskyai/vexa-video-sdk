@@ -297,10 +297,10 @@ test("image effect chains normalize, preserve order, and lower into project clip
       effects: [{ kind: "blur", radius: 2 }]
     }]
   });
-  assert.throws(
-    () => lowerProgrammableSceneToVideoProject(textEffects),
-    UnsupportedProgrammableSceneLoweringError
-  );
+  const textProject = lowerProgrammableSceneToVideoProject(textEffects);
+  const textClip = textProject.tracks[0]?.clips[0];
+  assert.equal(textClip?.kind, "text");
+  assert.deepEqual(textClip?.kind === "text" ? textClip.effects : undefined, [{ kind: "blur", radius: 2 }]);
 
   assert.throws(() => defineProgrammableScene({
     id: "invalid-effects", width: 100, height: 100, fps: 30, durationInFrames: 30,

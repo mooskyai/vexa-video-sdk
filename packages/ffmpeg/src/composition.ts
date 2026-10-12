@@ -442,6 +442,97 @@ function textFilter(
   return `[${inputLabel}]drawtext=${options.join(":")}[${outputLabel}]`;
 }
 
+function textEffectClipFilter(
+  project: VideoProjectAst,
+  clip: Extract<TimelineClip, { kind: "text" }>,
+  outputLabel: string
+): string {
+  const style = clip.style ?? {};
+  const localTime = "t";
+  const fontSize = numericPropertyExpression(
+    style.fontSize,
+    48,
+    localTime,
+    `clip ${clip.id}.style.fontSize`
+  );
+  const x = clip.transform?.x === undefined
+    ? "(w-text_w)/2"
+    : numericPropertyExpression(
+        clip.transform.x,
+        0,
+        localTime,
+        `clip ${clip.id}.transform.x`
+      );
+  const y = clip.transform?.y === undefined
+    ? "(h-text_h)/2"
+    : numericPropertyExpression(
+        clip.transform.y,
+        0,
+        localTime,
+        `clip ${clip.id}.transform.y`
+      );
+  const color = filterSafeToken(style.color ?? "white", `clip ${clip.id}.style.color`);
+  const options = [
+    `text='${escapeDrawtext(clip.text)}'`,
+    "expansion=none",
+    `fontsize=${quotedExpression(fontSize)}`,
+    `fontcolor=${color}`,
+    `x=${quotedExpression(x)}`,
+    `y=${quotedExpression(y)}`
+  ];
+
+  if (style.fontFile) options.push(`fontfile='${escapeFilterPath(style.fontFile)}'`);
+  if (style.boxColor) {
+    const box = filterSafeToken(style.boxColor, `clip ${clip.id}.style.boxColor`);
+    options.push("box=1", `boxcolor=${box}`, `boxborderw=${formatNumber(style.boxPadding ?? 8)}`);
+  }
+
+  for (const transition of [clip.transitions?.in, clip.transitions?.out]) {
+    if (transition && transition.type !== "fade") {
+      throw new InvalidProjectError(
+        `Text clip "${clip.id}" cannot combine programmable effects with ${transition.type} yet.`
+      );
+    }
+  }
+
+  const filters = [
+    `color=c=black@0:s=${project.canvas.width}x${project.canvas.height}:r=${formatNumber(project.canvas.fps)}:d=${formatNumber(clip.duration)}`,
+    "format=rgba",
+    `drawtext=${options.join(":")}`
+  ];
+  const effectFilters = compileProgrammableEffectFilters(clip.effects, clip.id);
+  if (effectFilters.length) filters.push(...effectFilters, "format=rgba");
+
+  if (numericPropertyHasKeyframes(clip.opacity)) {
+    const opacityExpression = numericPropertyExpression(
+      clip.opacity,
+      1,
+      "T",
+      `clip ${clip.id}.opacity`
+    );
+    filters.push(
+      `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${opacityExpression})'`
+    );
+  } else {
+    const opacity = numericPropertyValue(clip.opacity, 1, `clip ${clip.id}.opacity`);
+    if (opacity < 1) filters.push(`colorchannelmixer=aa=${formatNumber(opacity)}`);
+  }
+
+  const fadeIn = transitionDuration(clip, "in");
+  if (fadeIn > 0 && clip.transitions?.in?.type === "fade") {
+    filters.push(`fade=t=in:st=0:d=${formatNumber(fadeIn)}:alpha=1`);
+  }
+  const fadeOut = transitionDuration(clip, "out");
+  if (fadeOut > 0 && clip.transitions?.out?.type === "fade") {
+    filters.push(
+      `fade=t=out:st=${formatNumber(Math.max(0, clip.duration - fadeOut))}:d=${formatNumber(fadeOut)}:alpha=1`
+    );
+  }
+
+  filters.push(`setpts=PTS-STARTPTS+${formatNumber(clip.start)}/TB`);
+  return `${filters.join(",")}[${outputLabel}]`;
+}
+
 function transitionChainForTrack(
   track: ProjectTrack,
   items: IndexedClip[],
@@ -559,7 +650,18 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
 
       if (clip.kind === "text") {
         const next = `base${visualIndex + 1}`;
-        filters.push(textFilter(current, next, clip));
+        if (clip.effects?.length) {
+          const clipLabel = `tclip${visualIndex}`;
+          filters.push(textEffectClipFilter(project, clip, clipLabel));
+          const start = formatNumber(clip.start);
+          const end = formatNumber(clip.start + clip.duration);
+          filters.push(
+            `[${current}][${clipLabel}]overlay=x=0:y=0:eof_action=pass:shortest=0:format=auto:enable='between(t,${start},${end})'[${next}]`
+          );
+          optimizations.push("TEXT_ISOLATED_EFFECT_GRAPH");
+        } else {
+          filters.push(textFilter(current, next, clip));
+        }
         if (
           numericPropertyHasKeyframes(clip.transform?.x) ||
           numericPropertyHasKeyframes(clip.transform?.y) ||
@@ -829,14 +931,14 @@ export function createProjectExecutionPlan(
     optimizations.push("AUDIO_KEYFRAME_EXPRESSION_GRAPH");
   }
   if (project.tracks.some((track) => track.clips.some((clip) =>
-    (clip.kind === "video" || clip.kind === "image") &&
+    (clip.kind === "video" || clip.kind === "image" || clip.kind === "text") &&
     clip.enabled !== false &&
     Boolean(clip.effects?.length)
   ))) {
     optimizations.push("PROGRAMMABLE_EFFECT_GRAPH");
   }
   if (project.tracks.some((track) => track.clips.some((clip) =>
-    (clip.kind === "video" || clip.kind === "image") &&
+    (clip.kind === "video" || clip.kind === "image" || clip.kind === "text") &&
     clip.enabled !== false &&
     hasProgrammableCompositorEffects(clip.effects)
   ))) {

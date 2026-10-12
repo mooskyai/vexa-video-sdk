@@ -88,7 +88,7 @@ The planned sequence is:
 | V2.6 | **Complete** | TypeScript/TSX bundling and composition discovery |
 | V2.7 | **Complete** | Node composition/still renderer using existing Vexa execution paths |
 | V2.8 | **Complete** | Local Vexa Studio development environment |
-| V2.9 | **Next** | Shapes, effects, transitions, fonts, and composition captions; image/video/shape blur/color/noise/vignette plus compositor shadow/glow now execute through FFmpeg, with isolated text/fill/solid/surface effect execution still pending |
+| V2.9 | **Next** | Shapes, effects, transitions, fonts, and composition captions; image/video/shape effects plus isolated text effects now execute through FFmpeg, with fill/solid/surface effect execution still pending |
 | V2.10 | **Planned** | Optional extended programmable-media integrations |
 | V2.11 | **Planned** | Browser/WebCodecs rendering with typed fallback |
 | V2.12 | **Planned** | Parameterized templates and validated input schemas |

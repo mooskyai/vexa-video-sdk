@@ -1030,11 +1030,12 @@ function assertProjectRepresentable(item: ProgrammableSceneRenderItem): void {
     isVisualLeafNode(node) &&
     node.effects?.length &&
     node.kind !== "image" &&
-    node.kind !== "video"
+    node.kind !== "video" &&
+    node.kind !== "text"
   ) {
     throw new UnsupportedProgrammableSceneLoweringError(
       node.id,
-      "programmable effects currently lower through VideoProjectAst only for image/video nodes."
+      "programmable effects currently lower through VideoProjectAst only for image/video/text nodes."
     );
   }
   if (node.kind === "solid" || node.kind === "shape" || node.kind === "surface") {
@@ -1122,7 +1123,8 @@ export function lowerProgrammableSceneToVideoProject(
         kind: "text",
         text: node.text,
         ...(transform ? { transform } : {}),
-        ...(style ? { style } : {})
+        ...(style ? { style } : {}),
+        ...(node.effects !== undefined ? { effects: node.effects } : {})
       };
       track = { id: `scene:${node.id}`, type: "text", clips: [clip] };
     } else if (node.kind === "image") {

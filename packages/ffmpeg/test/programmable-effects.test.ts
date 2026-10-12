@@ -68,6 +68,47 @@ test("project plans compile effects before opacity and expose an optimization ma
   assert.ok(plan.optimizations.includes("PROGRAMMABLE_EFFECT_GRAPH"));
 });
 
+test("text effects compile on an isolated transparent layer before opacity and fades", () => {
+  const project: VideoProjectAst = normalizeVideoProject({
+    schemaVersion: 1,
+    id: "text-effect-plan",
+    canvas: { width: 320, height: 180, fps: 30, duration: 1, background: "black" },
+    tracks: [{
+      id: "text",
+      type: "text",
+      clips: [{
+        id: "title",
+        kind: "text",
+        text: "Vexa",
+        start: 0,
+        duration: 1,
+        opacity: 0.5,
+        transform: { x: 40, y: 20 },
+        style: { fontSize: 32, color: "white" },
+        effects: [
+          { kind: "brightness", amount: 0.8 },
+          { kind: "shadow", offsetX: 4, offsetY: 3, blur: 2, color: "black", opacity: 0.7 }
+        ],
+        transitions: { in: { type: "fade", duration: 0.2 } }
+      }]
+    }]
+  });
+
+  const plan = createProjectExecutionPlan(project, "output.mp4");
+  const drawtextIndex = plan.filterComplex.indexOf("drawtext=");
+  const effectIndex = plan.filterComplex.indexOf("lutrgb=");
+  const opacityIndex = plan.filterComplex.indexOf("colorchannelmixer=aa=0.5");
+  const fadeIndex = plan.filterComplex.indexOf("fade=t=in:st=0:d=0.2:alpha=1");
+  assert.match(plan.filterComplex, /color=c=black@0:s=320x180:r=30:d=1,format=rgba,drawtext=/u);
+  assert.ok(drawtextIndex >= 0 && effectIndex > drawtextIndex);
+  assert.ok(opacityIndex > effectIndex && fadeIndex > opacityIndex);
+  assert.match(plan.filterComplex, /split=4\[vexa_fx_title_1_orig\]/u);
+  assert.match(plan.filterComplex, /\[base0\]\[tclip0\]overlay=x=0:y=0/u);
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_EFFECT_GRAPH"));
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_EFFECT_COMPOSITOR_GRAPH"));
+  assert.ok(plan.optimizations.includes("TEXT_ISOLATED_EFFECT_GRAPH"));
+});
+
 test("shadow and glow preserve effect order through compositor branches with deterministic padding", () => {
   const effects: readonly ProgrammableEffect[] = [
     { kind: "brightness", amount: 0.8 },
@@ -168,6 +209,25 @@ test("FFmpeg effect execution fails closed for backend limits and unsafe composi
   assert.throws(
     () => createProjectExecutionPlan(advancedTransition, "output.mp4"),
     (error: unknown) => error instanceof InvalidProjectError && /cannot combine programmable effects with wipe-left/u.test(error.message)
+  );
+
+  const textTransition: VideoProjectAst = normalizeVideoProject({
+    schemaVersion: 1,
+    id: "text-effect-transition",
+    canvas: { width: 100, height: 100, fps: 30, duration: 1, background: "black" },
+    tracks: [{
+      id: "text",
+      type: "text",
+      clips: [{
+        id: "title", kind: "text", text: "Vexa", start: 0, duration: 1,
+        effects: [{ kind: "blur", radius: 2 }],
+        transitions: { in: { type: "wipe-left", duration: 0.2 } }
+      }]
+    }]
+  });
+  assert.throws(
+    () => createProjectExecutionPlan(textTransition, "output.mp4"),
+    (error: unknown) => error instanceof InvalidProjectError && /Text clip .* cannot combine programmable effects with wipe-left/u.test(error.message)
   );
 
   const spatialBlend: VideoProjectAst = normalizeVideoProject({

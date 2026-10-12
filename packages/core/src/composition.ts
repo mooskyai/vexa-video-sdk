@@ -109,6 +109,7 @@ export interface TextTimelineClip extends Omit<TimelineClipBase, "blendMode"> {
   kind: "text";
   text: string;
   style?: TextStyle;
+  effects?: readonly ProgrammableEffect[];
 }
 
 export type TimelineClip =
@@ -395,7 +396,7 @@ function normalizeClip(clip: TimelineClip, track: ProjectTrack): TimelineClip {
     : undefined;
 
   let effects: readonly ProgrammableEffect[] | undefined;
-  if (clip.kind === "video" || clip.kind === "image") {
+  if (clip.kind === "video" || clip.kind === "image" || clip.kind === "text") {
     if (clip.effects !== undefined) {
       if (!Array.isArray(clip.effects)) {
         throw new InvalidProjectError(`clip ${clip.id}.effects must be an array.`);

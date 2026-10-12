@@ -107,7 +107,11 @@ test("programmable scene lowers through VideoProject and renders background, ima
           durationInFrames: 45,
           zIndex: 3,
           transform: { x: 140, y: 20 },
-          style: { fontSize: 28, color: "white" }
+          style: { fontSize: 28, color: "white" },
+          effects: [
+            { kind: "shadow", offsetX: 5, offsetY: 4, blur: 2, color: "black", opacity: 0.8 },
+            { kind: "glow", radius: 2, color: "cyan", opacity: 0.5 }
+          ]
         },
         {
           id: "audio-layer",
@@ -120,6 +124,11 @@ test("programmable scene lowers through VideoProject and renders background, ima
     });
 
     const project = VideoProject.fromAst(lowerProgrammableSceneToVideoProject(scene));
+    const plan = await project.planRender(output, { crf: 30, preset: "veryfast" });
+    assert.ok(plan.optimizations.includes("TEXT_ISOLATED_EFFECT_GRAPH"));
+    assert.ok(plan.optimizations.includes("PROGRAMMABLE_EFFECT_COMPOSITOR_GRAPH"));
+    assert.match(plan.filterComplex, /color=c=black@0:s=320x180:r=30:d=1.5,format=rgba,drawtext=/u);
+    assert.match(plan.filterComplex, /vexa_fx_title_layer_0_orig/u);
     await project.render(output, { crf: 30, preset: "veryfast" });
 
     const info = await Video.load(output).probe();
@@ -132,10 +141,12 @@ test("programmable scene lowers through VideoProject and renders background, ima
     const redRegion = await sampleYAverage(output, 0.5, { x: 10, y: 10, width: 20, height: 20 });
     const yellowRegion = await sampleYAverage(output, 0.5, { x: 210, y: 110, width: 20, height: 20 });
     const backgroundRegion = await sampleYAverage(output, 0.5, { x: 290, y: 160, width: 20, height: 15 });
+    const textRegion = await sampleYAverage(output, 0.5, { x: 135, y: 15, width: 80, height: 40 });
 
     assert.ok(redRegion > 10 && redRegion < 50, `expected darkened grayscale video luminance, got ${redRegion}`);
     assert.ok(yellowRegion > 20 && yellowRegion < 140, `expected effected image luminance, got ${yellowRegion}`);
     assert.ok(backgroundRegion < 45, `expected dark background luminance, got ${backgroundRegion}`);
+    assert.ok(textRegion > backgroundRegion + 5, `expected isolated effected text to remain visible (${textRegion} vs ${backgroundRegion})`);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
