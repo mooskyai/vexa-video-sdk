@@ -526,7 +526,11 @@ Cover ordered effect attachment on visual scene leaves, normalization/defaulting
 
 ### Effect execution tests
 
-Cover project-level normalization for image/video effect chains, deterministic FFmpeg filter ordering, effect-before-opacity ordering, and the `PROGRAMMABLE_EFFECT_GRAPH` execution-plan marker. Real integration must render effect-bearing programmable image/video nodes and verify changed pixel/luminance output; the renderer shape fixture must prove a rasterized shape effect reaches the same FFmpeg path. Blur, brightness, contrast, saturation, hue, grayscale, sepia, deterministic noise, and vignette are accepted in this linear/raster slice. Text/fill/solid/surface effects and compositor-only shadow/glow must fail explicitly rather than being dropped or approximated.
+Cover project-level normalization for image/video effect chains, deterministic FFmpeg filter ordering, effect-before-opacity ordering, and the `PROGRAMMABLE_EFFECT_GRAPH` execution-plan marker. Real integration must render effect-bearing programmable image/video nodes and verify changed pixel/luminance output; the renderer shape fixture must prove a rasterized shape effect reaches the same FFmpeg path. Blur, brightness, contrast, saturation, hue, grayscale, sepia, deterministic noise, and vignette are accepted through the linear/raster path. Text/fill/solid/surface effects remain explicit unsupported paths until isolated visual-layer execution exists.
+
+### Effect compositor execution tests
+
+Cover shadow/glow branch construction, declaration-order preservation when compositor and linear effects are interleaved, deterministic transparent bounds padding, and position compensation for both explicit and centered placement. Real FFmpeg integration must verify visible shadow/glow pixels outside the source image bounds and the `PROGRAMMABLE_EFFECT_COMPOSITOR_GRAPH` marker. Unsafe compositor color tokens, excessive padding, effect-bearing advanced wipes, and spatial effects combined with non-normal blend modes must fail explicitly instead of bypassing or approximating the effect chain.
 
 ### Visual fixtures
 

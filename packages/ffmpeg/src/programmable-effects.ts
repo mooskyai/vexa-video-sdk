@@ -2,12 +2,49 @@ import { InvalidProjectError, type ProgrammableEffect } from "@vexa-video/core";
 
 const MAX_GBLUR_SIGMA = 1024;
 const MAX_NOISE_SEED = 2_147_483_645;
+const MAX_EFFECT_PADDING = 4096;
+
+export interface ProgrammableEffectPadding {
+  readonly left: number;
+  readonly right: number;
+  readonly top: number;
+  readonly bottom: number;
+}
+
+const ZERO_PADDING: ProgrammableEffectPadding = Object.freeze({
+  left: 0,
+  right: 0,
+  top: 0,
+  bottom: 0
+});
 
 function formatEffectNumber(value: number): string {
   const normalized = Object.is(value, -0) ? 0 : value;
   return Number.isInteger(normalized)
     ? String(normalized)
     : String(Number(normalized.toFixed(6)));
+}
+
+function assertBlurRadius(value: number, clipId: string, kind: "blur" | "shadow" | "glow"): void {
+  if (!Number.isFinite(value) || value < 0 || value > MAX_GBLUR_SIGMA) {
+    throw new InvalidProjectError(
+      `clip ${clipId}.effects ${kind} radius cannot exceed ${MAX_GBLUR_SIGMA} in the FFmpeg backend.`
+    );
+  }
+}
+
+function compositorColorToken(value: string, clipId: string, kind: "shadow" | "glow"): string {
+  if (!value || !/^[a-zA-Z0-9#._-]+$/u.test(value) || value.toLowerCase() === "transparent") {
+    throw new InvalidProjectError(
+      `clip ${clipId}.effects ${kind} color is not supported by the FFmpeg compositor backend.`
+    );
+  }
+  return value;
+}
+
+function compositorLabel(clipId: string, effectIndex: number): string {
+  const safeClip = clipId.replace(/[^a-zA-Z0-9_]/gu, "_").slice(0, 48) || "clip";
+  return `vexa_fx_${safeClip}_${effectIndex}`;
 }
 
 interface ColorMatrix {
@@ -137,6 +174,109 @@ function vignetteFilter(
   return `geq=r='r(X,Y)*${factor}':g='g(X,Y)*${factor}':b='b(X,Y)*${factor}':a='alpha(X,Y)'`;
 }
 
+function alphaMaskFilters(opacity: number, blur: number, clipId: string, kind: "shadow" | "glow"): string[] {
+  assertBlurRadius(blur, clipId, kind);
+  const filters = ["alphaextract"];
+  if (opacity < 1) filters.push(`lut=y='val*${formatEffectNumber(opacity)}'`);
+  if (blur > 0) filters.push(`gblur=sigma=${formatEffectNumber(blur)}:steps=2`);
+  return filters;
+}
+
+function shadowCompositorFilter(
+  effect: Extract<ProgrammableEffect, { kind: "shadow" }>,
+  clipId: string,
+  effectIndex: number
+): string | null {
+  const opacity = effect.opacity ?? 1;
+  if (opacity === 0) return null;
+  const color = compositorColorToken(effect.color, clipId, "shadow");
+  const stem = compositorLabel(clipId, effectIndex);
+  const mask = alphaMaskFilters(opacity, effect.blur, clipId, "shadow").join(",");
+  return [
+    `split=4[${stem}_orig][${stem}_color_src][${stem}_alpha_src][${stem}_blank_src]`,
+    `[${stem}_color_src]drawbox=x=0:y=0:w=iw:h=ih:color=${color}:t=fill:replace=1[${stem}_color]`,
+    `[${stem}_alpha_src]${mask}[${stem}_mask]`,
+    `[${stem}_color][${stem}_mask]alphamerge[${stem}_shadow]`,
+    `[${stem}_blank_src]colorchannelmixer=aa=0[${stem}_blank]`,
+    `[${stem}_blank][${stem}_shadow]overlay=x=${formatEffectNumber(effect.offsetX)}:y=${formatEffectNumber(effect.offsetY)}:eof_action=pass:shortest=1:format=auto[${stem}_placed]`,
+    `[${stem}_placed][${stem}_orig]overlay=x=0:y=0:eof_action=pass:shortest=1:format=auto`
+  ].join(";");
+}
+
+function glowCompositorFilter(
+  effect: Extract<ProgrammableEffect, { kind: "glow" }>,
+  clipId: string,
+  effectIndex: number
+): string | null {
+  const opacity = effect.opacity ?? 1;
+  if (opacity === 0) return null;
+  const color = compositorColorToken(effect.color, clipId, "glow");
+  const stem = compositorLabel(clipId, effectIndex);
+  const mask = alphaMaskFilters(opacity, effect.radius, clipId, "glow").join(",");
+  return [
+    `split=3[${stem}_orig][${stem}_color_src][${stem}_alpha_src]`,
+    `[${stem}_color_src]drawbox=x=0:y=0:w=iw:h=ih:color=${color}:t=fill:replace=1[${stem}_color]`,
+    `[${stem}_alpha_src]${mask}[${stem}_mask]`,
+    `[${stem}_color][${stem}_mask]alphamerge[${stem}_glow]`,
+    `[${stem}_glow][${stem}_orig]overlay=x=0:y=0:eof_action=pass:shortest=1:format=auto`
+  ].join(";");
+}
+
+function addPadding(
+  padding: { left: number; right: number; top: number; bottom: number },
+  additions: ProgrammableEffectPadding,
+  clipId: string
+): void {
+  padding.left += additions.left;
+  padding.right += additions.right;
+  padding.top += additions.top;
+  padding.bottom += additions.bottom;
+  if (Math.max(padding.left, padding.right, padding.top, padding.bottom) > MAX_EFFECT_PADDING) {
+    throw new InvalidProjectError(
+      `clip ${clipId}.effects requires more than ${MAX_EFFECT_PADDING}px compositor padding on one side.`
+    );
+  }
+}
+
+export function programmableEffectPadding(
+  effects: readonly ProgrammableEffect[] | undefined,
+  clipId: string
+): ProgrammableEffectPadding {
+  if (!effects?.length) return ZERO_PADDING;
+  const padding = { left: 0, right: 0, top: 0, bottom: 0 };
+
+  for (const effect of effects) {
+    if (effect.kind === "glow") {
+      if ((effect.opacity ?? 1) === 0 || effect.radius === 0) continue;
+      assertBlurRadius(effect.radius, clipId, "glow");
+      const extent = Math.ceil(effect.radius * 3);
+      addPadding(padding, { left: extent, right: extent, top: extent, bottom: extent }, clipId);
+      continue;
+    }
+    if (effect.kind === "shadow") {
+      if ((effect.opacity ?? 1) === 0) continue;
+      assertBlurRadius(effect.blur, clipId, "shadow");
+      const extent = Math.ceil(effect.blur * 3);
+      addPadding(padding, {
+        left: extent + Math.ceil(Math.max(0, -effect.offsetX)),
+        right: extent + Math.ceil(Math.max(0, effect.offsetX)),
+        top: extent + Math.ceil(Math.max(0, -effect.offsetY)),
+        bottom: extent + Math.ceil(Math.max(0, effect.offsetY))
+      }, clipId);
+    }
+  }
+
+  return Object.freeze(padding);
+}
+
+export function hasProgrammableCompositorEffects(
+  effects: readonly ProgrammableEffect[] | undefined
+): boolean {
+  return Boolean(effects?.some((effect) =>
+    (effect.kind === "shadow" || effect.kind === "glow") && (effect.opacity ?? 1) > 0
+  ));
+}
+
 export function compileProgrammableEffectFilters(
   effects: readonly ProgrammableEffect[] | undefined,
   clipId: string
@@ -144,15 +284,12 @@ export function compileProgrammableEffectFilters(
   if (!effects?.length) return [];
   const filters: string[] = [];
 
-  for (const effect of effects) {
+  for (let effectIndex = 0; effectIndex < effects.length; effectIndex += 1) {
+    const effect = effects[effectIndex]!;
     switch (effect.kind) {
       case "blur":
         if (effect.radius === 0) break;
-        if (effect.radius > MAX_GBLUR_SIGMA) {
-          throw new InvalidProjectError(
-            `clip ${clipId}.effects blur radius cannot exceed ${MAX_GBLUR_SIGMA} in the FFmpeg backend.`
-          );
-        }
+        assertBlurRadius(effect.radius, clipId, "blur");
         filters.push(`gblur=sigma=${formatEffectNumber(effect.radius)}:steps=2`);
         break;
 
@@ -200,11 +337,17 @@ export function compileProgrammableEffectFilters(
         break;
       }
 
-      case "shadow":
-      case "glow":
-        throw new InvalidProjectError(
-          `clip ${clipId}.effects ${effect.kind} requires compositor branch execution and is not supported by the linear FFmpeg effect path yet.`
-        );
+      case "shadow": {
+        const filter = shadowCompositorFilter(effect, clipId, effectIndex);
+        if (filter) filters.push(filter);
+        break;
+      }
+
+      case "glow": {
+        const filter = glowCompositorFilter(effect, clipId, effectIndex);
+        if (filter) filters.push(filter);
+        break;
+      }
 
       default: {
         const exhaustive: never = effect;

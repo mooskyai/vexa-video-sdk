@@ -27,7 +27,12 @@ import {
   detectOutputContainer
 } from "./compatibility.js";
 import { appendVideoEncoderOptions, hardwareOptimizationMarkers, resolveHardwareAcceleration } from "./hardware.js";
-import { compileProgrammableEffectFilters } from "./programmable-effects.js";
+import {
+  compileProgrammableEffectFilters,
+  hasProgrammableCompositorEffects,
+  programmableEffectPadding,
+  type ProgrammableEffectPadding
+} from "./programmable-effects.js";
 
 const AUDIO_CODECS: Record<Exclude<AudioCodec, "copy" | "none">, string> = {
   aac: "aac",
@@ -138,6 +143,7 @@ function fullCanvasTransitionEligible(
   canvas: VideoProjectAst["canvas"]
 ): boolean {
   const transform = clip.transform;
+  if (clip.effects?.length) return false;
   if (hasAnimatedVisualProperty(clip)) return false;
   if ((clip.blendMode ?? "normal") !== "normal") return false;
   if (numericPropertyValue(clip.opacity, 1, `clip ${clip.id}.opacity`) !== 1) return false;
@@ -249,6 +255,15 @@ function clipVisualFilters(
 
   filters.push("format=rgba");
 
+  const effectPadding = programmableEffectPadding(clip.effects, clip.id);
+  const horizontalPadding = effectPadding.left + effectPadding.right;
+  const verticalPadding = effectPadding.top + effectPadding.bottom;
+  if (horizontalPadding > 0 || verticalPadding > 0) {
+    filters.push(
+      `pad=iw+${horizontalPadding}:ih+${verticalPadding}:${effectPadding.left}:${effectPadding.top}:color=black@0`
+    );
+  }
+
   const effectFilters = compileProgrammableEffectFilters(clip.effects, clip.id);
   if (effectFilters.length) filters.push(...effectFilters, "format=rgba");
 
@@ -282,25 +297,34 @@ function clipVisualFilters(
 }
 
 function clipPosition(
-  clip: Extract<TimelineClip, { kind: "video" | "image" }>
+  clip: Extract<TimelineClip, { kind: "video" | "image" }>,
+  padding: ProgrammableEffectPadding
 ): { x: string; y: string } {
   const localTime = `(t-${formatNumber(clip.start)})`;
-  const x = clip.transform?.x === undefined
-    ? "(W-w)/2"
+  const authoredX = clip.transform?.x === undefined
+    ? null
     : numericPropertyExpression(
         clip.transform.x,
         0,
         localTime,
         `clip ${clip.id}.transform.x`
       );
-  const y = clip.transform?.y === undefined
-    ? "(H-h)/2"
+  const authoredY = clip.transform?.y === undefined
+    ? null
     : numericPropertyExpression(
         clip.transform.y,
         0,
         localTime,
         `clip ${clip.id}.transform.y`
       );
+  const hasHorizontalPadding = padding.left > 0 || padding.right > 0;
+  const hasVerticalPadding = padding.top > 0 || padding.bottom > 0;
+  const x = authoredX === null
+    ? (hasHorizontalPadding ? `(W-w-${padding.left}+${padding.right})/2` : "(W-w)/2")
+    : padding.left === 0 ? authoredX : `((${authoredX})-${padding.left})`;
+  const y = authoredY === null
+    ? (hasVerticalPadding ? `(H-h-${padding.top}+${padding.bottom})/2` : "(H-h)/2")
+    : padding.top === 0 ? authoredY : `((${authoredY})-${padding.top})`;
   return { x, y };
 }
 
@@ -549,6 +573,11 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
       }
 
       const advancedTransition = clip.transitions?.in;
+      if (clip.effects?.length && advancedTransition && advancedTransition.type !== "fade") {
+        throw new InvalidProjectError(
+          `Clip "${clip.id}" cannot combine programmable effects with ${advancedTransition.type} until the advanced transition graph preserves effect execution.`
+        );
+      }
       if (advancedTransition && advancedTransition.type !== "fade") {
         throw new InvalidProjectError(
           `Clip "${clip.id}" uses ${advancedTransition.type}, but advanced video transitions currently require a contiguous full-canvas video track with the transition on each incoming clip.`
@@ -566,8 +595,16 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
       const start = formatNumber(clip.start);
       const end = formatNumber(clip.start + clip.duration);
       const blendMode = clip.blendMode ?? "normal";
+      const effectPadding = programmableEffectPadding(clip.effects, clip.id);
+      const hasEffectPadding = effectPadding.left > 0 || effectPadding.right > 0 ||
+        effectPadding.top > 0 || effectPadding.bottom > 0;
 
       if (blendMode !== "normal") {
+        if (hasEffectPadding) {
+          throw new InvalidProjectError(
+            `Clip "${clip.id}" cannot combine spatial programmable effects with blendMode "${blendMode}" yet.`
+          );
+        }
         if (clip.transform?.x !== undefined || clip.transform?.y !== undefined) {
           throw new InvalidProjectError(
             `Clip "${clip.id}" uses blendMode "${blendMode}" with x/y positioning. Non-normal blend modes currently require full-canvas alignment.`
@@ -578,7 +615,7 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
         );
         optimizations.push("BLEND_MODE_GRAPH");
       } else {
-        const { x, y } = clipPosition(clip);
+        const { x, y } = clipPosition(clip, effectPadding);
         filters.push(
           `[${current}][${clipLabel}]overlay=x=${quotedExpression(x)}:y=${quotedExpression(y)}:eof_action=pass:shortest=0:format=auto:enable='between(t,${start},${end})'[${next}]`
         );
@@ -797,6 +834,13 @@ export function createProjectExecutionPlan(
     Boolean(clip.effects?.length)
   ))) {
     optimizations.push("PROGRAMMABLE_EFFECT_GRAPH");
+  }
+  if (project.tracks.some((track) => track.clips.some((clip) =>
+    (clip.kind === "video" || clip.kind === "image") &&
+    clip.enabled !== false &&
+    hasProgrammableCompositorEffects(clip.effects)
+  ))) {
+    optimizations.push("PROGRAMMABLE_EFFECT_COMPOSITOR_GRAPH");
   }
   if (project.tracks.some((track) => track.clips.some((clip) => clip.kind === "text" && clip.enabled !== false))) {
     optimizations.push("TEXT_IN_FILTER_GRAPH");

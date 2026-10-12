@@ -140,3 +140,80 @@ test("programmable scene lowers through VideoProject and renders background, ima
     await rm(workspace, { recursive: true, force: true });
   }
 });
+
+test("programmable shadow and glow execute through the FFmpeg compositor graph", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "vexa-programmable-compositor-effects-"));
+  const image = join(workspace, "card.png");
+  const output = join(workspace, "effects.mp4");
+
+  try {
+    await runProcess("ffmpeg", [
+      "-hide_banner", "-loglevel", "error", "-y",
+      "-f", "lavfi", "-i", "color=c=yellow:s=40x40",
+      "-frames:v", "1", image
+    ]);
+
+    const scene = defineProgrammableScene({
+      id: "compositor-effects",
+      width: 160,
+      height: 80,
+      fps: 30,
+      durationInFrames: 30,
+      background: "white",
+      assets: [{
+        id: "card",
+        kind: "image",
+        source: { kind: "storage", source: { kind: "local", path: image } }
+      }],
+      children: [
+        {
+          id: "shadow-card",
+          kind: "image",
+          assetId: "card",
+          durationInFrames: 30,
+          fit: "fill",
+          transform: { x: 20, y: 20, width: 40, height: 40 },
+          effects: [{
+            kind: "shadow",
+            offsetX: 12,
+            offsetY: 0,
+            blur: 0,
+            color: "black",
+            opacity: 1
+          }]
+        },
+        {
+          id: "glow-card",
+          kind: "image",
+          assetId: "card",
+          durationInFrames: 30,
+          zIndex: 1,
+          fit: "fill",
+          transform: { x: 100, y: 20, width: 40, height: 40 },
+          effects: [{
+            kind: "glow",
+            radius: 4,
+            color: "cyan",
+            opacity: 1
+          }]
+        }
+      ]
+    });
+
+    const project = VideoProject.fromAst(lowerProgrammableSceneToVideoProject(scene));
+    const plan = await project.planRender(output, { crf: 18, preset: "veryfast" });
+    assert.ok(plan.optimizations.includes("PROGRAMMABLE_EFFECT_COMPOSITOR_GRAPH"));
+    assert.match(plan.filterComplex, /split=4\[vexa_fx_shadow_card_0_orig\]/u);
+    assert.match(plan.filterComplex, /split=3\[vexa_fx_glow_card_0_orig\]/u);
+    await project.render(output, { crf: 18, preset: "veryfast" });
+
+    const shadowRegion = await sampleYAverage(output, 0.5, { x: 63, y: 28, width: 6, height: 20 });
+    const glowRegion = await sampleYAverage(output, 0.5, { x: 96, y: 28, width: 3, height: 20 });
+    const backgroundRegion = await sampleYAverage(output, 0.5, { x: 145, y: 5, width: 10, height: 10 });
+
+    assert.ok(shadowRegion < 80, `expected visible dark shadow outside the source image, got ${shadowRegion}`);
+    assert.ok(glowRegion < backgroundRegion - 3, `expected cyan glow to differ from white background (${glowRegion} vs ${backgroundRegion})`);
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});

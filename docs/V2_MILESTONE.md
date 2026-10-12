@@ -588,6 +588,8 @@ The fifth implementation slice attaches ordered programmable effect chains to vi
 
 The sixth implementation slice extends the existing `VideoProjectAst` image/video clip model with ordered programmable effects and compiles the representable linear/raster subset through the normal FFmpeg composition graph: blur, brightness, contrast, saturation, hue, grayscale, sepia, deterministic noise, and vignette. Renderer-rasterized shapes inherit that same image path. Effects run before existing opacity/fade handling, execution plans expose a `PROGRAMMABLE_EFFECT_GRAPH` marker, and real SDK/renderer integration coverage exercises FFmpeg output. Text/fill/solid/surface effects remain fail-closed because those nodes do not yet lower to an isolated visual clip, while shadow/glow remain fail-closed until compositor-branch execution can represent them without approximation.
 
+The seventh implementation slice adds ordered shadow/glow execution for image/video clips and renderer-rasterized shapes through explicit FFmpeg split/mask/blur/overlay compositor branches. Transparent bounds padding plus overlay-position compensation prevents spatial effects from clipping or shifting authored placement, declaration order remains stable when linear and compositor effects are interleaved, and execution plans expose `PROGRAMMABLE_EFFECT_COMPOSITOR_GRAPH`. Effect-bearing advanced wipes and spatial effects combined with non-normal blend modes fail explicitly until those graphs can preserve the same semantics. Text/fill/solid/surface effects remain fail-closed pending isolated visual-layer execution.
+
 ### Goal
 
 Provide a Vexa-owned motion-graphics component library.
