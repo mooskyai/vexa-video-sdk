@@ -550,7 +550,11 @@ Cover scene-to-project preservation of the shared fade contract, frame-to-second
 
 ### Programmable slide and wipe execution tests
 
-Cover scene-to-project preservation of slide/wipe contracts, all four directions, in/out timing, frame-to-second conversion, easing, slide composition with authored x/y placement, wipe alpha ordering after effects and opacity, isolated text execution, and renderer-materialized shapes/fills/solids. Real FFmpeg integration must exercise both transition kinds and expose `PROGRAMMABLE_SLIDE_TRANSITION_GRAPH` plus `PROGRAMMABLE_WIPE_TRANSITION_GRAPH`. Non-normal blend-mode combinations and push/zoom/iris remain explicit fail-closed paths rather than approximations.
+Cover scene-to-project preservation of slide/wipe contracts, all four directions, in/out timing, frame-to-second conversion, easing, slide composition with authored x/y placement, wipe alpha ordering after effects and opacity, isolated text execution, and renderer-materialized shapes/fills/solids. Real FFmpeg integration must exercise both transition kinds and expose `PROGRAMMABLE_SLIDE_TRANSITION_GRAPH` plus `PROGRAMMABLE_WIPE_TRANSITION_GRAPH`. Non-normal blend-mode combinations remain explicit fail-closed paths rather than approximations.
+
+### Programmable push execution tests
+
+Cover paired full-canvas video push planning, all four directions, project-FPS frame conversion, all shared easing modes, exact overlap validation, source-trim boundaries, opposite foreground/background motion, concat assembly, and the `PROGRAMMABLE_PUSH_TRANSITION_GRAPH` marker. Push must remain fail-closed for image/text/scene-leaf usage, outgoing-only declarations, non-full-canvas clips, effects/blend/opacity/keyframe/spatial combinations, mismatched overlap, extra clip transitions, and unsupported multi-clip chains. Programmable push must not implicitly change audio fades. Zoom and iris remain explicit future execution work.
 
 ### Visual fixtures
 

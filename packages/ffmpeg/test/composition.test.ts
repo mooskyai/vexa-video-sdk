@@ -323,8 +323,93 @@ test("programmable text slide and wipe reuse the isolated transparent layer", ()
   assert.ok(plan.optimizations.includes("TEXT_ISOLATED_TRANSITION_GRAPH"));
 });
 
-test("programmable push remains fail-closed until its paired-motion graph lands", () => {
+test("project compiler executes paired programmable push with easing and direction", () => {
   const pushed = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "push-track",
+      type: "video",
+      clips: [
+        {
+          id: "first",
+          kind: "video",
+          source: "a.mp4",
+          start: 0,
+          duration: 2,
+          transform: { width: 640, height: 360, fit: "cover" }
+        },
+        {
+          id: "second",
+          kind: "video",
+          source: "b.mp4",
+          start: 1.5,
+          duration: 2,
+          transform: { width: 640, height: 360, fit: "cover" },
+          transitions: {
+            in: { kind: "push", durationInFrames: 15, easing: "ease-in-out", direction: "left" }
+          }
+        }
+      ]
+    }]
+  });
+
+  const plan = createProjectExecutionPlan(pushed, "output.mp4", {}, {
+    "a.mp4": probe("a.mp4"),
+    "b.mp4": probe("b.mp4")
+  });
+
+  assert.match(plan.filterComplex, /split=2\[push_push_track_pre_src\]\[push_push_track_old_src\]/u);
+  assert.match(plan.filterComplex, /trim=start=1\.5:duration=0\.5/u);
+  assert.match(plan.filterComplex, /overlay=x='640\*\(/u);
+  assert.match(plan.filterComplex, /overlay=x='-640\*\(1-/u);
+  assert.match(plan.filterComplex, /concat=n=3:v=1:a=0/u);
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_TRANSITION_GRAPH"));
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_PUSH_TRANSITION_GRAPH"));
+  assert.equal(plan.optimizations.includes("VIDEO_XFADE_GRAPH"), false);
+});
+
+test("programmable push supports vertical paired motion", () => {
+  const pushed = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "push-vertical",
+      type: "video",
+      clips: [
+        {
+          id: "first",
+          kind: "video",
+          source: "a.mp4",
+          start: 0,
+          duration: 2,
+          transform: { width: 640, height: 360, fit: "fill" }
+        },
+        {
+          id: "second",
+          kind: "video",
+          source: "b.mp4",
+          start: 1.5,
+          duration: 2,
+          transform: { width: 640, height: 360, fit: "fill" },
+          transitions: {
+            in: { kind: "push", durationInFrames: 15, easing: "ease-out", direction: "down" }
+          }
+        }
+      ]
+    }]
+  });
+
+  const plan = createProjectExecutionPlan(pushed, "output.mp4", {}, {
+    "a.mp4": probe("a.mp4"),
+    "b.mp4": probe("b.mp4")
+  });
+
+  assert.match(plan.filterComplex, /overlay=x='0':y='-360\*\(/u);
+  assert.match(plan.filterComplex, /overlay=x='0':y='360\*\(1-/u);
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_PUSH_TRANSITION_GRAPH"));
+});
+
+test("programmable push stays fail-closed outside an eligible paired full-canvas video track", () => {
+  const imagePush = normalizeVideoProject({
     ...project,
     tracks: [{
       id: "images",
@@ -343,8 +428,47 @@ test("programmable push remains fail-closed until its paired-motion graph lands"
   });
 
   assert.throws(
-    () => createProjectExecutionPlan(pushed, "output.mp4"),
+    () => createProjectExecutionPlan(imagePush, "output.mp4"),
     (error: unknown) => error instanceof InvalidProjectError && /programmable push/u.test(error.message)
+  );
+
+  const badOverlap = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "push-track",
+      type: "video",
+      clips: [
+        {
+          id: "first",
+          kind: "video",
+          source: "a.mp4",
+          start: 0,
+          duration: 2,
+          transform: { width: 640, height: 360, fit: "cover" }
+        },
+        {
+          id: "second",
+          kind: "video",
+          source: "b.mp4",
+          start: 1.75,
+          duration: 2,
+          transform: { width: 640, height: 360, fit: "cover" },
+          transitions: {
+            in: { kind: "push", durationInFrames: 15, direction: "right" }
+          }
+        }
+      ]
+    }]
+  });
+
+  assert.throws(
+    () => createProjectExecutionPlan(badOverlap, "output.mp4", {}, {
+      "a.mp4": probe("a.mp4"),
+      "b.mp4": probe("b.mp4")
+    }),
+    (error: unknown) =>
+      error instanceof InvalidProjectError &&
+      /overlap the previous clip by exactly the transition duration/u.test(error.message)
   );
 });
 

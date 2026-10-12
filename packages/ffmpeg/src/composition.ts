@@ -734,6 +734,159 @@ function textIsolatedOverlayPosition(
   };
 }
 
+function programmablePushTransitionChainForTrack(
+  track: ProjectTrack,
+  items: IndexedClip[],
+  project: VideoProjectAst,
+  filters: string[]
+): { label: string; start: number; end: number } | null {
+  const clips = items
+    .filter((item) =>
+      item.track.id === track.id &&
+      item.clip.kind === "video" &&
+      item.clip.enabled !== false
+    )
+    .sort((a, b) => a.clip.start - b.clip.start);
+
+  const hasPush = clips.some((item) =>
+    [item.clip.transitions?.in, item.clip.transitions?.out].some(
+      (transition) => transition !== undefined && "kind" in transition && transition.kind === "push"
+    )
+  );
+  if (!hasPush) return null;
+
+  if (clips.length !== 2) {
+    throw new InvalidProjectError(
+      `Track "${track.id}" programmable push currently requires exactly two enabled video clips.`
+    );
+  }
+
+  const firstItem = clips[0]!;
+  const secondItem = clips[1]!;
+  const first = firstItem.clip as Extract<TimelineClip, { kind: "video" }>;
+  const second = secondItem.clip as Extract<TimelineClip, { kind: "video" }>;
+  const transition = second.transitions?.in;
+
+  if (!transition || !("kind" in transition) || transition.kind !== "push") {
+    throw new InvalidProjectError(
+      `Track "${track.id}" programmable push must be declared on the incoming second clip.`
+    );
+  }
+
+  for (const [clipIndex, clip] of [first, second].entries()) {
+    for (const edge of ["in", "out"] as const) {
+      const candidate = clip.transitions?.[edge];
+      if (!candidate) continue;
+      const isSelectedPush = clipIndex === 1 && edge === "in" && candidate === transition;
+      if (!isSelectedPush) {
+        throw new InvalidProjectError(
+          `Track "${track.id}" programmable push cannot combine with another clip transition yet.`
+        );
+      }
+    }
+  }
+
+  if (!fullCanvasTransitionEligible(first, project.canvas) ||
+      !fullCanvasTransitionEligible(second, project.canvas)) {
+    throw new InvalidProjectError(
+      `Track "${track.id}" programmable push requires two full-canvas video clips without effects, blend modes, animated visual properties, opacity changes, or spatial offsets.`
+    );
+  }
+
+  const duration = timelineTransitionDurationSeconds(transition, project.canvas.fps);
+  if (duration >= first.duration || duration >= second.duration) {
+    throw new InvalidProjectError(
+      `Track "${track.id}" programmable push duration must be shorter than both participating clips.`
+    );
+  }
+  const expectedStart = first.start + first.duration - duration;
+  if (Math.abs(second.start - expectedStart) > 0.02) {
+    throw new InvalidProjectError(
+      `Track "${track.id}" programmable push requires the incoming clip to overlap the previous clip by exactly the transition duration.`
+    );
+  }
+  if (firstItem.inputIndex === null || secondItem.inputIndex === null) {
+    throw new InvalidProjectError(`Track "${track.id}" programmable push is missing a video input.`);
+  }
+
+  const prefix = `push_${track.id}`.replace(/[^a-zA-Z0-9_]/gu, "_");
+  const preSource = `${prefix}_pre_src`;
+  const oldSource = `${prefix}_old_src`;
+  const newSource = `${prefix}_new_src`;
+  const postSource = `${prefix}_post_src`;
+  const pre = `${prefix}_pre`;
+  const old = `${prefix}_old`;
+  const incoming = `${prefix}_new`;
+  const post = `${prefix}_post`;
+  const stage = `${prefix}_stage`;
+  const base = `${prefix}_base`;
+  const transitionLabel = `${prefix}_transition`;
+  const output = `${prefix}_out`;
+
+  const preDuration = first.duration - duration;
+  const postDuration = second.duration - duration;
+  const firstSourceStart = first.sourceStart ?? 0;
+  const secondSourceStart = second.sourceStart ?? 0;
+  const prepare = (source: string, start: number, segmentDuration: number, label: string) =>
+    `[${source}]trim=start=${formatNumber(start)}:duration=${formatNumber(segmentDuration)},` +
+    `setpts=PTS-STARTPTS,scale=${project.canvas.width}:${project.canvas.height}:force_original_aspect_ratio=increase,` +
+    `crop=${project.canvas.width}:${project.canvas.height},fps=${formatNumber(project.canvas.fps)},format=rgba[${label}]`;
+
+  filters.push(`[${firstItem.inputIndex}:v]split=2[${preSource}][${oldSource}]`);
+  filters.push(`[${secondItem.inputIndex}:v]split=2[${newSource}][${postSource}]`);
+  filters.push(prepare(preSource, firstSourceStart, preDuration, pre));
+  filters.push(prepare(oldSource, firstSourceStart + preDuration, duration, old));
+  filters.push(prepare(newSource, secondSourceStart, duration, incoming));
+  filters.push(prepare(postSource, secondSourceStart + duration, postDuration, post));
+
+  const progress = `min(1,max(0,t/${formatNumber(duration)}))`;
+  const eased = easingExpression(progress, transition.easing ?? "linear");
+  const width = formatNumber(project.canvas.width);
+  const height = formatNumber(project.canvas.height);
+  let oldX = "0";
+  let oldY = "0";
+  let newX = "0";
+  let newY = "0";
+
+  switch (transition.direction ?? "left") {
+    case "left":
+      oldX = `${width}*(${eased})`;
+      newX = `-${width}*(1-(${eased}))`;
+      break;
+    case "right":
+      oldX = `-${width}*(${eased})`;
+      newX = `${width}*(1-(${eased}))`;
+      break;
+    case "up":
+      oldY = `${height}*(${eased})`;
+      newY = `-${height}*(1-(${eased}))`;
+      break;
+    case "down":
+      oldY = `-${height}*(${eased})`;
+      newY = `${height}*(1-(${eased}))`;
+      break;
+  }
+
+  filters.push(
+    `color=c=black@0:s=${project.canvas.width}x${project.canvas.height}:r=${formatNumber(project.canvas.fps)}:d=${formatNumber(duration)},format=rgba[${stage}]`
+  );
+  filters.push(
+    `[${stage}][${old}]overlay=x=${quotedExpression(oldX)}:y=${quotedExpression(oldY)}:eval=frame:eof_action=pass:shortest=0:format=auto[${base}]`
+  );
+  filters.push(
+    `[${base}][${incoming}]overlay=x=${quotedExpression(newX)}:y=${quotedExpression(newY)}:eval=frame:eof_action=pass:shortest=0:format=auto[${transitionLabel}]`
+  );
+  filters.push(
+    `[${pre}][${transitionLabel}][${post}]concat=n=3:v=1:a=0,format=rgba[${output}]`
+  );
+
+  return {
+    label: output,
+    start: first.start,
+    end: second.start + second.duration
+  };
+}
+
 function transitionChainForTrack(
   track: ProjectTrack,
   items: IndexedClip[],
@@ -827,7 +980,8 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
     if (track.hidden) continue;
 
     if (track.type === "video") {
-      const chain = transitionChainForTrack(track, indexed, project, filters);
+      const pushChain = programmablePushTransitionChainForTrack(track, indexed, project, filters);
+      const chain = pushChain ?? transitionChainForTrack(track, indexed, project, filters);
       if (chain) {
         const shifted = `xtrack${visualIndex}`;
         filters.push(
@@ -844,7 +998,11 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
         }
         current = next;
         visualIndex += 1;
-        optimizations.push("VIDEO_XFADE_GRAPH");
+        if (pushChain) {
+          optimizations.push("PROGRAMMABLE_TRANSITION_GRAPH", "PROGRAMMABLE_PUSH_TRANSITION_GRAPH");
+        } else {
+          optimizations.push("VIDEO_XFADE_GRAPH");
+        }
       }
     }
 
