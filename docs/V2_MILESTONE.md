@@ -596,6 +596,8 @@ The ninth implementation slice adds renderer-owned raster execution for Vexa `so
 
 The tenth implementation slice establishes browser-safe programmable transition contracts in `@vexa-video/core` for fade, slide, wipe, push, zoom, and circular iris transitions. Durations are frame-based positive integers; easing supports linear/ease-in/ease-out/ease-in-out; slide/wipe/push directions normalize deterministically. Visual scene leaves and React authoring components expose typed `transitions` pairs, scene normalization freezes canonical values and rejects transition durations longer than the owning node, and renderer-owned shape/fill/solid raster substitution preserves transition metadata. `VideoProjectAst` lowering remains explicitly fail-closed until the dedicated transition execution graph is implemented, preventing partial or silently dropped transition semantics.
 
+The eleventh implementation slice starts real transition execution by carrying the existing programmable transition objects through representable `VideoProjectAst` clips and compiling programmable fade in/out through FFmpeg alpha expressions. Frame durations are converted with the project FPS, linear/ease-in/ease-out/ease-in-out intent is preserved, effects run before clip opacity and the transition alpha, transition-bearing text uses the existing isolated transparent-layer path, and renderer-materialized fill/solid/shape nodes keep the same transition metadata. Legacy timeline fade/crossfade/wipe behavior remains separate and compatible. Slide, wipe, push, zoom, and iris execution remain explicitly fail-closed until their spatial/mask semantics are implemented rather than approximated.
+
 ### Goal
 
 Provide a Vexa-owned motion-graphics component library.

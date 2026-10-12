@@ -68,6 +68,36 @@ test("project plans compile effects before opacity and expose an optimization ma
   assert.ok(plan.optimizations.includes("PROGRAMMABLE_EFFECT_GRAPH"));
 });
 
+test("programmable fade executes after effects and opacity", () => {
+  const project: VideoProjectAst = normalizeVideoProject({
+    schemaVersion: 1,
+    id: "effect-fade-plan",
+    canvas: { width: 100, height: 100, fps: 30, duration: 1, background: "black" },
+    tracks: [{
+      id: "images",
+      type: "image",
+      clips: [{
+        id: "image",
+        kind: "image",
+        source: "image.png",
+        start: 0,
+        duration: 1,
+        opacity: 0.5,
+        effects: [{ kind: "brightness", amount: 0.5 }],
+        transitions: { in: { kind: "fade", durationInFrames: 15, easing: "ease-in" } }
+      }]
+    }]
+  });
+
+  const plan = createProjectExecutionPlan(project, "output.mp4");
+  const effectIndex = plan.filterComplex.indexOf("lutrgb=");
+  const opacityIndex = plan.filterComplex.indexOf("colorchannelmixer=aa=0.5");
+  const transitionIndex = plan.filterComplex.indexOf("alpha(X,Y)*");
+  assert.ok(effectIndex >= 0 && opacityIndex > effectIndex);
+  assert.ok(transitionIndex > opacityIndex);
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_TRANSITION_GRAPH"));
+});
+
 test("text effects compile on an isolated transparent layer before opacity and fades", () => {
   const project: VideoProjectAst = normalizeVideoProject({
     schemaVersion: 1,
@@ -227,7 +257,7 @@ test("FFmpeg effect execution fails closed for backend limits and unsafe composi
   });
   assert.throws(
     () => createProjectExecutionPlan(textTransition, "output.mp4"),
-    (error: unknown) => error instanceof InvalidProjectError && /Text clip .* cannot combine programmable effects with wipe-left/u.test(error.message)
+    (error: unknown) => error instanceof InvalidProjectError && /Text clip .* cannot execute wipe-left on an isolated text layer yet/u.test(error.message)
   );
 
   const spatialBlend: VideoProjectAst = normalizeVideoProject({

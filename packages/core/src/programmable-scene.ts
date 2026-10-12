@@ -1068,10 +1068,21 @@ function lowerTextStyle(style: ProgrammableSceneTextStyle | undefined): TextStyl
 function assertProjectRepresentable(item: ProgrammableSceneRenderItem): void {
   const node = item.node;
   if (isVisualLeafNode(node) && node.transitions !== undefined) {
-    throw new UnsupportedProgrammableSceneLoweringError(
-      node.id,
-      "programmable transitions require the dedicated transition execution graph."
+    const unsupported = [node.transitions.in, node.transitions.out].find(
+      (transition) => transition !== undefined && transition.kind !== "fade"
     );
+    if (unsupported) {
+      throw new UnsupportedProgrammableSceneLoweringError(
+        node.id,
+        `programmable ${unsupported.kind} transitions are not executable yet.`
+      );
+    }
+    if (node.kind === "fill") {
+      throw new UnsupportedProgrammableSceneLoweringError(
+        node.id,
+        "transition-bearing fill nodes require renderer materialization before project lowering."
+      );
+    }
   }
   if (
     isVisualLeafNode(node) &&
@@ -1171,7 +1182,8 @@ export function lowerProgrammableSceneToVideoProject(
         text: node.text,
         ...(transform ? { transform } : {}),
         ...(style ? { style } : {}),
-        ...(node.effects !== undefined ? { effects: node.effects } : {})
+        ...(node.effects !== undefined ? { effects: node.effects } : {}),
+        ...(node.transitions !== undefined ? { transitions: node.transitions } : {})
       };
       track = { id: `scene:${node.id}`, type: "text", clips: [clip] };
     } else if (node.kind === "image") {
@@ -1182,7 +1194,8 @@ export function lowerProgrammableSceneToVideoProject(
         kind: "image",
         source: resolveAssetForProject(asset, options),
         ...(transform ? { transform } : {}),
-        ...(node.effects !== undefined ? { effects: node.effects } : {})
+        ...(node.effects !== undefined ? { effects: node.effects } : {}),
+        ...(node.transitions !== undefined ? { transitions: node.transitions } : {})
       };
       track = { id: `scene:${node.id}`, type: "image", clips: [clip] };
     } else if (node.kind === "video") {
@@ -1196,7 +1209,8 @@ export function lowerProgrammableSceneToVideoProject(
         includeAudio: !(node.muted ?? false),
         volume: (node.muted ?? false) ? 0 : (node.volume ?? 1),
         ...(transform ? { transform } : {}),
-        ...(node.effects !== undefined ? { effects: node.effects } : {})
+        ...(node.effects !== undefined ? { effects: node.effects } : {}),
+        ...(node.transitions !== undefined ? { transitions: node.transitions } : {})
       };
       track = { id: `scene:${node.id}`, type: "video", clips: [clip] };
     } else if (node.kind === "audio") {

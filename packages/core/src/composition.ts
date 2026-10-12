@@ -13,6 +13,11 @@ import {
   normalizeProgrammableEffects,
   type ProgrammableEffect
 } from "./programmable-effects.js";
+import {
+  InvalidProgrammableTransitionError,
+  normalizeProgrammableTransition,
+  type ProgrammableTransition
+} from "./programmable-transitions.js";
 
 export type ProjectTrackType = "video" | "audio" | "image" | "text";
 export type ClipKind = ProjectTrackType;
@@ -53,15 +58,16 @@ export interface ClipTransform {
   fit?: ResizeFit;
 }
 
+export interface LegacyClipTransition {
+  type: TransitionType;
+  duration: number;
+}
+
+export type TimelineTransition = LegacyClipTransition | ProgrammableTransition;
+
 export interface ClipTransitions {
-  in?: {
-    type: TransitionType;
-    duration: number;
-  };
-  out?: {
-    type: TransitionType;
-    duration: number;
-  };
+  in?: TimelineTransition;
+  out?: TimelineTransition;
 }
 
 export interface TimelineClipBase {
@@ -305,9 +311,28 @@ export function numericPropertyValueAt(
 function normalizeTransition(
   transition: ClipTransitions["in"] | undefined,
   label: string,
-  clipDuration: number
+  clipDuration: number,
+  fps: number
 ): ClipTransitions["in"] | undefined {
   if (!transition) return undefined;
+
+  if ("kind" in transition) {
+    try {
+      const normalized = normalizeProgrammableTransition(transition);
+      if ((normalized.durationInFrames / fps) > clipDuration + 1e-9) {
+        throw new InvalidProgrammableTransitionError(
+          `${label}.durationInFrames cannot exceed the clip duration.`
+        );
+      }
+      return normalized;
+    } catch (error) {
+      if (error instanceof InvalidProgrammableTransitionError) {
+        throw new InvalidProjectError(`${label} is invalid: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
   if (!["fade", "crossfade", "wipe-left", "wipe-right"].includes(transition.type)) {
     throw new InvalidProjectError(`${label}.type is not supported.`);
   }
@@ -318,7 +343,7 @@ function normalizeTransition(
   return { type: transition.type, duration: transition.duration };
 }
 
-function normalizeClip(clip: TimelineClip, track: ProjectTrack): TimelineClip {
+function normalizeClip(clip: TimelineClip, track: ProjectTrack, fps: number): TimelineClip {
   if (!clip.id.trim()) throw new InvalidProjectError("Every clip requires a non-empty id.");
   if (clip.kind !== track.type) {
     throw new InvalidProjectError(
@@ -384,16 +409,26 @@ function normalizeClip(clip: TimelineClip, track: ProjectTrack): TimelineClip {
   const transitionIn = normalizeTransition(
     clip.transitions?.in,
     `clip ${clip.id}.transitions.in`,
-    clip.duration
+    clip.duration,
+    fps
   );
   const transitionOut = normalizeTransition(
     clip.transitions?.out,
     `clip ${clip.id}.transitions.out`,
-    clip.duration
+    clip.duration,
+    fps
   );
   const transitions = transitionIn || transitionOut
     ? { ...(transitionIn ? { in: transitionIn } : {}), ...(transitionOut ? { out: transitionOut } : {}) }
     : undefined;
+
+  if (clip.kind === "audio" && [transitionIn, transitionOut].some(
+    (transition) => transition !== undefined && "kind" in transition
+  )) {
+    throw new InvalidProjectError(
+      `clip ${clip.id} cannot use programmable visual transitions on an audio track.`
+    );
+  }
 
   let effects: readonly ProgrammableEffect[] | undefined;
   if (clip.kind === "video" || clip.kind === "image" || clip.kind === "text") {
@@ -490,7 +525,7 @@ export function normalizeVideoProject(project: VideoProjectAst): VideoProjectAst
     const clips = track.clips.map((clip) => {
       if (clipIds.has(clip.id)) throw new InvalidProjectError(`Duplicate clip id: ${clip.id}.`);
       clipIds.add(clip.id);
-      return normalizeClip(clip, track);
+      return normalizeClip(clip, track, project.canvas.fps);
     });
 
     return {

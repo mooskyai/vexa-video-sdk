@@ -6,6 +6,7 @@ import type {
   ProjectRenderOptions,
   ProjectTrack,
   TimelineClip,
+  TimelineTransition,
   NumericProperty,
   VideoCodec,
   VideoProjectAst,
@@ -157,8 +158,9 @@ function fullCanvasTransitionEligible(
   return width === canvas.width && height === canvas.height;
 }
 
-function xfadeTransitionName(type: string): string | null {
-  switch (type) {
+function xfadeTransitionName(transition: TimelineTransition): string | null {
+  if (!("type" in transition)) return null;
+  switch (transition.type) {
     case "crossfade": return "fade";
     case "wipe-left": return "wipeleft";
     case "wipe-right": return "wiperight";
@@ -166,12 +168,52 @@ function xfadeTransitionName(type: string): string | null {
   }
 }
 
-function blendModeName(mode: string): string {
-  return mode;
+function timelineTransitionDurationSeconds(
+  transition: TimelineTransition,
+  fps: number
+): number {
+  return "kind" in transition
+    ? transition.durationInFrames / fps
+    : transition.duration;
 }
 
-function transitionDuration(clip: TimelineClip, edge: "in" | "out"): number {
-  return clip.transitions?.[edge]?.duration ?? 0;
+function legacyTransitionDuration(clip: TimelineClip, edge: "in" | "out"): number {
+  const transition = clip.transitions?.[edge];
+  return transition && "type" in transition ? transition.duration : 0;
+}
+
+function programmableFadeAlphaExpression(
+  clip: TimelineClip,
+  canvas: VideoProjectAst["canvas"],
+  timeExpression: string
+): string | null {
+  const factors: string[] = [];
+  for (const edge of ["in", "out"] as const) {
+    const transition = clip.transitions?.[edge];
+    if (!transition || !("kind" in transition) || transition.kind !== "fade") continue;
+    const duration = transition.durationInFrames / canvas.fps;
+    const rawProgress = edge === "in"
+      ? `((${timeExpression})/${formatNumber(duration)})`
+      : `(((${timeExpression})-${formatNumber(clip.duration - duration)})/${formatNumber(duration)})`;
+    const progress = `min(1,max(0,${rawProgress}))`;
+    const eased = easingExpression(progress, transition.easing ?? "linear");
+    factors.push(edge === "in" ? `(${eased})` : `(1-(${eased}))`);
+  }
+  return factors.length ? factors.join("*") : null;
+}
+
+function assertExecutableProgrammableTransitions(clip: TimelineClip): void {
+  for (const transition of [clip.transitions?.in, clip.transitions?.out]) {
+    if (transition && "kind" in transition && transition.kind !== "fade") {
+      throw new InvalidProjectError(
+        `Clip "${clip.id}" uses programmable ${transition.kind}, but only programmable fade execution is wired in this transition slice.`
+      );
+    }
+  }
+}
+
+function blendModeName(mode: string): string {
+  return mode;
 }
 
 function clipVisualFilters(
@@ -282,12 +324,21 @@ function clipVisualFilters(
     if (opacity < 1) filters.push(`colorchannelmixer=aa=${formatNumber(opacity)}`);
   }
 
-  const fadeIn = transitionDuration(clip, "in");
-  if (fadeIn > 0 && clip.transitions?.in?.type === "fade") {
+  const programmableFadeAlpha = programmableFadeAlphaExpression(clip, canvas, "T");
+  if (programmableFadeAlpha) {
+    filters.push(
+      `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${programmableFadeAlpha})'`
+    );
+  }
+
+  const transitionIn = clip.transitions?.in;
+  const fadeIn = legacyTransitionDuration(clip, "in");
+  if (fadeIn > 0 && transitionIn && "type" in transitionIn && transitionIn.type === "fade") {
     filters.push(`fade=t=in:st=0:d=${formatNumber(fadeIn)}:alpha=1`);
   }
-  const fadeOut = transitionDuration(clip, "out");
-  if (fadeOut > 0 && clip.transitions?.out?.type === "fade") {
+  const transitionOut = clip.transitions?.out;
+  const fadeOut = legacyTransitionDuration(clip, "out");
+  if (fadeOut > 0 && transitionOut && "type" in transitionOut && transitionOut.type === "fade") {
     filters.push(
       `fade=t=out:st=${formatNumber(Math.max(0, clip.duration - fadeOut))}:d=${formatNumber(fadeOut)}:alpha=1`
     );
@@ -442,7 +493,7 @@ function textFilter(
   return `[${inputLabel}]drawtext=${options.join(":")}[${outputLabel}]`;
 }
 
-function textEffectClipFilter(
+function textIsolatedClipFilter(
   project: VideoProjectAst,
   clip: Extract<TimelineClip, { kind: "text" }>,
   outputLabel: string
@@ -488,9 +539,15 @@ function textEffectClipFilter(
   }
 
   for (const transition of [clip.transitions?.in, clip.transitions?.out]) {
-    if (transition && transition.type !== "fade") {
+    if (!transition) continue;
+    if ("kind" in transition && transition.kind !== "fade") {
       throw new InvalidProjectError(
-        `Text clip "${clip.id}" cannot combine programmable effects with ${transition.type} yet.`
+        `Text clip "${clip.id}" cannot execute programmable ${transition.kind} yet.`
+      );
+    }
+    if ("type" in transition && transition.type !== "fade") {
+      throw new InvalidProjectError(
+        `Text clip "${clip.id}" cannot execute ${transition.type} on an isolated text layer yet.`
       );
     }
   }
@@ -518,12 +575,21 @@ function textEffectClipFilter(
     if (opacity < 1) filters.push(`colorchannelmixer=aa=${formatNumber(opacity)}`);
   }
 
-  const fadeIn = transitionDuration(clip, "in");
-  if (fadeIn > 0 && clip.transitions?.in?.type === "fade") {
+  const programmableFadeAlpha = programmableFadeAlphaExpression(clip, project.canvas, "T");
+  if (programmableFadeAlpha) {
+    filters.push(
+      `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${programmableFadeAlpha})'`
+    );
+  }
+
+  const transitionIn = clip.transitions?.in;
+  const fadeIn = legacyTransitionDuration(clip, "in");
+  if (fadeIn > 0 && transitionIn && "type" in transitionIn && transitionIn.type === "fade") {
     filters.push(`fade=t=in:st=0:d=${formatNumber(fadeIn)}:alpha=1`);
   }
-  const fadeOut = transitionDuration(clip, "out");
-  if (fadeOut > 0 && clip.transitions?.out?.type === "fade") {
+  const transitionOut = clip.transitions?.out;
+  const fadeOut = legacyTransitionDuration(clip, "out");
+  if (fadeOut > 0 && transitionOut && "type" in transitionOut && transitionOut.type === "fade") {
     filters.push(
       `fade=t=out:st=${formatNumber(Math.max(0, clip.duration - fadeOut))}:d=${formatNumber(fadeOut)}:alpha=1`
     );
@@ -557,8 +623,9 @@ function transitionChainForTrack(
     const previous = clips[index - 1]!.clip as Extract<TimelineClip, { kind: "video" }>;
     const current = clips[index]!.clip as Extract<TimelineClip, { kind: "video" }>;
     const transition = current.transitions?.in;
-    if (!transition || !xfadeTransitionName(transition.type)) return null;
-    const expectedStart = previous.start + previous.duration - transition.duration;
+    if (!transition || !xfadeTransitionName(transition)) return null;
+    const duration = timelineTransitionDurationSeconds(transition, project.canvas.fps);
+    const expectedStart = previous.start + previous.duration - duration;
     if (Math.abs(current.start - expectedStart) > 0.02) return null;
   }
 
@@ -586,9 +653,12 @@ function transitionChainForTrack(
       `[${item.inputIndex}:v]trim=start=${formatNumber(clip.sourceStart ?? 0)}:duration=${formatNumber(clip.duration)},setpts=PTS-STARTPTS,scale=${project.canvas.width}:${project.canvas.height}:force_original_aspect_ratio=increase,crop=${project.canvas.width}:${project.canvas.height},fps=${formatNumber(project.canvas.fps)},format=yuv420p[${prepared}]`
     );
     const transition = clip.transitions!.in!;
+    const transitionName = xfadeTransitionName(transition);
+    if (!transitionName) return null;
+    const transitionDuration = timelineTransitionDurationSeconds(transition, project.canvas.fps);
     const nextLabel = `xfade_${track.id}_${index}`.replace(/[^a-zA-Z0-9_]/gu, "_");
     filters.push(
-      `[${currentLabel}][${prepared}]xfade=transition=${xfadeTransitionName(transition.type)}:duration=${formatNumber(transition.duration)}:offset=${formatNumber(clip.start - firstClip.start)}[${nextLabel}]`
+      `[${currentLabel}][${prepared}]xfade=transition=${transitionName}:duration=${formatNumber(transitionDuration)}:offset=${formatNumber(clip.start - firstClip.start)}[${nextLabel}]`
     );
     currentLabel = nextLabel;
   }
@@ -650,15 +720,21 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
 
       if (clip.kind === "text") {
         const next = `base${visualIndex + 1}`;
-        if (clip.effects?.length) {
+        if (clip.effects?.length || clip.transitions?.in || clip.transitions?.out) {
+          assertExecutableProgrammableTransitions(clip);
           const clipLabel = `tclip${visualIndex}`;
-          filters.push(textEffectClipFilter(project, clip, clipLabel));
+          filters.push(textIsolatedClipFilter(project, clip, clipLabel));
           const start = formatNumber(clip.start);
           const end = formatNumber(clip.start + clip.duration);
           filters.push(
             `[${current}][${clipLabel}]overlay=x=0:y=0:eof_action=pass:shortest=0:format=auto:enable='between(t,${start},${end})'[${next}]`
           );
-          optimizations.push("TEXT_ISOLATED_EFFECT_GRAPH");
+          if (clip.effects?.length) optimizations.push("TEXT_ISOLATED_EFFECT_GRAPH");
+          if ([clip.transitions?.in, clip.transitions?.out].some(
+            (transition) => transition !== undefined && "kind" in transition
+          )) {
+            optimizations.push("PROGRAMMABLE_TRANSITION_GRAPH", "TEXT_ISOLATED_TRANSITION_GRAPH");
+          }
         } else {
           filters.push(textFilter(current, next, clip));
         }
@@ -674,21 +750,36 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
         continue;
       }
 
+      assertExecutableProgrammableTransitions(clip);
       const advancedTransition = clip.transitions?.in;
-      if (clip.effects?.length && advancedTransition && advancedTransition.type !== "fade") {
+      if (
+        clip.effects?.length &&
+        advancedTransition &&
+        "type" in advancedTransition &&
+        advancedTransition.type !== "fade"
+      ) {
         throw new InvalidProjectError(
           `Clip "${clip.id}" cannot combine programmable effects with ${advancedTransition.type} until the advanced transition graph preserves effect execution.`
         );
       }
-      if (advancedTransition && advancedTransition.type !== "fade") {
+      if (advancedTransition && "type" in advancedTransition && advancedTransition.type !== "fade") {
         throw new InvalidProjectError(
           `Clip "${clip.id}" uses ${advancedTransition.type}, but advanced video transitions currently require a contiguous full-canvas video track with the transition on each incoming clip.`
         );
       }
-      if (clip.transitions?.out && clip.transitions.out.type !== "fade") {
+      if (
+        clip.transitions?.out &&
+        "type" in clip.transitions.out &&
+        clip.transitions.out.type !== "fade"
+      ) {
         throw new InvalidProjectError(
           `Clip "${clip.id}" uses an advanced outgoing transition. Put crossfade/wipe on the incoming clip instead.`
         );
+      }
+      if ([clip.transitions?.in, clip.transitions?.out].some(
+        (transition) => transition !== undefined && "kind" in transition
+      )) {
+        optimizations.push("PROGRAMMABLE_TRANSITION_GRAPH");
       }
 
       const clipLabel = `vclip${visualIndex}`;
@@ -746,7 +837,8 @@ function effectiveAudioFadeDuration(
   edge: "in" | "out"
 ): number {
   const transition = item.clip.transitions?.[edge];
-  if (transition) return transition.duration;
+  if (transition && "type" in transition) return transition.duration;
+  if (transition) return 0;
   if (edge !== "out") return 0;
 
   const siblings = indexed
@@ -759,10 +851,11 @@ function effectiveAudioFadeDuration(
   const position = siblings.findIndex((candidate) => candidate.clip.id === item.clip.id);
   const next = position >= 0 ? siblings[position + 1] : undefined;
   const incoming = next?.clip.transitions?.in;
-  if (!incoming || incoming.type === "fade") return 0;
-  const expected = item.clip.start + item.clip.duration - incoming.duration;
+  if (!incoming || !("type" in incoming) || incoming.type === "fade") return 0;
+  const duration = incoming.duration;
+  const expected = item.clip.start + item.clip.duration - duration;
   return Math.abs((next?.clip.start ?? Number.NaN) - expected) <= 0.02
-    ? incoming.duration
+    ? duration
     : 0;
 }
 

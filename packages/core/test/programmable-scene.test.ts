@@ -367,6 +367,39 @@ test("visual transitions normalize, serialize, and fail closed before execution 
   }), /transitions is invalid/);
 });
 
+test("programmable fade transitions lower into project clips without changing the shared contract", () => {
+  const scene = defineProgrammableScene({
+    id: "fade-lowering",
+    width: 320,
+    height: 180,
+    fps: 30,
+    durationInFrames: 60,
+    assets: [{
+      id: "image",
+      kind: "image",
+      source: { kind: "static", src: "assets/card.png" }
+    }],
+    children: [{
+      id: "card",
+      kind: "image",
+      assetId: "image",
+      durationInFrames: 30,
+      transitions: {
+        in: { kind: "fade", durationInFrames: 12, easing: "ease-in" },
+        out: { kind: "fade", durationInFrames: 8, easing: "ease-out" }
+      }
+    }]
+  });
+
+  const project = lowerProgrammableSceneToVideoProject(scene);
+  const clip = project.tracks[0]?.clips[0];
+  assert.deepEqual(clip?.transitions, {
+    in: { kind: "fade", durationInFrames: 12, easing: "ease-in" },
+    out: { kind: "fade", durationInFrames: 8, easing: "ease-out" }
+  });
+  assert.equal(clip?.duration, 1);
+});
+
 test("asset readiness state updates immutably", () => {
   const scene = defineProgrammableScene({
     id: "readiness", width: 10, height: 10, fps: 30, durationInFrames: 10,

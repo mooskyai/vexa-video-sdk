@@ -542,7 +542,11 @@ Cover renderer materialization for every `solid` node plus effect-bearing `fill`
 
 ### Transition contract and authoring tests
 
-Cover fade, slide, wipe, push, zoom, and circular iris transition normalization; positive frame durations; deterministic linear easing and left-direction defaults; explicit easing/direction overrides; immutable in/out transition pairs; stable serialization; typed invalid duration/easing/direction failures; and browser-entry parity. Scene normalization must reject a transition longer than its owning node, React visual components must preserve normalized transition intent, and renderer-owned shape/fill/solid raster substitution must carry transitions forward. Before the dedicated execution graph lands, any transition-bearing scene that reaches `VideoProjectAst` lowering must fail explicitly rather than approximating or dropping the transition.
+Cover fade, slide, wipe, push, zoom, and circular iris transition normalization; positive frame durations; deterministic linear easing and left-direction defaults; explicit easing/direction overrides; immutable in/out transition pairs; stable serialization; typed invalid duration/easing/direction failures; and browser-entry parity. Scene normalization must reject a transition longer than its owning node, React visual components must preserve normalized transition intent, and renderer-owned shape/fill/solid raster substitution must carry transitions forward.
+
+### Programmable fade execution tests
+
+Cover scene-to-project preservation of the shared fade contract, frame-to-second conversion from the actual project FPS, fade-in/fade-out boundary expressions, all four easing modes, effect -> opacity -> transition ordering, isolated text execution, renderer-materialized primitives, and the `PROGRAMMABLE_TRANSITION_GRAPH` marker. Programmable visual transitions must not implicitly change audio fades. Slide, wipe, push, zoom, iris, and unsupported combinations remain explicit fail-closed paths until their execution semantics land.
 
 ### Visual fixtures
 

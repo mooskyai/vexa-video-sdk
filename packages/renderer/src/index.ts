@@ -429,7 +429,10 @@ function collectPrimitiveRenderItems(scene: ProgrammableScene): readonly Program
   const items = createProgrammableSceneRenderGraph(scene).items.filter(
     (item): item is ProgrammablePrimitiveRenderItem =>
       item.node.kind === "solid" ||
-      (item.node.kind === "fill" && Boolean(item.node.effects?.length))
+      (
+        item.node.kind === "fill" &&
+        Boolean(item.node.effects?.length || item.node.transitions !== undefined)
+      )
   );
   items.sort((left, right) => left.declarationOrder - right.declarationOrder);
   return Object.freeze(items);

@@ -161,6 +161,9 @@ function shapeShowcaseScene(
         startFrame: 4,
         durationInFrames: 16,
         opacity: 0.9,
+        transitions: {
+          in: { kind: "fade", durationInFrames: 4, easing: "ease-in-out" }
+        },
         shape: {
           geometry: {
             kind: "star",

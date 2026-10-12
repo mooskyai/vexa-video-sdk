@@ -128,3 +128,67 @@ test("project rejects keyframes outside the clip duration", () => {
     /exceeds the clip duration/
   );
 });
+
+test("project schema preserves programmable fade transitions and validates frame duration", () => {
+  const normalized = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "v1",
+      type: "video",
+      clips: [{
+        id: "programmable-fade",
+        kind: "video",
+        source: "one.mp4",
+        start: 0,
+        duration: 1,
+        transitions: {
+          in: { kind: "fade", durationInFrames: 15, easing: "ease-in" },
+          out: { kind: "fade", durationInFrames: 10, easing: "ease-out" }
+        }
+      }]
+    }]
+  });
+
+  assert.deepEqual(normalized.tracks[0]?.clips[0]?.transitions, {
+    in: { kind: "fade", durationInFrames: 15, easing: "ease-in" },
+    out: { kind: "fade", durationInFrames: 10, easing: "ease-out" }
+  });
+
+  assert.throws(
+    () => normalizeVideoProject({
+      ...project,
+      tracks: [{
+        id: "v1",
+        type: "video",
+        clips: [{
+          id: "too-long",
+          kind: "video",
+          source: "one.mp4",
+          start: 0,
+          duration: 0.25,
+          transitions: { in: { kind: "fade", durationInFrames: 10 } }
+        }]
+      }]
+    }),
+    /durationInFrames cannot exceed the clip duration/
+  );
+
+  assert.throws(
+    () => normalizeVideoProject({
+      ...project,
+      tracks: [{
+        id: "a1",
+        type: "audio",
+        clips: [{
+          id: "audio-transition",
+          kind: "audio",
+          source: "audio.m4a",
+          start: 0,
+          duration: 1,
+          transitions: { in: { kind: "fade", durationInFrames: 5 } }
+        }]
+      }]
+    }),
+    /cannot use programmable visual transitions on an audio track/
+  );
+});

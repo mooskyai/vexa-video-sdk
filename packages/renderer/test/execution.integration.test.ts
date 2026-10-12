@@ -160,6 +160,7 @@ test("bundled executable compositions resolve storage assets and render stills, 
     ).length, 9);
     assert.ok(shapeVideo.executionPlan.optimizations.includes("PROGRAMMABLE_EFFECT_GRAPH"));
     assert.ok(shapeVideo.executionPlan.optimizations.includes("PROGRAMMABLE_EFFECT_COMPOSITOR_GRAPH"));
+    assert.ok(shapeVideo.executionPlan.optimizations.includes("PROGRAMMABLE_TRANSITION_GRAPH"));
     assert.equal(shapeVideo.executionPlan.durationSeconds, 1);
     const shapeMp4 = await readFile(shapeVideoOutput);
     assert.equal(shapeMp4.subarray(4, 8).toString("ascii"), "ftyp");

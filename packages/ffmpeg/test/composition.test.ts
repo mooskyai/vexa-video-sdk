@@ -175,6 +175,64 @@ test("project compiler builds an xfade graph for overlapping full-canvas clips",
   assert.ok(plan.optimizations.includes("VIDEO_XFADE_GRAPH"));
 });
 
+test("project compiler executes programmable fade easing after clip opacity", () => {
+  const faded = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "images",
+      type: "image",
+      clips: [{
+        id: "card",
+        kind: "image",
+        source: "card.png",
+        start: 0,
+        duration: 2,
+        opacity: 0.5,
+        transitions: {
+          in: { kind: "fade", durationInFrames: 15, easing: "ease-in" },
+          out: { kind: "fade", durationInFrames: 15, easing: "ease-out" }
+        }
+      }]
+    }]
+  });
+
+  const plan = createProjectExecutionPlan(faded, "output.mp4");
+  const opacityIndex = plan.filterComplex.indexOf("colorchannelmixer=aa=0.5");
+  const transitionIndex = plan.filterComplex.indexOf("alpha(X,Y)*");
+  assert.ok(opacityIndex >= 0 && transitionIndex > opacityIndex);
+  assert.match(plan.filterComplex, /min\(1,max\(0,\(\(T\)\/0\.5\)\)\)/u);
+  assert.match(plan.filterComplex, /1-\(1-\(min\(1,max\(0,/u);
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_TRANSITION_GRAPH"));
+});
+
+test("programmable text fade uses an isolated transparent layer", () => {
+  const fadedText = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "titles",
+      type: "text",
+      clips: [{
+        id: "title",
+        kind: "text",
+        text: "Vexa",
+        start: 0.5,
+        duration: 1,
+        style: { fontSize: 36, color: "white" },
+        transitions: {
+          in: { kind: "fade", durationInFrames: 10, easing: "ease-in-out" }
+        }
+      }]
+    }]
+  });
+
+  const plan = createProjectExecutionPlan(fadedText, "output.mp4");
+  assert.match(plan.filterComplex, /color=c=black@0:s=640x360:r=30:d=1,format=rgba,drawtext=/u);
+  assert.match(plan.filterComplex, /\[base0\]\[tclip0\]overlay=x=0:y=0/u);
+  assert.match(plan.filterComplex, /alpha\(X,Y\)\*/u);
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_TRANSITION_GRAPH"));
+  assert.ok(plan.optimizations.includes("TEXT_ISOLATED_TRANSITION_GRAPH"));
+});
+
 test("project compiler supports full-canvas blend modes", () => {
   const blended = normalizeVideoProject({
     ...project,
