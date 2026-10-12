@@ -93,6 +93,7 @@ function shapeShowcaseScene(
         id: "shape-rectangle",
         kind: "shape",
         transform: props.unsupportedRotation ? { rotation: 15 } : { x: 4, y: 2 },
+        effects: [{ kind: "brightness", amount: 0.75 }],
         shape: {
           geometry: { kind: "rectangle", x: 16, y: 18, width: 58, height: 38, radiusX: 8 },
           style: {
