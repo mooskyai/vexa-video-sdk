@@ -281,6 +281,48 @@ function programmableSlideOffsetExpression(
   return offsets.length ? offsets.map((offset) => `(${offset})`).join("+") : null;
 }
 
+function programmableZoomScaleExpression(
+  clip: TimelineClip,
+  canvas: VideoProjectAst["canvas"],
+  timeExpression: string
+): string | null {
+  const factors: string[] = [];
+  for (const edge of ["in", "out"] as const) {
+    const transition = clip.transitions?.[edge];
+    if (!transition || !("kind" in transition) || transition.kind !== "zoom") continue;
+    const visibility = programmableTransitionVisibilityExpression(
+      transition,
+      edge,
+      clip.duration,
+      canvas.fps,
+      timeExpression
+    );
+    factors.push(`max(0.001,(${visibility}))`);
+  }
+  return factors.length ? factors.map((factor) => `(${factor})`).join("*") : null;
+}
+
+function hasProgrammableTransitionKind(
+  clip: TimelineClip,
+  kind: ProgrammableTimelineTransition["kind"]
+): boolean {
+  return [clip.transitions?.in, clip.transitions?.out].some(
+    (transition) => transition !== undefined && "kind" in transition && transition.kind === kind
+  );
+}
+
+function hasAnimatedTransformProperty(
+  clip: Extract<TimelineClip, { kind: "video" | "image" }>
+): boolean {
+  return Boolean(
+    numericPropertyHasKeyframes(clip.transform?.x) ||
+    numericPropertyHasKeyframes(clip.transform?.y) ||
+    numericPropertyHasKeyframes(clip.transform?.width) ||
+    numericPropertyHasKeyframes(clip.transform?.height) ||
+    numericPropertyHasKeyframes(clip.transform?.rotation)
+  );
+}
+
 function programmableTransitionOptimizationMarkers(clip: TimelineClip): string[] {
   const kinds: string[] = [];
   for (const transition of [clip.transitions?.in, clip.transitions?.out]) {
@@ -290,6 +332,7 @@ function programmableTransitionOptimizationMarkers(clip: TimelineClip): string[]
   const markers = ["PROGRAMMABLE_TRANSITION_GRAPH"];
   if (kinds.includes("slide")) markers.push("PROGRAMMABLE_SLIDE_TRANSITION_GRAPH");
   if (kinds.includes("wipe")) markers.push("PROGRAMMABLE_WIPE_TRANSITION_GRAPH");
+  if (kinds.includes("zoom")) markers.push("PROGRAMMABLE_ZOOM_TRANSITION_GRAPH");
   return markers;
 }
 
@@ -300,10 +343,11 @@ function assertExecutableProgrammableTransitions(clip: TimelineClip): void {
       "kind" in transition &&
       transition.kind !== "fade" &&
       transition.kind !== "slide" &&
-      transition.kind !== "wipe"
+      transition.kind !== "wipe" &&
+      transition.kind !== "zoom"
     ) {
       throw new InvalidProjectError(
-        `Clip "${clip.id}" uses programmable ${transition.kind}, but only programmable fade, slide, and wipe execution is wired in this transition slice.`
+        `Clip "${clip.id}" uses programmable ${transition.kind}, but only programmable fade, slide, wipe, and zoom execution is wired in this layer-local transition path.`
       );
     }
   }
@@ -448,6 +492,15 @@ function clipVisualFilters(
     );
   }
 
+  const programmableZoomScale = programmableZoomScaleExpression(clip, canvas, "t");
+  if (programmableZoomScale) {
+    filters.push(
+      `scale=w=${quotedExpression(`max(1,iw*(${programmableZoomScale}))`)}:` +
+      `h=${quotedExpression(`max(1,ih*(${programmableZoomScale}))`)}:eval=frame`,
+      "format=rgba"
+    );
+  }
+
   return filters;
 }
 
@@ -475,12 +528,21 @@ function clipPosition(
       );
   const hasHorizontalPadding = padding.left > 0 || padding.right > 0;
   const hasVerticalPadding = padding.top > 0 || padding.bottom > 0;
-  const x = authoredX === null
+  let x = authoredX === null
     ? (hasHorizontalPadding ? `(W-w-${padding.left}+${padding.right})/2` : "(W-w)/2")
     : padding.left === 0 ? authoredX : `((${authoredX})-${padding.left})`;
-  const y = authoredY === null
+  let y = authoredY === null
     ? (hasVerticalPadding ? `(H-h-${padding.top}+${padding.bottom})/2` : "(H-h)/2")
     : padding.top === 0 ? authoredY : `((${authoredY})-${padding.top})`;
+  const zoomScale = programmableZoomScaleExpression(clip, canvas, localTime);
+  if (zoomScale) {
+    x = authoredX === null
+      ? (hasHorizontalPadding ? `(W-${padding.left}+${padding.right})/2-w/2` : "(W-w)/2")
+      : `((${x})+(w/(2*(${zoomScale})))-w/2)`;
+    y = authoredY === null
+      ? (hasVerticalPadding ? `(H-${padding.top}+${padding.bottom})/2-h/2` : "(H-h)/2")
+      : `((${y})+(h/(2*(${zoomScale})))-h/2)`;
+  }
   const slideX = programmableSlideOffsetExpression(clip, canvas, "x", localTime);
   const slideY = programmableSlideOffsetExpression(clip, canvas, "y", localTime);
   return {
@@ -654,7 +716,8 @@ function textIsolatedClipFilter(
       "kind" in transition &&
       transition.kind !== "fade" &&
       transition.kind !== "slide" &&
-      transition.kind !== "wipe"
+      transition.kind !== "wipe" &&
+      transition.kind !== "zoom"
     ) {
       throw new InvalidProjectError(
         `Text clip "${clip.id}" cannot execute programmable ${transition.kind} yet.`
@@ -717,6 +780,15 @@ function textIsolatedClipFilter(
     );
   }
 
+  const programmableZoomScale = programmableZoomScaleExpression(clip, project.canvas, "t");
+  if (programmableZoomScale) {
+    filters.push(
+      `scale=w=${quotedExpression(`max(1,iw*(${programmableZoomScale}))`)}:` +
+      `h=${quotedExpression(`max(1,ih*(${programmableZoomScale}))`)}:eval=frame`,
+      "format=rgba"
+    );
+  }
+
   filters.push(`setpts=PTS-STARTPTS+${formatNumber(clip.start)}/TB`);
   return `${filters.join(",")}[${outputLabel}]`;
 }
@@ -728,9 +800,12 @@ function textIsolatedOverlayPosition(
   const localTime = `(t-${formatNumber(clip.start)})`;
   const slideX = programmableSlideOffsetExpression(clip, project.canvas, "x", localTime);
   const slideY = programmableSlideOffsetExpression(clip, project.canvas, "y", localTime);
+  const zoomScale = programmableZoomScaleExpression(clip, project.canvas, localTime);
+  const baseX = zoomScale ? "(W-w)/2" : "0";
+  const baseY = zoomScale ? "(H-h)/2" : "0";
   return {
-    x: slideX ? `(${slideX})` : "0",
-    y: slideY ? `(${slideY})` : "0"
+    x: slideX ? `((${baseX})+(${slideX}))` : baseX,
+    y: slideY ? `((${baseY})+(${slideY}))` : baseY
   };
 }
 
@@ -1015,6 +1090,18 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
         const next = `base${visualIndex + 1}`;
         if (clip.effects?.length || clip.transitions?.in || clip.transitions?.out) {
           assertExecutableProgrammableTransitions(clip);
+          if (
+            hasProgrammableTransitionKind(clip, "zoom") &&
+            (
+              numericPropertyHasKeyframes(clip.transform?.x) ||
+              numericPropertyHasKeyframes(clip.transform?.y) ||
+              numericPropertyHasKeyframes(clip.style?.fontSize)
+            )
+          ) {
+            throw new InvalidProjectError(
+              `Text clip "${clip.id}" cannot combine programmable zoom with animated position or font size yet.`
+            );
+          }
           const clipLabel = `tclip${visualIndex}`;
           filters.push(textIsolatedClipFilter(project, clip, clipLabel));
           const start = formatNumber(clip.start);
@@ -1046,6 +1133,11 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
       }
 
       assertExecutableProgrammableTransitions(clip);
+      if (hasProgrammableTransitionKind(clip, "zoom") && hasAnimatedTransformProperty(clip)) {
+        throw new InvalidProjectError(
+          `Clip "${clip.id}" cannot combine programmable zoom with animated transforms yet.`
+        );
+      }
       const advancedTransition = clip.transitions?.in;
       if (
         clip.effects?.length &&
@@ -1087,7 +1179,7 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
         (transition) =>
           transition !== undefined &&
           "kind" in transition &&
-          (transition.kind === "slide" || transition.kind === "wipe")
+          (transition.kind === "slide" || transition.kind === "wipe" || transition.kind === "zoom")
       );
 
       if (

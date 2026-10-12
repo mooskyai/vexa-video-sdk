@@ -433,6 +433,39 @@ test("programmable slide and wipe transitions lower into project clips without c
   assert.equal(clip?.duration, 1);
 });
 
+test("programmable zoom transitions lower into project clips without changing the shared contract", () => {
+  const scene = defineProgrammableScene({
+    id: "zoom-transition-lowering",
+    width: 320,
+    height: 180,
+    fps: 30,
+    durationInFrames: 60,
+    assets: [{
+      id: "image",
+      kind: "image",
+      source: { kind: "static", src: "assets/card.png" }
+    }],
+    children: [{
+      id: "card",
+      kind: "image",
+      assetId: "image",
+      durationInFrames: 30,
+      transitions: {
+        in: { kind: "zoom", durationInFrames: 12, easing: "ease-in-out" },
+        out: { kind: "zoom", durationInFrames: 8, easing: "ease-out" }
+      }
+    }]
+  });
+
+  const project = lowerProgrammableSceneToVideoProject(scene);
+  const clip = project.tracks[0]?.clips[0];
+  assert.deepEqual(clip?.transitions, {
+    in: { kind: "zoom", durationInFrames: 12, easing: "ease-in-out" },
+    out: { kind: "zoom", durationInFrames: 8, easing: "ease-out" }
+  });
+  assert.equal(clip?.duration, 1);
+});
+
 test("asset readiness state updates immutably", () => {
   const scene = defineProgrammableScene({
     id: "readiness", width: 10, height: 10, fps: 30, durationInFrames: 10,

@@ -323,6 +323,116 @@ test("programmable text slide and wipe reuse the isolated transparent layer", ()
   assert.ok(plan.optimizations.includes("TEXT_ISOLATED_TRANSITION_GRAPH"));
 });
 
+test("project compiler executes programmable zoom after effects and opacity around the authored center", () => {
+  const zoomed = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "images",
+      type: "image",
+      clips: [{
+        id: "card",
+        kind: "image",
+        source: "card.png",
+        start: 0.5,
+        duration: 2,
+        opacity: 0.5,
+        effects: [{ kind: "brightness", amount: 0.8 }],
+        transform: { x: 20, y: 10, width: 120, height: 80, fit: "fill" },
+        transitions: {
+          in: { kind: "zoom", durationInFrames: 15, easing: "ease-in-out" },
+          out: { kind: "zoom", durationInFrames: 15, easing: "ease-out" }
+        }
+      }]
+    }]
+  });
+
+  const plan = createProjectExecutionPlan(zoomed, "output.mp4");
+  const opacityIndex = plan.filterComplex.indexOf("colorchannelmixer=aa=0.5");
+  const zoomIndex = plan.filterComplex.indexOf("scale=w='max(1,iw*(");
+  assert.ok(opacityIndex >= 0 && zoomIndex > opacityIndex);
+  assert.match(plan.filterComplex, /max\(0\.001,\(.*\/0\.5/u);
+  assert.match(plan.filterComplex, /overlay=x='[^']*w\/\(2\*\(/u);
+  assert.match(plan.filterComplex, /:y='[^']*h\/\(2\*\(/u);
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_TRANSITION_GRAPH"));
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_ZOOM_TRANSITION_GRAPH"));
+});
+
+test("programmable text zoom scales the isolated layer around the canvas center", () => {
+  const zoomedText = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "titles",
+      type: "text",
+      clips: [{
+        id: "title",
+        kind: "text",
+        text: "Vexa",
+        start: 0.5,
+        duration: 1,
+        style: { fontSize: 36, color: "white" },
+        transitions: {
+          in: { kind: "zoom", durationInFrames: 10, easing: "ease-in-out" }
+        }
+      }]
+    }]
+  });
+
+  const plan = createProjectExecutionPlan(zoomedText, "output.mp4");
+  assert.match(plan.filterComplex, /color=c=black@0:s=640x360:r=30:d=1,format=rgba,drawtext=/u);
+  assert.match(plan.filterComplex, /scale=w='max\(1,iw\*/u);
+  assert.match(plan.filterComplex, /\[base0\]\[tclip0\]overlay=x='\(W-w\)\/2':y='\(H-h\)\/2'/u);
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_ZOOM_TRANSITION_GRAPH"));
+  assert.ok(plan.optimizations.includes("TEXT_ISOLATED_TRANSITION_GRAPH"));
+});
+
+test("programmable zoom stays fail-closed for animated geometry and non-normal blend modes", () => {
+  const animatedZoom = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "images",
+      type: "image",
+      clips: [{
+        id: "card",
+        kind: "image",
+        source: "card.png",
+        start: 0,
+        duration: 2,
+        transform: {
+          x: { value: 0, keyframes: [{ time: 2, value: 100, easing: "linear" }] }
+        },
+        transitions: { in: { kind: "zoom", durationInFrames: 10 } }
+      }]
+    }]
+  });
+  assert.throws(
+    () => createProjectExecutionPlan(animatedZoom, "output.mp4"),
+    (error: unknown) =>
+      error instanceof InvalidProjectError && /zoom with animated transforms/u.test(error.message)
+  );
+
+  const blendedZoom = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "images",
+      type: "image",
+      clips: [{
+        id: "card",
+        kind: "image",
+        source: "card.png",
+        start: 0,
+        duration: 2,
+        blendMode: "screen",
+        transitions: { in: { kind: "zoom", durationInFrames: 10 } }
+      }]
+    }]
+  });
+  assert.throws(
+    () => createProjectExecutionPlan(blendedZoom, "output.mp4"),
+    (error: unknown) =>
+      error instanceof InvalidProjectError && /programmable zoom.*blendMode/u.test(error.message)
+  );
+});
+
 test("project compiler executes paired programmable push with easing and direction", () => {
   const pushed = normalizeVideoProject({
     ...project,

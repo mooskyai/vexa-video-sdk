@@ -554,7 +554,11 @@ Cover scene-to-project preservation of slide/wipe contracts, all four directions
 
 ### Programmable push execution tests
 
-Cover paired full-canvas video push planning, all four directions, project-FPS frame conversion, all shared easing modes, exact overlap validation, source-trim boundaries, opposite foreground/background motion, concat assembly, and the `PROGRAMMABLE_PUSH_TRANSITION_GRAPH` marker. Push must remain fail-closed for image/text/scene-leaf usage, outgoing-only declarations, non-full-canvas clips, effects/blend/opacity/keyframe/spatial combinations, mismatched overlap, extra clip transitions, and unsupported multi-clip chains. Programmable push must not implicitly change audio fades. Zoom and iris remain explicit future execution work.
+Cover paired full-canvas video push planning, all four directions, project-FPS frame conversion, all shared easing modes, exact overlap validation, source-trim boundaries, opposite foreground/background motion, concat assembly, and the `PROGRAMMABLE_PUSH_TRANSITION_GRAPH` marker. Push must remain fail-closed for image/text/scene-leaf usage, outgoing-only declarations, non-full-canvas clips, effects/blend/opacity/keyframe/spatial combinations, mismatched overlap, extra clip transitions, and unsupported multi-clip chains. Programmable push must not implicitly change audio fades.
+
+### Programmable zoom execution tests
+
+Cover scene-to-project zoom preservation, in/out frame-to-second timing, all shared easing modes, effect -> opacity -> zoom ordering, center-preserving positioned image/video geometry, isolated text centering, renderer-materialized primitives, and the `PROGRAMMABLE_ZOOM_TRANSITION_GRAPH` marker. Animated transform geometry and non-normal blend modes combined with zoom must fail explicitly instead of drifting or changing blend semantics. Real FFmpeg integration must exercise zoom on a renderer-rasterized visual. Circular iris remains explicit future execution work.
 
 ### Visual fixtures
 

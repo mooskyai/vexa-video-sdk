@@ -151,6 +151,11 @@ function shapeShowcaseScene(
         id: "shape-polygon",
         kind: "shape",
         zIndex: 3,
+        durationInFrames: 12,
+        transitions: {
+          in: { kind: "zoom", durationInFrames: 4, easing: "ease-out" },
+          out: { kind: "zoom", durationInFrames: 4, easing: "ease-in-out" }
+        },
         shape: {
           geometry: {
             kind: "polygon",
