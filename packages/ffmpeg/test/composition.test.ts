@@ -433,6 +433,79 @@ test("programmable zoom stays fail-closed for animated geometry and non-normal b
   );
 });
 
+test("project compiler executes programmable iris after effects and opacity around the layer center", () => {
+  const irised = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "images",
+      type: "image",
+      clips: [{
+        id: "card",
+        kind: "image",
+        source: "card.png",
+        start: 0,
+        duration: 2,
+        opacity: 0.75,
+        effects: [{ kind: "brightness", amount: 0.8 }],
+        transform: { x: 20, y: 10, width: 120, height: 80, fit: "fill" },
+        transitions: {
+          in: { kind: "iris", durationInFrames: 15, easing: "ease-in-out" },
+          out: { kind: "iris", durationInFrames: 15, easing: "ease-out" }
+        }
+      }]
+    }]
+  });
+
+  const plan = createProjectExecutionPlan(irised, "output.mp4");
+  const opacityIndex = plan.filterComplex.indexOf("colorchannelmixer=aa=0.75");
+  const irisIndex = plan.filterComplex.indexOf("(X-W/2)*(X-W/2)+(Y-H/2)*(Y-H/2)");
+  assert.ok(opacityIndex >= 0 && irisIndex > opacityIndex);
+  assert.match(plan.filterComplex, /\(W\/2\)\*\(W\/2\)\+\(H\/2\)\*\(H\/2\)/u);
+  assert.match(plan.filterComplex, /min\(1,max\(0,/u);
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_TRANSITION_GRAPH"));
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_IRIS_TRANSITION_GRAPH"));
+});
+
+test("programmable text iris masks the isolated transparent layer", () => {
+  const irisedText = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "titles",
+      type: "text",
+      clips: [{
+        id: "title",
+        kind: "text",
+        text: "Vexa",
+        start: 0.5,
+        duration: 1,
+        style: { fontSize: 36, color: "white" },
+        transitions: { in: { kind: "iris", durationInFrames: 10, easing: "ease-in-out" } }
+      }]
+    }]
+  });
+
+  const plan = createProjectExecutionPlan(irisedText, "output.mp4");
+  assert.match(plan.filterComplex, /color=c=black@0:s=640x360:r=30:d=1,format=rgba,drawtext=/u);
+  assert.match(plan.filterComplex, /alpha\(X,Y\).*X-W\/2/u);
+  assert.ok(plan.optimizations.includes("PROGRAMMABLE_IRIS_TRANSITION_GRAPH"));
+  assert.ok(plan.optimizations.includes("TEXT_ISOLATED_TRANSITION_GRAPH"));
+});
+
+test("programmable iris stays fail-closed for non-normal blend modes", () => {
+  const blendedIris = normalizeVideoProject({
+    ...project,
+    tracks: [{ id: "images", type: "image", clips: [{
+      id: "card", kind: "image", source: "card.png", start: 0, duration: 2,
+      blendMode: "screen", transitions: { in: { kind: "iris", durationInFrames: 10 } }
+    }] }]
+  });
+
+  assert.throws(
+    () => createProjectExecutionPlan(blendedIris, "output.mp4"),
+    (error: unknown) => error instanceof InvalidProjectError && /programmable iris.*blendMode/u.test(error.message)
+  );
+});
+
 test("project compiler executes paired programmable push with easing and direction", () => {
   const pushed = normalizeVideoProject({
     ...project,

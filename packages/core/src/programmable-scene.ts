@@ -1074,7 +1074,8 @@ function assertProjectRepresentable(item: ProgrammableSceneRenderItem): void {
         transition.kind !== "fade" &&
         transition.kind !== "slide" &&
         transition.kind !== "wipe" &&
-        transition.kind !== "zoom"
+        transition.kind !== "zoom" &&
+        transition.kind !== "iris"
     );
     if (unsupported) {
       throw new UnsupportedProgrammableSceneLoweringError(

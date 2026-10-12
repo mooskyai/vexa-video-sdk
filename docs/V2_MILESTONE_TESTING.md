@@ -558,7 +558,11 @@ Cover paired full-canvas video push planning, all four directions, project-FPS f
 
 ### Programmable zoom execution tests
 
-Cover scene-to-project zoom preservation, in/out frame-to-second timing, all shared easing modes, effect -> opacity -> zoom ordering, center-preserving positioned image/video geometry, isolated text centering, renderer-materialized primitives, and the `PROGRAMMABLE_ZOOM_TRANSITION_GRAPH` marker. Animated transform geometry and non-normal blend modes combined with zoom must fail explicitly instead of drifting or changing blend semantics. Real FFmpeg integration must exercise zoom on a renderer-rasterized visual. Circular iris remains explicit future execution work.
+Cover scene-to-project zoom preservation, in/out frame-to-second timing, all shared easing modes, effect -> opacity -> zoom ordering, center-preserving positioned image/video geometry, isolated text centering, renderer-materialized primitives, and the `PROGRAMMABLE_ZOOM_TRANSITION_GRAPH` marker. Animated transform geometry and non-normal blend modes combined with zoom must fail explicitly instead of drifting or changing blend semantics. Real FFmpeg integration must exercise zoom on a renderer-rasterized visual.
+
+### Programmable circular iris execution tests
+
+Cover scene-to-project iris preservation, in/out frame-to-second timing, all shared easing modes, effect -> opacity -> iris ordering, layer-centered radial geometry, fully-closed/open boundary behavior, isolated text execution, renderer-materialized primitives, and the `PROGRAMMABLE_IRIS_TRANSITION_GRAPH` marker. Real FFmpeg integration must exercise iris on a renderer-rasterized visual. Non-normal blend-mode combinations must fail explicitly instead of bypassing the alpha mask.
 
 ### Visual fixtures
 

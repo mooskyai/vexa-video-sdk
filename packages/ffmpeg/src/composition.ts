@@ -254,6 +254,31 @@ function programmableWipeAlphaExpression(
   return masks.length ? masks.map((mask) => `(${mask})`).join("*") : null;
 }
 
+function programmableIrisAlphaExpression(
+  clip: TimelineClip,
+  canvas: VideoProjectAst["canvas"],
+  timeExpression: string
+): string | null {
+  const masks: string[] = [];
+  for (const edge of ["in", "out"] as const) {
+    const transition = clip.transitions?.[edge];
+    if (!transition || !("kind" in transition) || transition.kind !== "iris") continue;
+    const visibility = programmableTransitionVisibilityExpression(
+      transition,
+      edge,
+      clip.duration,
+      canvas.fps,
+      timeExpression
+    );
+    const distanceSquared = "(X-W/2)*(X-W/2)+(Y-H/2)*(Y-H/2)";
+    const maxRadiusSquared = "(W/2)*(W/2)+(H/2)*(H/2)";
+    masks.push(
+      `if(lt(${distanceSquared},(${maxRadiusSquared})*(${visibility})*(${visibility})),1,0)`
+    );
+  }
+  return masks.length ? masks.map((mask) => `(${mask})`).join("*") : null;
+}
+
 function programmableSlideOffsetExpression(
   clip: TimelineClip,
   canvas: VideoProjectAst["canvas"],
@@ -333,6 +358,7 @@ function programmableTransitionOptimizationMarkers(clip: TimelineClip): string[]
   if (kinds.includes("slide")) markers.push("PROGRAMMABLE_SLIDE_TRANSITION_GRAPH");
   if (kinds.includes("wipe")) markers.push("PROGRAMMABLE_WIPE_TRANSITION_GRAPH");
   if (kinds.includes("zoom")) markers.push("PROGRAMMABLE_ZOOM_TRANSITION_GRAPH");
+  if (kinds.includes("iris")) markers.push("PROGRAMMABLE_IRIS_TRANSITION_GRAPH");
   return markers;
 }
 
@@ -344,10 +370,11 @@ function assertExecutableProgrammableTransitions(clip: TimelineClip): void {
       transition.kind !== "fade" &&
       transition.kind !== "slide" &&
       transition.kind !== "wipe" &&
-      transition.kind !== "zoom"
+      transition.kind !== "zoom" &&
+      transition.kind !== "iris"
     ) {
       throw new InvalidProjectError(
-        `Clip "${clip.id}" uses programmable ${transition.kind}, but only programmable fade, slide, wipe, and zoom execution is wired in this layer-local transition path.`
+        `Clip "${clip.id}" uses programmable ${transition.kind}, but only programmable fade, slide, wipe, zoom, and iris execution is wired in this layer-local transition path.`
       );
     }
   }
@@ -476,6 +503,13 @@ function clipVisualFilters(
   if (programmableWipeAlpha) {
     filters.push(
       `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${programmableWipeAlpha})'`
+    );
+  }
+
+  const programmableIrisAlpha = programmableIrisAlphaExpression(clip, canvas, "T");
+  if (programmableIrisAlpha) {
+    filters.push(
+      `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${programmableIrisAlpha})'`
     );
   }
 
@@ -717,7 +751,8 @@ function textIsolatedClipFilter(
       transition.kind !== "fade" &&
       transition.kind !== "slide" &&
       transition.kind !== "wipe" &&
-      transition.kind !== "zoom"
+      transition.kind !== "zoom" &&
+      transition.kind !== "iris"
     ) {
       throw new InvalidProjectError(
         `Text clip "${clip.id}" cannot execute programmable ${transition.kind} yet.`
@@ -764,6 +799,13 @@ function textIsolatedClipFilter(
   if (programmableWipeAlpha) {
     filters.push(
       `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${programmableWipeAlpha})'`
+    );
+  }
+
+  const programmableIrisAlpha = programmableIrisAlphaExpression(clip, project.canvas, "T");
+  if (programmableIrisAlpha) {
+    filters.push(
+      `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${programmableIrisAlpha})'`
     );
   }
 
@@ -1179,7 +1221,7 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
         (transition) =>
           transition !== undefined &&
           "kind" in transition &&
-          (transition.kind === "slide" || transition.kind === "wipe" || transition.kind === "zoom")
+          (transition.kind === "slide" || transition.kind === "wipe" || transition.kind === "zoom" || transition.kind === "iris")
       );
 
       if (

@@ -154,7 +154,7 @@ function shapeShowcaseScene(
         durationInFrames: 12,
         transitions: {
           in: { kind: "zoom", durationInFrames: 4, easing: "ease-out" },
-          out: { kind: "zoom", durationInFrames: 4, easing: "ease-in-out" }
+          out: { kind: "iris", durationInFrames: 4, easing: "ease-in-out" }
         },
         shape: {
           geometry: {

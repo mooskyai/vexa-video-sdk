@@ -330,7 +330,7 @@ test("visual transitions normalize, serialize, and keep unsupported transition f
       durationInFrames: 30,
       transitions: {
         in: { kind: "slide" as const, durationInFrames: 12 },
-        out: { kind: "iris" as const, durationInFrames: 8, easing: "ease-out" as const }
+        out: { kind: "push" as const, durationInFrames: 8, easing: "ease-out" as const }
       }
     }]
   } as const;
@@ -341,7 +341,7 @@ test("visual transitions normalize, serialize, and keep unsupported transition f
   if (node?.kind !== "image") throw new Error("expected transition-bearing image node");
   assert.deepEqual(node.transitions, {
     in: { kind: "slide", durationInFrames: 12, easing: "linear", direction: "left" },
-    out: { kind: "iris", durationInFrames: 8, easing: "ease-out" }
+    out: { kind: "push", durationInFrames: 8, easing: "ease-out", direction: "left" }
   });
   assert.equal(Object.isFrozen(node.transitions), true);
   assert.equal(Object.isFrozen(node.transitions?.in), true);
@@ -433,7 +433,7 @@ test("programmable slide and wipe transitions lower into project clips without c
   assert.equal(clip?.duration, 1);
 });
 
-test("programmable zoom transitions lower into project clips without changing the shared contract", () => {
+test("programmable zoom and iris transitions lower into project clips without changing the shared contract", () => {
   const scene = defineProgrammableScene({
     id: "zoom-transition-lowering",
     width: 320,
@@ -452,7 +452,7 @@ test("programmable zoom transitions lower into project clips without changing th
       durationInFrames: 30,
       transitions: {
         in: { kind: "zoom", durationInFrames: 12, easing: "ease-in-out" },
-        out: { kind: "zoom", durationInFrames: 8, easing: "ease-out" }
+        out: { kind: "iris", durationInFrames: 8, easing: "ease-out" }
       }
     }]
   });
@@ -461,7 +461,7 @@ test("programmable zoom transitions lower into project clips without changing th
   const clip = project.tracks[0]?.clips[0];
   assert.deepEqual(clip?.transitions, {
     in: { kind: "zoom", durationInFrames: 12, easing: "ease-in-out" },
-    out: { kind: "zoom", durationInFrames: 8, easing: "ease-out" }
+    out: { kind: "iris", durationInFrames: 8, easing: "ease-out" }
   });
   assert.equal(clip?.duration, 1);
 });
