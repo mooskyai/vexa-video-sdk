@@ -25,9 +25,11 @@ import {
   type MediaStorageSource,
   type ProgrammableScene,
   type ProgrammableSceneAsset,
+  type ProgrammableSceneFillNode,
   type ProgrammableSceneNode,
   type ProgrammableSceneRenderItem,
   type ProgrammableSceneShapeNode,
+  type ProgrammableSceneSolidNode,
   type ProgrammableSceneTransform,
   type ProgrammableShape,
   type ProgrammableShapeStyle,
@@ -67,6 +69,7 @@ export type VexaRendererErrorCode =
   | "RENDER_HARDWARE_UNAVAILABLE"
   | "RENDER_ASSET_RESOLUTION_FAILED"
   | "RENDER_SHAPE_UNSUPPORTED"
+  | "RENDER_PRIMITIVE_UNSUPPORTED"
   | "RENDER_EXECUTION_FAILED";
 
 export class VexaRendererError extends Error {
@@ -410,9 +413,23 @@ type ProgrammableShapeRenderItem = ProgrammableSceneRenderItem & {
   readonly node: ProgrammableSceneShapeNode;
 };
 
+type ProgrammablePrimitiveRenderItem = ProgrammableSceneRenderItem & {
+  readonly node: ProgrammableSceneFillNode | ProgrammableSceneSolidNode;
+};
+
 function collectShapeRenderItems(scene: ProgrammableScene): readonly ProgrammableShapeRenderItem[] {
   const items = createProgrammableSceneRenderGraph(scene).items.filter(
     (item): item is ProgrammableShapeRenderItem => item.node.kind === "shape"
+  );
+  items.sort((left, right) => left.declarationOrder - right.declarationOrder);
+  return Object.freeze(items);
+}
+
+function collectPrimitiveRenderItems(scene: ProgrammableScene): readonly ProgrammablePrimitiveRenderItem[] {
+  const items = createProgrammableSceneRenderGraph(scene).items.filter(
+    (item): item is ProgrammablePrimitiveRenderItem =>
+      item.node.kind === "solid" ||
+      (item.node.kind === "fill" && Boolean(item.node.effects?.length))
   );
   items.sort((left, right) => left.declarationOrder - right.declarationOrder);
   return Object.freeze(items);
@@ -434,6 +451,25 @@ function assertShapeTransformSupported(item: ProgrammableShapeRenderItem): void 
   throw new VexaRendererError(
     `Shape node "${item.node.id}" currently supports translation-only scene transforms; unsupported transform fields: ${[...unsupported].sort(compareText).join(", ")}.`,
     "RENDER_SHAPE_UNSUPPORTED"
+  );
+}
+
+function assertPrimitiveTransformSupported(item: ProgrammablePrimitiveRenderItem): void {
+  const unsupported = new Set<string>();
+  const check = (transform: ProgrammableSceneTransform): void => {
+    if (transform.width !== undefined) unsupported.add("width");
+    if (transform.height !== undefined) unsupported.add("height");
+    if (transform.rotation !== undefined) unsupported.add("rotation");
+    if (transform.scaleX !== undefined) unsupported.add("scaleX");
+    if (transform.scaleY !== undefined) unsupported.add("scaleY");
+    if (transform.anchorX !== undefined) unsupported.add("anchorX");
+    if (transform.anchorY !== undefined) unsupported.add("anchorY");
+  };
+  for (const transform of item.transformChain) check(transform);
+  if (unsupported.size === 0) return;
+  throw new VexaRendererError(
+    `${item.node.kind === "fill" ? "Fill" : "Solid"} node "${item.node.id}" currently supports translation-only scene transforms; unsupported transform fields: ${[...unsupported].sort(compareText).join(", ")}.`,
+    "RENDER_PRIMITIVE_UNSUPPORTED"
   );
 }
 
@@ -460,6 +496,33 @@ function safeShapePaint(value: string, label: string): string {
     );
   }
   return escapeXmlAttribute(value);
+}
+
+function safePrimitivePaint(value: string, label: string): string {
+  if (/url\s*\(/iu.test(value) || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(value)) {
+    throw new VexaRendererError(
+      `${label} contains a paint value that is not supported by the renderer-owned SVG primitive path.`,
+      "RENDER_PRIMITIVE_UNSUPPORTED"
+    );
+  }
+  return escapeXmlAttribute(value);
+}
+
+function primitiveSvgDocument(
+  node: ProgrammableSceneFillNode | ProgrammableSceneSolidNode,
+  width: number,
+  height: number
+): string {
+  const primitiveWidth = node.kind === "fill" ? width : node.width;
+  const primitiveHeight = node.kind === "fill" ? height : node.height;
+  const fill = safePrimitivePaint(node.color, `${node.kind} ${node.id} color`);
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
+    `  <rect x="0" y="0" width="${formatShapeNumber(primitiveWidth)}" height="${formatShapeNumber(primitiveHeight)}" fill="${fill}" />`,
+    "</svg>",
+    ""
+  ].join("\n");
 }
 
 function shapeSvgDocument(shape: ProgrammableShape, width: number, height: number): string {
@@ -605,6 +668,102 @@ async function materializeProgrammableSceneShapes(
   });
 }
 
+function renderPrimitiveFileName(index: number, nodeId: string): string {
+  const safeId = nodeId.replace(/[^a-zA-Z0-9._-]/gu, "-").slice(0, 96) || `primitive-${index}`;
+  return join("primitives", `${String(index).padStart(3, "0")}-${safeId}.png`);
+}
+
+function allocatePrimitiveAssetId(index: number, usedAssetIds: Set<string>): string {
+  let candidate = `__vexa_renderer_primitive_${String(index).padStart(4, "0")}`;
+  while (usedAssetIds.has(candidate)) candidate = `_${candidate}`;
+  usedAssetIds.add(candidate);
+  return candidate;
+}
+
+function replacePrimitiveNodes(
+  nodes: readonly ProgrammableSceneNode[],
+  primitiveAssetIds: ReadonlyMap<string, string>
+): readonly ProgrammableSceneNode[] {
+  return Object.freeze(nodes.map((node) => {
+    if (node.kind === "group" || node.kind === "layer") {
+      return Object.freeze({
+        ...node,
+        children: replacePrimitiveNodes(node.children, primitiveAssetIds)
+      });
+    }
+    if (node.kind !== "fill" && node.kind !== "solid") return node;
+
+    const assetId = primitiveAssetIds.get(node.id);
+    if (!assetId) return node;
+    return Object.freeze({
+      kind: "image",
+      id: node.id,
+      ...(node.startFrame !== undefined ? { startFrame: node.startFrame } : {}),
+      ...(node.durationInFrames !== undefined ? { durationInFrames: node.durationInFrames } : {}),
+      ...(node.zIndex !== undefined ? { zIndex: node.zIndex } : {}),
+      ...(node.opacity !== undefined ? { opacity: node.opacity } : {}),
+      ...(node.transform !== undefined ? { transform: node.transform } : {}),
+      ...(node.effects !== undefined ? { effects: node.effects } : {}),
+      assetId
+    });
+  }));
+}
+
+async function materializeProgrammableScenePrimitives(
+  scene: ProgrammableScene,
+  items: readonly ProgrammablePrimitiveRenderItem[],
+  fileFor: (relativePath: string) => string,
+  reservedAssetIds: readonly string[],
+  signal?: AbortSignal
+): Promise<ProgrammableScene> {
+  if (items.length === 0) return scene;
+  for (const item of items) assertPrimitiveTransformSupported(item);
+
+  const usedAssetIds = new Set<string>([
+    ...scene.assets.map((asset) => asset.id),
+    ...reservedAssetIds
+  ]);
+  const primitiveAssetIds = new Map<string, string>();
+  const generatedAssets: ProgrammableSceneAsset[] = [];
+
+  for (let index = 0; index < items.length; index += 1) {
+    if (signal?.aborted) throw new ProcessAbortedError();
+    const item = items[index]!;
+    const assetId = allocatePrimitiveAssetId(index, usedAssetIds);
+    const target = fileFor(renderPrimitiveFileName(index, item.node.id));
+    await mkdir(dirname(target), { recursive: true });
+    const png = new Resvg(
+      primitiveSvgDocument(item.node, scene.width, scene.height),
+      { font: { loadSystemFonts: false } }
+    ).render().asPng();
+    await writeFile(
+      target,
+      png,
+      {
+        ...(signal ? { signal } : {})
+      }
+    );
+    primitiveAssetIds.set(item.node.id, assetId);
+    generatedAssets.push(Object.freeze({
+      id: assetId,
+      kind: "image",
+      source: Object.freeze({ kind: "static", src: target })
+    }));
+  }
+
+  return defineProgrammableScene({
+    schemaVersion: scene.schemaVersion,
+    id: scene.id,
+    width: scene.width,
+    height: scene.height,
+    fps: scene.fps,
+    durationInFrames: scene.durationInFrames,
+    ...(scene.background !== undefined ? { background: scene.background } : {}),
+    assets: Object.freeze([...scene.assets, ...generatedAssets]),
+    children: replacePrimitiveNodes(scene.children, primitiveAssetIds)
+  });
+}
+
 function storageSourceExtension(source: MediaStorageSource): string {
   let candidate = "";
   if (source.kind === "local") {
@@ -638,8 +797,13 @@ async function createRenderAssetWorkspace(
     !Object.prototype.hasOwnProperty.call(callerResolvedAssets, asset.id)
   );
   const shapeItems = collectShapeRenderItems(scene);
+  const primitiveItems = collectPrimitiveRenderItems(scene);
   const resolvedAssets: Record<string, string> = { ...callerResolvedAssets };
-  if (unresolvedStorageAssets.length === 0 && shapeItems.length === 0) {
+  if (
+    unresolvedStorageAssets.length === 0 &&
+    shapeItems.length === 0 &&
+    primitiveItems.length === 0
+  ) {
     return Object.freeze({
       scene,
       resolvedAssets: Object.freeze(resolvedAssets),
@@ -685,8 +849,15 @@ async function createRenderAssetWorkspace(
   let renderScene = scene;
   try {
     renderScene = await materializeProgrammableSceneShapes(
-      scene,
+      renderScene,
       shapeItems,
+      (relativePath) => workspace.file(relativePath),
+      Object.keys(resolvedAssets),
+      signal
+    );
+    renderScene = await materializeProgrammableScenePrimitives(
+      renderScene,
+      primitiveItems,
       (relativePath) => workspace.file(relativePath),
       Object.keys(resolvedAssets),
       signal
@@ -696,7 +867,7 @@ async function createRenderAssetWorkspace(
     if (signal?.aborted || cause instanceof ProcessAbortedError) throw new ProcessAbortedError();
     if (cause instanceof VexaRendererError) throw cause;
     throw new VexaRendererError(
-      `Failed to materialize programmable shapes for composition "${compositionId}": ${cause instanceof Error ? cause.message : String(cause)}.`,
+      `Failed to materialize programmable raster nodes for composition "${compositionId}": ${cause instanceof Error ? cause.message : String(cause)}.`,
       "RENDER_EXECUTION_FAILED",
       { compositionId, cause }
     );

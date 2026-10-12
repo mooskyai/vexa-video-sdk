@@ -592,6 +592,8 @@ The seventh implementation slice adds ordered shadow/glow execution for image/vi
 
 The eighth implementation slice lets programmable text effects lower into `VideoProjectAst` and renders effect-bearing text on a transparent full-canvas layer before compositing it back into the project. The isolated layer reuses the same ordered FFmpeg effect compiler as image/video/shape, applies clip opacity and fade transitions after effects, preserves text position/font-size keyframes and default-font resolution, exposes `TEXT_ISOLATED_EFFECT_GRAPH`, and rejects effect-bearing text wipes/crossfades until an advanced text-transition graph exists. Fill/solid/surface effects remain fail-closed.
 
+The ninth implementation slice adds renderer-owned raster execution for Vexa `solid` nodes and effect-bearing `fill` nodes. These primitives are converted to transparent full-canvas SVG documents, rasterized to managed-workspace PNGs with the existing `resvg-js` path, substituted with image nodes while preserving timing/z/opacity/effects, and then executed through the same FFmpeg effect compiler as other raster visuals. Translation-only scene transforms are supported; width/height/rotation/scale/anchor transforms fail explicitly with `RENDER_PRIMITIVE_UNSUPPORTED`. Plain representable fills keep the direct project-background lowering fast path. Application-owned `surface` nodes remain contract-only until Vexa defines a renderer registration/execution API instead of guessing what a `rendererId` means.
+
 ### Goal
 
 Provide a Vexa-owned motion-graphics component library.

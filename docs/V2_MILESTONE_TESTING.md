@@ -536,6 +536,10 @@ Cover shadow/glow branch construction, declaration-order preservation when compo
 
 Cover text effect normalization at the project boundary, programmable-scene text lowering, isolated transparent-layer construction, effect-before-opacity/fade ordering, text position/font-size keyframes, and `TEXT_ISOLATED_EFFECT_GRAPH`. Real FFmpeg integration must render effect-bearing text without modifying background pixels outside the text layer. Linear and compositor effects must reuse the shared effect compiler; effect-bearing text wipes/crossfades must fail explicitly until the advanced transition graph supports isolated text.
 
+### Renderer fill and solid execution tests
+
+Cover renderer materialization for every `solid` node plus effect-bearing `fill` nodes, managed-workspace SVG-to-PNG rasterization, generated-asset cleanup, preservation of timing/z/opacity/effects, reuse of the normal image/FFmpeg effect path, and explicit `RENDER_PRIMITIVE_UNSUPPORTED` failures for width/height/rotation/scale/anchor scene transforms. Keep plain representable fills on the project-background fast path. `surface` remains a serializable application-owned renderer contract and must stay fail-closed until a renderer registration/execution API is defined.
+
 ### Visual fixtures
 
 Create Vexa-owned frames for:

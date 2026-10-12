@@ -86,14 +86,18 @@ test("bundled executable compositions resolve storage assets and render stills, 
       format: "png",
       inputProps: { background: "#0f172a", unsupportedRotation: false }
     });
-    const shapeInputs = shapeFrame.executionPlan.inputs.filter(
+    const generatedInputs = shapeFrame.executionPlan.inputs.filter(
       (input) => input.kind === "image" && input.source.toLowerCase().endsWith(".png")
     );
-    assert.equal(shapeInputs.length, 7);
+    assert.equal(generatedInputs.length, 9);
+    assert.equal(
+      generatedInputs.filter((input) => /[\\/]primitives[\\/]/u.test(input.source)).length,
+      2
+    );
     assert.match(shapeFrame.executionPlan.filterComplex, /lutrgb=/u);
     const shapeFramePng = await readFile(shapeFrameOutput);
     assert.deepEqual([...shapeFramePng.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
-    for (const input of shapeInputs) {
+    for (const input of generatedInputs) {
       await assert.rejects(
         () => readFile(input.source),
         (error: unknown) =>
@@ -112,6 +116,21 @@ test("bundled executable compositions resolve storage assets and render stills, 
       }),
       (error: unknown) =>
         error instanceof VexaRendererError && error.code === "RENDER_SHAPE_UNSUPPORTED"
+    );
+
+    await assert.rejects(
+      () => renderer.renderFrame({
+        compositionId: "shape-showcase",
+        frame: 8,
+        output: join(tempRoot, "shape-showcase-primitive-unsupported.png"),
+        inputProps: {
+          background: "#0f172a",
+          unsupportedRotation: false,
+          unsupportedPrimitiveRotation: true
+        }
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError && error.code === "RENDER_PRIMITIVE_UNSUPPORTED"
     );
 
     const shapeRange = await renderer.renderFrameRange({
@@ -138,8 +157,9 @@ test("bundled executable compositions resolve storage assets and render stills, 
     });
     assert.equal(shapeVideo.executionPlan.inputs.filter(
       (input) => input.kind === "image" && input.source.toLowerCase().endsWith(".png")
-    ).length, 7);
+    ).length, 9);
     assert.ok(shapeVideo.executionPlan.optimizations.includes("PROGRAMMABLE_EFFECT_GRAPH"));
+    assert.ok(shapeVideo.executionPlan.optimizations.includes("PROGRAMMABLE_EFFECT_COMPOSITOR_GRAPH"));
     assert.equal(shapeVideo.executionPlan.durationSeconds, 1);
     const shapeMp4 = await readFile(shapeVideoOutput);
     assert.equal(shapeMp4.subarray(4, 8).toString("ascii"), "ftyp");

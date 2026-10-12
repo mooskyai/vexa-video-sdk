@@ -22,6 +22,7 @@ interface ProductDemoProps extends BackgroundProps {
 
 interface ShapeShowcaseProps extends BackgroundProps {
   readonly unsupportedRotation: boolean;
+  readonly unsupportedPrimitiveRotation: boolean;
 }
 
 const productDemo = defineComposition<ProductDemoProps>({
@@ -42,7 +43,11 @@ const shapeShowcase = defineComposition<ShapeShowcaseProps>({
   height: 180,
   fps: 12,
   durationInFrames: 24,
-  defaultProps: { background: "#0f172a", unsupportedRotation: false }
+  defaultProps: {
+    background: "#0f172a",
+    unsupportedRotation: false,
+    unsupportedPrimitiveRotation: false
+  }
 });
 
 const socialSquare = defineStill<BackgroundProps>({
@@ -89,6 +94,16 @@ function shapeShowcaseScene(
     durationInFrames,
     background: props.background,
     children: [
+      {
+        id: "effect-fill",
+        kind: "fill",
+        zIndex: -2,
+        color: "#111827",
+        effects: [
+          { kind: "brightness", amount: 0.85 },
+          { kind: "vignette", amount: 0.25, softness: 0.6 }
+        ]
+      },
       {
         id: "shape-rectangle",
         kind: "shape",
@@ -188,6 +203,20 @@ function shapeShowcaseScene(
             stroke: { color: "#22d3ee", width: 4, lineCap: "round" }
           }
         }
+      },
+      {
+        id: "effect-solid",
+        kind: "solid",
+        zIndex: 7,
+        color: "#a855f7",
+        width: 38,
+        height: 24,
+        transform: props.unsupportedPrimitiveRotation
+          ? { x: 256, y: 140, rotation: 12 }
+          : { x: 256, y: 140 },
+        effects: [
+          { kind: "glow", radius: 3, color: "#c084fc", opacity: 0.65 }
+        ]
       }
     ]
   });
