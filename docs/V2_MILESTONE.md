@@ -594,6 +594,8 @@ The eighth implementation slice lets programmable text effects lower into `Video
 
 The ninth implementation slice adds renderer-owned raster execution for Vexa `solid` nodes and effect-bearing `fill` nodes. These primitives are converted to transparent full-canvas SVG documents, rasterized to managed-workspace PNGs with the existing `resvg-js` path, substituted with image nodes while preserving timing/z/opacity/effects, and then executed through the same FFmpeg effect compiler as other raster visuals. Translation-only scene transforms are supported; width/height/rotation/scale/anchor transforms fail explicitly with `RENDER_PRIMITIVE_UNSUPPORTED`. Plain representable fills keep the direct project-background lowering fast path. Application-owned `surface` nodes remain contract-only until Vexa defines a renderer registration/execution API instead of guessing what a `rendererId` means.
 
+The tenth implementation slice establishes browser-safe programmable transition contracts in `@vexa-video/core` for fade, slide, wipe, push, zoom, and circular iris transitions. Durations are frame-based positive integers; easing supports linear/ease-in/ease-out/ease-in-out; slide/wipe/push directions normalize deterministically. Visual scene leaves and React authoring components expose typed `transitions` pairs, scene normalization freezes canonical values and rejects transition durations longer than the owning node, and renderer-owned shape/fill/solid raster substitution preserves transition metadata. `VideoProjectAst` lowering remains explicitly fail-closed until the dedicated transition execution graph is implemented, preventing partial or silently dropped transition semantics.
+
 ### Goal
 
 Provide a Vexa-owned motion-graphics component library.

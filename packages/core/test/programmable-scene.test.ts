@@ -311,6 +311,62 @@ test("image effect chains normalize, preserve order, and lower into project clip
   }), /effects is invalid/);
 });
 
+test("visual transitions normalize, serialize, and fail closed before execution wiring", () => {
+  const options = {
+    id: "transition-scene",
+    width: 320,
+    height: 180,
+    fps: 30,
+    durationInFrames: 60,
+    assets: [{
+      id: "image",
+      kind: "image" as const,
+      source: { kind: "static" as const, src: "assets/card.png" }
+    }],
+    children: [{
+      id: "card",
+      kind: "image" as const,
+      assetId: "image",
+      durationInFrames: 30,
+      transitions: {
+        in: { kind: "slide" as const, durationInFrames: 12 },
+        out: { kind: "iris" as const, durationInFrames: 8, easing: "ease-out" as const }
+      }
+    }]
+  } as const;
+
+  const scene = defineProgrammableScene(options);
+  const browserScene = defineBrowserProgrammableScene(options);
+  const node = scene.children[0];
+  if (node?.kind !== "image") throw new Error("expected transition-bearing image node");
+  assert.deepEqual(node.transitions, {
+    in: { kind: "slide", durationInFrames: 12, easing: "linear", direction: "left" },
+    out: { kind: "iris", durationInFrames: 8, easing: "ease-out" }
+  });
+  assert.equal(Object.isFrozen(node.transitions), true);
+  assert.equal(Object.isFrozen(node.transitions?.in), true);
+  assert.equal(serializeProgrammableScene(scene), serializeBrowserProgrammableScene(browserScene));
+  assert.throws(
+    () => lowerProgrammableSceneToVideoProject(scene),
+    UnsupportedProgrammableSceneLoweringError
+  );
+
+  assert.throws(() => defineProgrammableScene({
+    id: "invalid-transition-duration",
+    width: 100,
+    height: 100,
+    fps: 30,
+    durationInFrames: 30,
+    children: [{
+      id: "title",
+      kind: "text",
+      text: "Vexa",
+      durationInFrames: 5,
+      transitions: { in: { kind: "fade", durationInFrames: 6 } }
+    }]
+  }), /transitions is invalid/);
+});
+
 test("asset readiness state updates immutably", () => {
   const scene = defineProgrammableScene({
     id: "readiness", width: 10, height: 10, fps: 30, durationInFrames: 10,

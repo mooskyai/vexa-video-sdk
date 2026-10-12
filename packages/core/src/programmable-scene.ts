@@ -7,6 +7,11 @@ import {
   type ProgrammableEffect
 } from "./programmable-effects.js";
 import { InvalidProgrammableShapeError, normalizeProgrammableShape, type ProgrammableShape } from "./programmable-shapes.js";
+import {
+  InvalidProgrammableTransitionError,
+  normalizeProgrammableTransitions,
+  type ProgrammableTransitions
+} from "./programmable-transitions.js";
 import { frameToSeconds } from "./programmable-timing.js";
 import type { MediaStorageSource } from "./storage.js";
 
@@ -139,6 +144,7 @@ export interface ProgrammableSceneNodeBase {
 
 export interface ProgrammableSceneVisualNodeBase extends ProgrammableSceneNodeBase {
   readonly effects?: readonly ProgrammableEffect[];
+  readonly transitions?: ProgrammableTransitions;
 }
 
 export interface ProgrammableSceneGroupNode extends ProgrammableSceneNodeBase {
@@ -549,6 +555,36 @@ function normalizeEffects(
   }
 }
 
+function normalizeTransitions(
+  transitions: ProgrammableTransitions | undefined,
+  nodeId: string,
+  durationInFrames: number
+): ProgrammableTransitions | undefined {
+  if (transitions === undefined) return undefined;
+  try {
+    const normalized = normalizeProgrammableTransitions(transitions);
+    if (normalized.in && normalized.in.durationInFrames > durationInFrames) {
+      throw new InvalidProgrammableTransitionError(
+        "transitions.in.durationInFrames cannot exceed the node duration."
+      );
+    }
+    if (normalized.out && normalized.out.durationInFrames > durationInFrames) {
+      throw new InvalidProgrammableTransitionError(
+        "transitions.out.durationInFrames cannot exceed the node duration."
+      );
+    }
+    return normalized;
+  } catch (error) {
+    if (error instanceof InvalidProgrammableTransitionError) {
+      throw new InvalidProgrammableSceneError(
+        `node ${nodeId}.transitions is invalid: ${error.message}`,
+        { nodeId }
+      );
+    }
+    throw error;
+  }
+}
+
 function isVisualLeafNode(node: ProgrammableSceneNode): node is ProgrammableSceneVisualLeafNode {
   return node.kind !== "group" && node.kind !== "layer" && node.kind !== "audio";
 }
@@ -627,6 +663,9 @@ function normalizeNode(node: ProgrammableSceneNode, context: NormalizeContext): 
   }
   const transform = normalizeTransform(node.transform, id);
   const effects = isVisualLeafNode(node) ? normalizeEffects(node.effects, id) : undefined;
+  const transitions = isVisualLeafNode(node)
+    ? normalizeTransitions(node.transitions, id, durationInFrames)
+    : undefined;
   const base = {
     id,
     startFrame,
@@ -636,9 +675,11 @@ function normalizeNode(node: ProgrammableSceneNode, context: NormalizeContext): 
     ...(transform ? { transform } : {})
   };
 
-  const visualBase = effects === undefined
-    ? base
-    : { ...base, effects };
+  const visualBase = {
+    ...base,
+    ...(effects !== undefined ? { effects } : {}),
+    ...(transitions !== undefined ? { transitions } : {})
+  };
 
   if (node.kind === "group" || node.kind === "layer") {
     const children = node.children.map((child) => normalizeNode(child, {
@@ -1026,6 +1067,12 @@ function lowerTextStyle(style: ProgrammableSceneTextStyle | undefined): TextStyl
 
 function assertProjectRepresentable(item: ProgrammableSceneRenderItem): void {
   const node = item.node;
+  if (isVisualLeafNode(node) && node.transitions !== undefined) {
+    throw new UnsupportedProgrammableSceneLoweringError(
+      node.id,
+      "programmable transitions require the dedicated transition execution graph."
+    );
+  }
   if (
     isVisualLeafNode(node) &&
     node.effects?.length &&

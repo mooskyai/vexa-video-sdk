@@ -35,6 +35,7 @@ function TitleCard() {
         radiusX={24}
         style={{ fill: "#5b5df0" }}
         effects={[{ kind: "glow", radius: 18, color: "#8b5cf6", opacity: 0.65 }]}
+        transitions={{ in: { kind: "zoom", durationInFrames: 12, easing: "ease-out" } }}
       />
       <VexaText id="title" text="Vexa Video" style={{ fontSize: 72, color: "white" }} />
     </VexaLayer>
@@ -49,4 +50,4 @@ const logo = vexaStaticAsset("logo", "image", "/assets/logo.png");
 </VexaCompositionRoot>;
 ```
 
-The package also provides composition registration, sequence/series/loop/freeze timing scopes, media scene components, generic `VexaShape` authoring plus rectangle/ellipse/circle/line/polygon/star/path/arc convenience components, ordered `effects` props on visual scene components, input/config hooks, and render-readiness coordination for asynchronous authoring work. Effects use the shared `ProgrammableEffect` contract from `@vexa-video/core/browser`; audio and group/layer containers intentionally do not expose visual effects.
+The package also provides composition registration, sequence/series/loop/freeze timing scopes, media scene components, generic `VexaShape` authoring plus rectangle/ellipse/circle/line/polygon/star/path/arc convenience components, ordered `effects` and `transitions` props on visual scene components, input/config hooks, and render-readiness coordination for asynchronous authoring work. Effects and transitions use the shared browser-safe contracts from `@vexa-video/core/browser`; audio and group/layer containers intentionally do not expose visual effects or transitions. Transition authoring currently normalizes intent only; renderer execution remains fail-closed until the dedicated transition graph is implemented.

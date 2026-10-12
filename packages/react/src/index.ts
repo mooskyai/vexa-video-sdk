@@ -28,6 +28,7 @@ import type {
   JsonObject,
   ProgrammableArcShape,
   ProgrammableEffect,
+  ProgrammableTransitions,
   ProgrammableCompositionDefinition,
   ProgrammableCompositionStaticMetadata,
   ProgrammableEllipseShape,
@@ -663,6 +664,7 @@ export interface VexaLeafBaseProps extends Omit<ProgrammableSceneNodeBase, "id">
 
 export interface VexaVisualLeafBaseProps extends VexaLeafBaseProps {
   readonly effects?: readonly ProgrammableEffect[];
+  readonly transitions?: ProgrammableTransitions;
 }
 
 function visualNodeBase(
@@ -670,7 +672,8 @@ function visualNodeBase(
 ): Omit<ProgrammableSceneVisualNodeBase, "id"> {
   return {
     ...nodeBase(props),
-    ...(props.effects !== undefined ? { effects: props.effects } : {})
+    ...(props.effects !== undefined ? { effects: props.effects } : {}),
+    ...(props.transitions !== undefined ? { transitions: props.transitions } : {})
   };
 }
 
@@ -979,6 +982,7 @@ export function vexaStorageAsset(
 export type {
   JsonObject,
   ProgrammableEffect,
+  ProgrammableTransitions,
   ProgrammableCompositionDefinition,
   ProgrammableScene,
   ProgrammableSceneAsset,

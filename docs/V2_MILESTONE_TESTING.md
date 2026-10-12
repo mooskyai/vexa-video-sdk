@@ -540,6 +540,10 @@ Cover text effect normalization at the project boundary, programmable-scene text
 
 Cover renderer materialization for every `solid` node plus effect-bearing `fill` nodes, managed-workspace SVG-to-PNG rasterization, generated-asset cleanup, preservation of timing/z/opacity/effects, reuse of the normal image/FFmpeg effect path, and explicit `RENDER_PRIMITIVE_UNSUPPORTED` failures for width/height/rotation/scale/anchor scene transforms. Keep plain representable fills on the project-background fast path. `surface` remains a serializable application-owned renderer contract and must stay fail-closed until a renderer registration/execution API is defined.
 
+### Transition contract and authoring tests
+
+Cover fade, slide, wipe, push, zoom, and circular iris transition normalization; positive frame durations; deterministic linear easing and left-direction defaults; explicit easing/direction overrides; immutable in/out transition pairs; stable serialization; typed invalid duration/easing/direction failures; and browser-entry parity. Scene normalization must reject a transition longer than its owning node, React visual components must preserve normalized transition intent, and renderer-owned shape/fill/solid raster substitution must carry transitions forward. Before the dedicated execution graph lands, any transition-bearing scene that reaches `VideoProjectAst` lowering must fail explicitly rather than approximating or dropping the transition.
+
 ### Visual fixtures
 
 Create Vexa-owned frames for:

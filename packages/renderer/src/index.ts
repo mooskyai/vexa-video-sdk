@@ -608,6 +608,7 @@ function replaceShapeNodes(
       ...(node.opacity !== undefined ? { opacity: node.opacity } : {}),
       ...(node.transform !== undefined ? { transform: node.transform } : {}),
       ...(node.effects !== undefined ? { effects: node.effects } : {}),
+      ...(node.transitions !== undefined ? { transitions: node.transitions } : {}),
       assetId
     });
   }));
@@ -704,6 +705,7 @@ function replacePrimitiveNodes(
       ...(node.opacity !== undefined ? { opacity: node.opacity } : {}),
       ...(node.transform !== undefined ? { transform: node.transform } : {}),
       ...(node.effects !== undefined ? { effects: node.effects } : {}),
+      ...(node.transitions !== undefined ? { transitions: node.transitions } : {}),
       assetId
     });
   }));

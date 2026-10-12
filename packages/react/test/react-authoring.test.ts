@@ -354,7 +354,7 @@ test("shape components map through the shared programmable shape contract", asyn
   await act(async () => renderer.unmount());
 });
 
-test("visual components attach ordered effects through the shared programmable effect contract", async () => {
+test("visual components attach ordered effects and transitions through shared core contracts", async () => {
   const assets = [vexaStaticAsset("photo", "image", "/photo.png")] as const;
   const child = createElement(
     VexaLayer,
@@ -367,7 +367,10 @@ test("visual components attach ordered effects through the shared programmable e
       effects: [
         { kind: "glow", radius: 12, color: "#8b5cf6", opacity: 0.6 },
         { kind: "hue", degrees: -45 }
-      ]
+      ],
+      transitions: {
+        in: { kind: "zoom", durationInFrames: 10, easing: "ease-out" }
+      }
     }),
     createElement(VexaImage, {
       id: "photo-node",
@@ -375,7 +378,10 @@ test("visual components attach ordered effects through the shared programmable e
       effects: [
         { kind: "brightness", amount: 1.1 },
         { kind: "vignette", amount: 0.4 }
-      ]
+      ],
+      transitions: {
+        out: { kind: "wipe", durationInFrames: 6, direction: "right" }
+      }
     })
   );
 
@@ -388,10 +394,16 @@ test("visual components attach ordered effects through the shared programmable e
     { kind: "glow", radius: 12, color: "#8b5cf6", opacity: 0.6 },
     { kind: "hue", degrees: 315 }
   ]);
+  assert.deepEqual(shape?.kind === "shape" ? shape.transitions : undefined, {
+    in: { kind: "zoom", durationInFrames: 10, easing: "ease-out" }
+  });
   assert.deepEqual(image?.kind === "image" ? image.effects : undefined, [
     { kind: "brightness", amount: 1.1 },
     { kind: "vignette", amount: 0.4, softness: 0.5 }
   ]);
+  assert.deepEqual(image?.kind === "image" ? image.transitions : undefined, {
+    out: { kind: "wipe", durationInFrames: 6, easing: "linear", direction: "right" }
+  });
   await act(async () => renderer.unmount());
 });
 
