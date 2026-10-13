@@ -1,4 +1,5 @@
-import { InvalidProjectError } from "./errors.js";
+import { normalizeCaptionDocument, type CaptionDocument } from "./captions.js";
+import { InvalidCaptionError, InvalidProjectError } from "./errors.js";
 import type {
   AudioCodec,
   EncoderPreset,
@@ -174,6 +175,7 @@ export interface VideoProjectAst {
   id: string;
   name?: string;
   canvas: ProjectCanvas;
+  captions?: CaptionDocument;
   tracks: readonly ProjectTrack[];
 }
 
@@ -676,6 +678,18 @@ export function normalizeVideoProject(project: VideoProjectAst): VideoProjectAst
     assertFinitePositive(project.canvas.duration, "project.canvas.duration");
   }
 
+  let captions: CaptionDocument | undefined;
+  if (project.captions !== undefined) {
+    try {
+      captions = normalizeCaptionDocument(project.captions);
+    } catch (error) {
+      if (error instanceof InvalidCaptionError) {
+        throw new InvalidProjectError(`project.captions is invalid: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
   const trackIds = new Set<string>();
   const clipIds = new Set<string>();
   const tracks = project.tracks.map((track) => {
@@ -709,6 +723,7 @@ export function normalizeVideoProject(project: VideoProjectAst): VideoProjectAst
       ...(project.canvas.duration !== undefined ? { duration: project.canvas.duration } : {}),
       background: project.canvas.background ?? "black"
     },
+    ...(captions !== undefined ? { captions } : {}),
     tracks
   };
 
@@ -723,6 +738,13 @@ export function normalizeVideoProject(project: VideoProjectAst): VideoProjectAst
         }
       }
     }
+    for (const cue of normalized.captions?.cues ?? []) {
+      if (cue.end > normalized.canvas.duration + 1e-6) {
+        throw new InvalidProjectError(
+          `Caption cue "${cue.id}" ends after the explicit project duration of ${normalized.canvas.duration}s.`
+        );
+      }
+    }
   }
 
   return normalized;
@@ -731,6 +753,9 @@ export function normalizeVideoProject(project: VideoProjectAst): VideoProjectAst
 export function projectDurationSeconds(project: VideoProjectAst): number {
   if (project.canvas.duration !== undefined) return project.canvas.duration;
   let duration = 0;
+  for (const cue of project.captions?.cues ?? []) {
+    duration = Math.max(duration, cue.end);
+  }
   for (const track of project.tracks) {
     if (track.hidden && track.type !== "audio") continue;
     if (track.muted && track.type === "audio") continue;
@@ -750,6 +775,7 @@ export function createVideoProjectAst(options: {
   fps?: number;
   duration?: number;
   background?: string;
+  captions?: CaptionDocument;
 }): VideoProjectAst {
   return normalizeVideoProject({
     schemaVersion: 1,
@@ -762,6 +788,7 @@ export function createVideoProjectAst(options: {
       ...(options.duration !== undefined ? { duration: options.duration } : {}),
       ...(options.background ? { background: options.background } : {})
     },
+    ...(options.captions !== undefined ? { captions: options.captions } : {}),
     tracks: []
   });
 }

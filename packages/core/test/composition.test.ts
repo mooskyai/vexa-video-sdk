@@ -366,3 +366,39 @@ test("project remote font references normalize deterministically and conflict wi
     /remoteFont.weight must be an integer between 1 and 1000/
   );
 });
+
+test("project captions normalize deterministically and contribute to inferred duration", () => {
+  const normalized = normalizeVideoProject({
+    schemaVersion: 1,
+    id: "caption-project",
+    canvas: { width: 320, height: 180, fps: 30 },
+    captions: {
+      schemaVersion: 1,
+      format: "vtt",
+      language: "en",
+      cues: [
+        {
+          id: "second",
+          start: 1,
+          end: 2,
+          text: "Second cue",
+          words: [{ text: "Second", start: 1, end: 1.5 }, { text: "cue", start: 1.5, end: 2 }]
+        },
+        { id: "first", start: 0, end: 1, text: "First cue" }
+      ]
+    },
+    tracks: []
+  });
+
+  assert.deepEqual(normalized.captions?.cues.map((cue) => cue.id), ["first", "second"]);
+  assert.equal(normalized.captions?.cues[1]?.words?.length, 2);
+  assert.equal(projectDurationSeconds(normalized), 2);
+
+  assert.throws(
+    () => normalizeVideoProject({
+      ...normalized,
+      canvas: { ...normalized.canvas, duration: 1.5 }
+    }),
+    /Caption cue "second" ends after the explicit project duration/
+  );
+});

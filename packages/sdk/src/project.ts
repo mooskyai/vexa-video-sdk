@@ -1,4 +1,5 @@
 import type {
+  CaptionDocument,
   HardwareAccelerationCapabilities,
   MediaOutputResult,
   ProbeResult,
@@ -38,6 +39,7 @@ export interface CreateVideoProjectOptions {
   fps?: number;
   duration?: number;
   background?: string;
+  captions?: CaptionDocument;
 }
 
 export interface AddProjectTrackOptions {

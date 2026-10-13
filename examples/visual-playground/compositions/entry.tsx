@@ -97,6 +97,22 @@ function socialSquareScene(
     fps: 1,
     durationInFrames: 1,
     background: props.background,
+    captions: {
+      schemaVersion: 1,
+      format: "vtt",
+      language: "en",
+      cues: [{
+        id: "social-caption",
+        start: 0,
+        end: 1,
+        text: "Composition captions",
+        style: {
+          fontSize: 32,
+          position: "bottom",
+          marginBottom: 64
+        }
+      }]
+    },
     children: [{
       id: "font-readiness-title",
       kind: "text",
@@ -134,6 +150,17 @@ function shapeShowcaseScene(
     fps: metadata.kind === "video" ? metadata.fps : 1,
     durationInFrames,
     background: props.background,
+    captions: {
+      schemaVersion: 1,
+      format: "vtt",
+      cues: [{
+        id: "shape-caption",
+        start: 0,
+        end: 1,
+        text: "Vexa shapes",
+        style: { fontSize: 18, position: "bottom", marginBottom: 12 }
+      }]
+    },
     children: [
       {
         id: "effect-fill",

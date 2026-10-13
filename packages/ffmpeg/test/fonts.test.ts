@@ -199,3 +199,51 @@ test("resolveProjectFontFiles fails closed on unresolved remote font references"
       /must be materialized by a renderer font adapter/u.test(error.message)
   );
 });
+
+test("resolveProjectFontFiles prepares composition caption fonts without mutating input", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "vexa-caption-font-"));
+  const fonts = join(directory, "fonts");
+  const font = join(fonts, "caption.ttf");
+  const project: VideoProjectAst = {
+    schemaVersion: 1,
+    id: "caption-fonts",
+    canvas: { width: 320, height: 180, fps: 30, duration: 1 },
+    captions: {
+      schemaVersion: 1,
+      format: "vtt",
+      cues: [{
+        id: "caption",
+        start: 0,
+        end: 1,
+        text: "Caption",
+        style: { fontFile: join("fonts", "caption.ttf") }
+      }]
+    },
+    tracks: []
+  };
+
+  try {
+    await mkdir(fonts, { recursive: true });
+    await writeFile(font, "font-placeholder");
+    const resolved = await resolveProjectFontFiles(project, { baseDirectory: directory });
+    assert.equal(resolved.captions?.cues[0]?.style?.fontFile, font);
+    assert.equal(
+      project.captions?.cues[0]?.style?.fontFile,
+      join("fonts", "caption.ttf")
+    );
+
+    const defaulted = await resolveProjectFontFiles({
+      ...project,
+      captions: {
+        ...project.captions!,
+        cues: [{ id: "default", start: 0, end: 1, text: "Default" }]
+      }
+    }, {
+      baseDirectory: directory,
+      defaultFontFile: join("fonts", "caption.ttf")
+    });
+    assert.equal(defaulted.captions?.cues[0]?.style?.fontFile, font);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

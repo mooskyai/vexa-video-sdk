@@ -4,4 +4,4 @@ Node.js execution SDK for Vexa Video SDK: video, audio, timeline projects, capti
 
 This package is Node-only and may execute FFmpeg/ffprobe processes.
 
-`VideoProject` prepares text fonts before media probing/render planning: explicit local `fontFile` paths must be readable, relative paths resolve from the current working directory, and text without an explicit font receives Vexa's platform default. Missing fonts fail as `ProjectFontResolutionError` before FFmpeg rendering starts.
+`VideoProject` accepts optional composition-level `CaptionDocument` intent and prepares text/caption fonts before media probing/render planning: explicit local `fontFile` paths must be readable, relative paths resolve from the current working directory, and text or caption cues without an explicit font receive Vexa's platform default. Missing fonts fail as `ProjectFontResolutionError` before FFmpeg rendering starts.

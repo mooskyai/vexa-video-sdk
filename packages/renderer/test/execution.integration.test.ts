@@ -166,6 +166,8 @@ test("bundled executable compositions resolve storage assets and render stills, 
     assert.ok(shapeVideo.executionPlan.optimizations.includes("PROGRAMMABLE_WIPE_TRANSITION_GRAPH"));
     assert.ok(shapeVideo.executionPlan.optimizations.includes("PROGRAMMABLE_ZOOM_TRANSITION_GRAPH"));
     assert.ok(shapeVideo.executionPlan.optimizations.includes("PROGRAMMABLE_IRIS_TRANSITION_GRAPH"));
+    assert.ok(shapeVideo.executionPlan.optimizations.includes("CAPTION_DRAW_TEXT_GRAPH"));
+    assert.match(shapeVideo.executionPlan.filterComplex, /Vexa shapes/u);
     assert.equal(shapeVideo.executionPlan.durationSeconds, 1);
     const shapeMp4 = await readFile(shapeVideoOutput);
     assert.equal(shapeMp4.subarray(4, 8).toString("ascii"), "ftyp");
@@ -180,6 +182,7 @@ test("bundled executable compositions resolve storage assets and render stills, 
     assert.equal(still.metadata.kind, "still");
     assert.equal(still.executionPlan.task, "project-frame-render");
     assert.match(still.executionPlan.filterComplex, /fontfile='/u);
+    assert.match(still.executionPlan.filterComplex, /Composition captions/u);
     assert.deepEqual(stillProgress.map((progress) => progress.phase), ["starting", "complete"]);
     const png = await readFile(stillOutput);
     assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);

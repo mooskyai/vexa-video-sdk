@@ -558,6 +558,48 @@ test("remote font references stay browser-safe, immutable, and lower unchanged",
   );
 });
 
+test("composition captions stay browser-safe, enter the render graph, and lower unchanged", () => {
+  const options = {
+    id: "caption-scene",
+    width: 320,
+    height: 180,
+    fps: 30,
+    durationInFrames: 60,
+    captions: {
+      schemaVersion: 1 as const,
+      format: "vtt" as const,
+      language: "en",
+      cues: [
+        {
+          id: "second",
+          start: 1,
+          end: 2,
+          text: "Second cue",
+          words: [{ text: "Second", start: 1, end: 1.5 }, { text: "cue", start: 1.5, end: 2 }]
+        },
+        { id: "first", start: 0, end: 1, text: "First cue" }
+      ]
+    }
+  };
+
+  const scene = defineProgrammableScene(options);
+  const browserScene = defineBrowserProgrammableScene(options);
+  assert.deepEqual(scene.captions?.cues.map((cue) => cue.id), ["first", "second"]);
+  assert.equal(serializeProgrammableScene(scene), serializeBrowserProgrammableScene(browserScene));
+  assert.deepEqual(createProgrammableSceneRenderGraph(scene).captions, scene.captions);
+
+  const project = lowerProgrammableSceneToVideoProject(scene);
+  assert.deepEqual(project.captions, scene.captions);
+
+  assert.throws(
+    () => defineProgrammableScene({
+      ...options,
+      durationInFrames: 30
+    }),
+    /Caption cue "second" ends after the scene duration/
+  );
+});
+
 test("asset readiness state updates immutably", () => {
   const scene = defineProgrammableScene({
     id: "readiness", width: 10, height: 10, fps: 30, durationInFrames: 10,

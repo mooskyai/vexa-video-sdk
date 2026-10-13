@@ -692,6 +692,7 @@ async function materializeProgrammableSceneShapes(
     fps: scene.fps,
     durationInFrames: scene.durationInFrames,
     ...(scene.background !== undefined ? { background: scene.background } : {}),
+    ...(scene.captions !== undefined ? { captions: scene.captions } : {}),
     assets: Object.freeze([...scene.assets, ...generatedAssets]),
     children: replaceShapeNodes(scene.children, shapeAssetIds)
   });
@@ -789,6 +790,7 @@ async function materializeProgrammableScenePrimitives(
     fps: scene.fps,
     durationInFrames: scene.durationInFrames,
     ...(scene.background !== undefined ? { background: scene.background } : {}),
+    ...(scene.captions !== undefined ? { captions: scene.captions } : {}),
     assets: Object.freeze([...scene.assets, ...generatedAssets]),
     children: replacePrimitiveNodes(scene.children, primitiveAssetIds)
   });

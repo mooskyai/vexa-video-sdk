@@ -20,6 +20,7 @@ import {
   numericPropertyValue,
   projectDurationSeconds
 } from "@vexa-video/core";
+import { compileCaptionFilterGraph } from "./captions.js";
 import {
   assertAudioCodecCompatible,
   assertVideoCodecCompatible,
@@ -1441,7 +1442,14 @@ export function createProjectExecutionPlan(
   const inputArgs = buildInputArgs(project, indexed, inputs);
   const visual = compileVisualGraph(project, indexed);
   const audio = compileAudioGraph(project, indexed, probeMap);
-  const filterComplex = [...visual.filters, ...audio.filters].join(";");
+  const captions = project.captions?.cues.length
+    ? compileCaptionFilterGraph(project.captions)
+    : null;
+  const videoOutputLabel = captions ? "captionout" : visual.outputLabel;
+  const captionFilters = captions
+    ? [`[${visual.outputLabel}]${captions.expression}[${videoOutputLabel}]`]
+    : [];
+  const filterComplex = [...visual.filters, ...captionFilters, ...audio.filters].join(";");
   const container = detectOutputContainer(output);
   if ((options.videoCodec as string | undefined) === "copy") {
     throw new InvalidProjectError('Project composition cannot use videoCodec "copy" because timeline rendering requires a composed video stream.');
@@ -1470,7 +1478,7 @@ export function createProjectExecutionPlan(
   const args: string[] = [];
   args.push(options.overwrite === false ? "-n" : "-y");
   args.push(...inputArgs);
-  args.push("-filter_complex", filterComplex, "-map", `[${visual.outputLabel}]`);
+  args.push("-filter_complex", filterComplex, "-map", `[${videoOutputLabel}]`);
   if (audio.outputLabel && audioCodec !== "none") args.push("-map", `[${audio.outputLabel}]`);
   appendVideoEncoderOptions(args, hardware, {
     ...(options.crf !== undefined ? { crf: options.crf } : {}),
@@ -1493,6 +1501,7 @@ export function createProjectExecutionPlan(
     ...visual.optimizations,
     ...hardwareOptimizationMarkers(hardware)
   ];
+  if (captions) optimizations.push(...captions.optimizations);
   if (audio.outputLabel && audioCodec !== "none") optimizations.push("AUDIO_MIX_GRAPH");
   if (project.tracks.some((track) =>
     track.clips.some((clip) =>
@@ -1532,7 +1541,7 @@ export function createProjectExecutionPlan(
     durationSeconds: duration,
     inputs,
     filterComplex,
-    videoMap: visual.outputLabel,
+    videoMap: videoOutputLabel,
     audioMap: audio.outputLabel,
     args,
     optimizations: [...new Set(optimizations)],

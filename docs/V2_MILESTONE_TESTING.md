@@ -576,6 +576,10 @@ Cover explicit absolute and relative local fonts, execution-root resolution, def
 
 Cover browser-safe normalization/serialization of provider, family, optional weight, and normal/italic style; local/remote mutual exclusion; scene-to-project preservation; and direct FFmpeg/readiness rejection while the reference is unresolved. Bundle-render integration must exercise a provider adapter returning a real absolute local font path and verify the resulting FFmpeg graph contains `fontfile`. Missing providers, duplicate adapter providers, adapter failures, relative returned paths, unreadable returned files, and cancellation must fail deterministically through the renderer's typed boundaries. Provider/network SDKs must not become dependencies of core, React, or FFmpeg.
 
+### Composition caption foundation tests
+
+Cover deterministic `CaptionDocument` normalization on programmable scenes and `VideoProjectAst`, browser serialization parity, scene render-graph preservation, unchanged scene-to-project lowering, cue-end validation against explicit composition duration, and caption contribution to inferred project duration. Font readiness must resolve relative/absolute caption font files and inject the same controlled local default used by text clips without mutating the caller's project. Project FFmpeg planning must append the existing caption graph after the final composed visual stream, expose `CAPTION_DRAW_TEXT_GRAPH`, retain word-timing/animation optimization markers, and preserve captions through still/frame/range/video execution. Renderer rasterization of shapes/fills/solids must not discard scene captions. Active-word/karaoke visual highlighting is a separate acceptance slice.
+
 ### Visual fixtures
 
 Create Vexa-owned frames for:

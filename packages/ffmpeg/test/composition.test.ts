@@ -72,6 +72,43 @@ test("createProjectExecutionPlan builds one filter_complex for timeline composit
   assert.deepEqual(plan.args.slice(-3), ["-t", "4", "output.mp4"]);
 });
 
+test("project compiler appends composition captions after the composed visual graph", () => {
+  const withCaptions = normalizeVideoProject({
+    ...project,
+    captions: {
+      schemaVersion: 1,
+      format: "vtt",
+      cues: [{
+        id: "caption-1",
+        start: 0.5,
+        end: 2,
+        text: "Composition caption",
+        words: [
+          { text: "Composition", start: 0.5, end: 1.25 },
+          { text: "caption", start: 1.25, end: 2 }
+        ],
+        style: {
+          fontFile: "C:\\Windows\\Fonts\\segoeui.ttf",
+          fontSize: 32,
+          animation: "fade"
+        }
+      }]
+    }
+  });
+
+  const plan = createProjectExecutionPlan(withCaptions, "output.mp4", {}, {
+    "a.mp4": probe("a.mp4"),
+    "b.mp4": probe("b.mp4")
+  });
+
+  assert.equal(plan.videoMap, "captionout");
+  assert.match(plan.filterComplex, /\[vout\]drawtext=/u);
+  assert.match(plan.filterComplex, /Composition caption/u);
+  assert.ok(plan.optimizations.includes("CAPTION_DRAW_TEXT_GRAPH"));
+  assert.ok(plan.optimizations.includes("WORD_LEVEL_TIMING_MODEL"));
+  assert.ok(plan.optimizations.includes("ANIMATED_CAPTION_PRIMITIVES"));
+});
+
 test("project WebM output selects VP9 and Opus", () => {
   const plan = createProjectExecutionPlan(project, "output.webm", {}, {
     "a.mp4": probe("a.mp4"),

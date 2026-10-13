@@ -1,3 +1,4 @@
+import { normalizeCaptionDocument, type CaptionDocument } from "./captions.js";
 import type {
   ClipTransform,
   ProjectTrack,
@@ -7,6 +8,7 @@ import type {
   VideoProjectAst
 } from "./composition.js";
 import type { ResizeFit } from "./editing.js";
+import { InvalidCaptionError } from "./errors.js";
 import type { JsonObject, JsonValue } from "./programmable-composition.js";
 import {
   InvalidProgrammableEffectError,
@@ -267,6 +269,7 @@ export interface ProgrammableScene {
   readonly fps: number;
   readonly durationInFrames: number;
   readonly background?: string;
+  readonly captions?: CaptionDocument;
   readonly assets: readonly ProgrammableSceneAsset[];
   readonly children: readonly ProgrammableSceneNode[];
 }
@@ -279,6 +282,7 @@ export interface DefineProgrammableSceneOptions {
   readonly fps: number;
   readonly durationInFrames: number;
   readonly background?: string;
+  readonly captions?: CaptionDocument;
   readonly assets?: readonly ProgrammableSceneAsset[];
   readonly children?: readonly ProgrammableSceneNode[];
   readonly assetPolicy?: ProgrammableSceneAssetPolicy;
@@ -303,6 +307,7 @@ export interface ProgrammableSceneRenderGraph {
   readonly fps: number;
   readonly durationInFrames: number;
   readonly background?: string;
+  readonly captions?: CaptionDocument;
   readonly assets: readonly ProgrammableSceneAsset[];
   readonly items: readonly ProgrammableSceneRenderItem[];
 }
@@ -948,6 +953,27 @@ export function defineProgrammableScene(options: DefineProgrammableSceneOptions)
   assertPositiveInteger(options.durationInFrames, `scene ${id}.durationInFrames`);
   if (options.background !== undefined) assertNonEmpty(options.background, `scene ${id}.background`);
 
+  let captions: CaptionDocument | undefined;
+  if (options.captions !== undefined) {
+    try {
+      captions = normalizeCaptionDocument(options.captions);
+    } catch (error) {
+      if (error instanceof InvalidCaptionError) {
+        throw new InvalidProgrammableSceneError(
+          `scene ${id}.captions is invalid: ${error.message}`
+        );
+      }
+      throw error;
+    }
+    const durationSeconds = frameToSeconds(options.durationInFrames, options.fps);
+    const overflow = captions.cues.find((cue) => cue.end > durationSeconds + 1e-6);
+    if (overflow) {
+      throw new InvalidProgrammableSceneError(
+        `Caption cue "${overflow.id}" ends after the scene duration of ${durationSeconds}s.`
+      );
+    }
+  }
+
   const policy = normalizePolicy(options.assetPolicy);
   const assets = (options.assets ?? []).map((asset) => normalizeAsset(asset, policy));
   assets.sort((left, right) => compareStableText(left.id, right.id));
@@ -975,6 +1001,7 @@ export function defineProgrammableScene(options: DefineProgrammableSceneOptions)
     fps: options.fps,
     durationInFrames: options.durationInFrames,
     ...(options.background !== undefined ? { background: options.background } : {}),
+    ...(captions !== undefined ? { captions } : {}),
     assets: Object.freeze(assets),
     children: Object.freeze(children)
   });
@@ -989,6 +1016,7 @@ export function normalizeProgrammableScene(scene: ProgrammableScene): Programmab
     fps: scene.fps,
     durationInFrames: scene.durationInFrames,
     ...(scene.background !== undefined ? { background: scene.background } : {}),
+    ...(scene.captions !== undefined ? { captions: scene.captions } : {}),
     assets: scene.assets,
     children: scene.children
   });
@@ -1058,6 +1086,7 @@ export function createProgrammableSceneRenderGraph(scene: ProgrammableScene): Pr
     fps: normalized.fps,
     durationInFrames: normalized.durationInFrames,
     ...(normalized.background !== undefined ? { background: normalized.background } : {}),
+    ...(normalized.captions !== undefined ? { captions: normalized.captions } : {}),
     assets: normalized.assets,
     items: Object.freeze(items)
   });
@@ -1385,6 +1414,7 @@ export function lowerProgrammableSceneToVideoProject(
       duration: frameToSeconds(normalized.durationInFrames, normalized.fps),
       ...(background !== undefined ? { background } : {})
     }),
+    ...(normalized.captions !== undefined ? { captions: normalized.captions } : {}),
     tracks: Object.freeze(tracks)
   });
 }

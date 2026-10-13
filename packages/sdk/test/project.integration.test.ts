@@ -122,6 +122,23 @@ test("VideoProject rejects unreadable explicit text fonts before render planning
   }
 });
 
+test("VideoProject.create preserves composition captions", () => {
+  const project = VideoProject.create({
+    id: "captions",
+    width: 320,
+    height: 180,
+    fps: 30,
+    captions: {
+      schemaVersion: 1,
+      format: "vtt",
+      cues: [{ id: "c1", start: 0, end: 2, text: "Composition caption" }]
+    }
+  });
+
+  assert.equal(project.durationSeconds, 2);
+  assert.equal(project.ast.captions?.cues[0]?.text, "Composition caption");
+});
+
 test("VideoProject renders image and standalone audio tracks", async () => {
   const workspace = await mkdtemp(join(tmpdir(), "vexa-project-assets-"));
   const image = join(workspace, "card.png");

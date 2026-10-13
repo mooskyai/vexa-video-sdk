@@ -101,7 +101,8 @@ export async function resolveDefaultFontFile(
 }
 
 /**
- * Resolve every enabled/renderable text clip to an absolute readable local font.
+ * Resolve every enabled/renderable text clip and composition caption cue to
+ * an absolute readable local font.
  *
  * This is deliberately Node-side: browser-safe authoring keeps fontFile as
  * serializable intent, while SDK/renderer execution waits for filesystem
@@ -228,5 +229,39 @@ export async function resolveProjectFontFiles(
     }
   }
 
-  return projectChanged ? { ...project, tracks } : project;
+  let captions = project.captions;
+  if (captions !== undefined) {
+    let captionsChanged = false;
+    const cues: NonNullable<VideoProjectAst["captions"]>["cues"][number][] = [];
+    for (const cue of captions.cues) {
+      const itemId = `caption:${cue.id}`;
+      const fontFile = cue.style?.fontFile
+        ? await resolveClipFont(itemId, cue.style.fontFile, "font file")
+        : await defaultForClip(itemId);
+      if (cue.style?.fontFile === fontFile) {
+        cues.push(cue);
+        continue;
+      }
+      captionsChanged = true;
+      cues.push({
+        ...cue,
+        style: {
+          ...cue.style,
+          fontFile
+        }
+      });
+    }
+    if (captionsChanged) {
+      projectChanged = true;
+      captions = { ...captions, cues };
+    }
+  }
+
+  return projectChanged
+    ? {
+        ...project,
+        tracks,
+        ...(captions !== undefined ? { captions } : {})
+      }
+    : project;
 }
