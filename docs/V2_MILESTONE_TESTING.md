@@ -613,6 +613,10 @@ The renderer must wait for declared fonts before a frame is considered ready.
 
 ## V2.10 — Extended programmable media
 
+### Surface renderer adapter foundation tests
+
+Cover renderer-id normalization, duplicate adapters, missing adapters, adapter exceptions, empty/malformed SVG output, cancellation, translation-only transform enforcement, and managed-workspace cleanup after success or failure. A real bundled surface fixture must render an inactive frame, an active frame, and a video range while preserving the authored start/duration plus effects/transitions after surface-to-image substitution. Verify generated surface PNGs are deleted after render completion. Audit `@vexa-video/core` and the normal `@vexa-video/sdk` dependency graphs so renderer/integration dependencies do not leak into those packages.
+
 Each optional integration must have:
 
 - an isolated package/dependency boundary;

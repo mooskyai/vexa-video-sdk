@@ -669,6 +669,10 @@ Captions:
 
 ## V2.10 — Extended programmable media
 
+**Status:** In progress.
+
+The first implementation slice establishes the optional Node surface-renderer boundary already anticipated by the browser-safe `surface` scene contract. `VexaRenderExecutionOptions.surfaceAdapters` accepts renderer-id keyed adapters only for bundle rendering; core and the normal SDK gain no dependency on renderer integrations. A static adapter receives normalized composition/node timing plus serializable surface data and returns SVG text. The renderer owns SVG-to-PNG rasterization inside its managed workspace, substitutes the surface with the existing image/project path, preserves timing, opacity, z-order, translation, effects, and transitions, and removes generated files on success or failure. Missing or duplicate adapters, adapter exceptions, malformed/empty SVG results, cancellation, and unsupported non-translation transforms fail through typed renderer errors. Animated media outputs remain later V2.10 slices rather than being approximated as static frames.
+
 ### Goal
 
 Cover common programmable-video inputs without bloating core packages.

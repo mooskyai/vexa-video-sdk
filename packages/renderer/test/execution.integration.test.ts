@@ -12,7 +12,8 @@ import {
   VexaCompositionRenderer,
   VexaRendererError,
   createCompositionRenderer,
-  type VexaRenderProgress
+  type VexaRenderProgress,
+  type VexaSurfaceRendererAdapter
 } from "../src/index.js";
 import type { VexaBundleManifest } from "@vexa-video/bundler";
 
@@ -41,6 +42,19 @@ async function createBundledRenderer(tempRoot: string): Promise<VexaCompositionR
   return await VexaCompositionRenderer.fromManifest(bundle.manifestPath, {
     timeoutMs: 30_000
   });
+}
+
+async function createSurfaceBundledRenderer(tempRoot: string): Promise<VexaCompositionRenderer> {
+  const repoRoot = resolve(fileURLToPath(new URL("../../../", import.meta.url)));
+  const fixtureRoot = join(repoRoot, "packages/renderer/test/fixtures/surface");
+  const bundle = await bundleCompositions({
+    rootDir: fixtureRoot,
+    entry: "entry.ts",
+    outDir: join(tempRoot, "surface-bundle"),
+    mode: "development",
+    sourceMap: "none"
+  });
+  return await VexaCompositionRenderer.fromManifest(bundle.manifestPath, { timeoutMs: 30_000 });
 }
 
 test("manifest-object renderers stay planning-only until a bundle location is known", async () => {
@@ -439,6 +453,231 @@ test("bundled executable compositions resolve storage assets and render stills, 
     assert.equal(mp4.subarray(4, 8).toString("ascii"), "ftyp");
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("surface renderer adapters materialize static SVG intent with timing and cleanup", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "vexa-surface-adapter-"));
+  const workspaceRoot = join(tempRoot, "workspaces");
+  const inactiveOutput = join(tempRoot, "surface-inactive.png");
+  const activeOutput = join(tempRoot, "surface-active.png");
+  const videoOutput = join(tempRoot, "surface.mp4");
+
+  try {
+    await mkdir(workspaceRoot, { recursive: true });
+    const renderer = await createSurfaceBundledRenderer(tempRoot);
+    const storage = new Storage({ workspaceRoot });
+    const calls: Array<{
+      readonly compositionId: string;
+      readonly nodeId: string;
+      readonly absoluteStartFrame: number;
+      readonly durationInFrames: number;
+      readonly fps: number;
+    }> = [];
+    const adapter: VexaSurfaceRendererAdapter = {
+      rendererId: "fixture.surface",
+      renderSurface(surface, context) {
+        assert.equal(surface.kind, "svg");
+        assert.equal(surface.data?.label, "Surface adapter");
+        assert.equal(surface.data?.fill, "#22c55e");
+        calls.push({
+          compositionId: context.compositionId,
+          nodeId: context.nodeId,
+          absoluteStartFrame: context.absoluteStartFrame,
+          durationInFrames: context.durationInFrames,
+          fps: context.fps
+        });
+        return {
+          kind: "svg",
+          svg: [
+            `<svg xmlns="http://www.w3.org/2000/svg" width="${context.width}" height="${context.height}" viewBox="0 0 ${context.width} ${context.height}">`,
+            '<rect x="20" y="20" width="120" height="50" rx="8" fill="#22c55e" />',
+            "</svg>"
+          ].join("")
+        };
+      }
+    };
+
+    await assert.rejects(
+      () => renderer.renderFrame({
+        compositionId: "surface-showcase",
+        frame: 6,
+        output: join(tempRoot, "surface-missing-adapter.png"),
+        storage
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError && error.code === "RENDER_SURFACE_UNAVAILABLE"
+    );
+
+    await assert.rejects(
+      () => renderer.renderFrame({
+        compositionId: "surface-showcase",
+        frame: 6,
+        output: join(tempRoot, "surface-duplicate-adapter.png"),
+        storage,
+        surfaceAdapters: [adapter, adapter]
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError && error.code === "INVALID_RENDERER_OPTIONS"
+    );
+
+    await assert.rejects(
+      () => renderer.renderFrame({
+        compositionId: "surface-showcase",
+        frame: 6,
+        output: join(tempRoot, "surface-adapter-failure.png"),
+        storage,
+        surfaceAdapters: [{
+          rendererId: "fixture.surface",
+          renderSurface() { throw new Error("fixture adapter failed"); }
+        }]
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError &&
+        error.code === "RENDER_SURFACE_FAILED" &&
+        /fixture adapter failed/u.test(error.message)
+    );
+
+    await assert.rejects(
+      () => renderer.renderFrame({
+        compositionId: "surface-showcase",
+        frame: 6,
+        output: join(tempRoot, "surface-empty-svg.png"),
+        storage,
+        surfaceAdapters: [{
+          rendererId: "fixture.surface",
+          renderSurface: () => ({ kind: "svg", svg: "   " })
+        }]
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError && error.code === "RENDER_SURFACE_FAILED"
+    );
+
+    await assert.rejects(
+      () => renderer.renderFrame({
+        compositionId: "surface-showcase",
+        frame: 6,
+        output: join(tempRoot, "surface-invalid-svg.png"),
+        storage,
+        surfaceAdapters: [{
+          rendererId: "fixture.surface",
+          renderSurface: () => ({ kind: "svg", svg: "not-svg" })
+        }]
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError && error.code === "RENDER_SURFACE_FAILED"
+    );
+
+    await assert.rejects(
+      () => renderer.renderFrame({
+        compositionId: "surface-showcase",
+        frame: 6,
+        output: join(tempRoot, "surface-unsupported-transform.png"),
+        storage,
+        inputProps: { unsupportedRotation: true },
+        surfaceAdapters: [adapter]
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError && error.code === "RENDER_SURFACE_UNSUPPORTED"
+    );
+
+    const aborted = new AbortController();
+    aborted.abort();
+    await assert.rejects(
+      () => renderer.renderFrame({
+        compositionId: "surface-showcase",
+        frame: 6,
+        output: join(tempRoot, "surface-aborted.png"),
+        storage,
+        signal: aborted.signal,
+        surfaceAdapters: [adapter]
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError && error.code === "RENDER_ABORTED"
+    );
+
+    const inactive = await renderer.renderFrame({
+      compositionId: "surface-showcase",
+      frame: 2,
+      output: inactiveOutput,
+      storage,
+      surfaceAdapters: [adapter]
+    });
+    const active = await renderer.renderFrame({
+      compositionId: "surface-showcase",
+      frame: 6,
+      output: activeOutput,
+      storage,
+      surfaceAdapters: [adapter]
+    });
+    assert.notEqual(Buffer.compare(await readFile(inactiveOutput), await readFile(activeOutput)), 0);
+    assert.match(active.executionPlan.filterComplex, /a='alpha\(X,Y\)\*/u);
+    const activeSurfaceInput = active.executionPlan.inputs.find(
+      (input) => input.kind === "image" && /[\\/]surfaces[\\/]/u.test(input.source)
+    );
+    if (!activeSurfaceInput) throw new Error("expected a renderer-owned surface image input");
+    await assert.rejects(
+      () => readFile(activeSurfaceInput.source),
+      (error: unknown) =>
+        error instanceof Error &&
+        "code" in error &&
+        (error as NodeJS.ErrnoException).code === "ENOENT"
+    );
+
+    const video = await renderer.renderVideo({
+      compositionId: "surface-showcase",
+      startFrame: 0,
+      endFrameExclusive: 12,
+      output: videoOutput,
+      storage,
+      surfaceAdapters: [adapter],
+      hardwareAcceleration: "cpu"
+    });
+    assert.equal(video.executionPlan.durationSeconds, 1.2);
+    assert.ok(video.executionPlan.optimizations.includes("PROGRAMMABLE_TRANSITION_GRAPH"));
+    const videoSurfaceInput = video.executionPlan.inputs.find(
+      (input) => input.kind === "image" && /[\\/]surfaces[\\/]/u.test(input.source)
+    );
+    if (!videoSurfaceInput) throw new Error("expected a renderer-owned surface video input");
+    const mp4 = await readFile(videoOutput);
+    assert.equal(mp4.subarray(4, 8).toString("ascii"), "ftyp");
+    await assert.rejects(
+      () => readFile(videoSurfaceInput.source),
+      (error: unknown) =>
+        error instanceof Error &&
+        "code" in error &&
+        (error as NodeJS.ErrnoException).code === "ENOENT"
+    );
+
+    assert.equal(calls.length, 3);
+    for (const call of calls) {
+      assert.equal(call.compositionId, "surface-showcase");
+      assert.equal(call.nodeId, "surface-card");
+      assert.equal(call.absoluteStartFrame, 4);
+      assert.equal(call.durationInFrames, 8);
+      assert.equal(call.fps, 10);
+    }
+    assert.deepEqual(await readdir(workspaceRoot), []);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("surface adapter execution stays outside core and normal SDK dependencies", async () => {
+  const repoRoot = resolve(fileURLToPath(new URL("../../../", import.meta.url)));
+  for (const packagePath of ["packages/core/package.json", "packages/sdk/package.json"]) {
+    const manifest = JSON.parse(await readFile(join(repoRoot, packagePath), "utf8")) as {
+      readonly dependencies?: Readonly<Record<string, string>>;
+      readonly optionalDependencies?: Readonly<Record<string, string>>;
+      readonly peerDependencies?: Readonly<Record<string, string>>;
+    };
+    const dependencies = {
+      ...(manifest.dependencies ?? {}),
+      ...(manifest.optionalDependencies ?? {}),
+      ...(manifest.peerDependencies ?? {})
+    };
+    assert.equal(dependencies["@vexa-video/renderer"], undefined);
+    assert.equal(dependencies["@resvg/resvg-js"], undefined);
   }
 });
 
