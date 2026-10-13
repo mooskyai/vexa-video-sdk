@@ -1,6 +1,7 @@
 import type {
   CaptionDocument,
   CaptionFormat,
+  CaptionSpeakerStyle,
   CaptionStyle,
   CaptionTemplateName,
   ProjectRenderOptions,
@@ -58,6 +59,7 @@ export interface AutomaticCaptionOptions extends AiControlOptions {
   format?: CaptionFormat;
   template?: CaptionTemplateName;
   style?: CaptionStyle;
+  speakerStyles?: Readonly<Record<string, CaptionSpeakerStyle>>;
 }
 
 export interface SceneBoundary {

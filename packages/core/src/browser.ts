@@ -10,6 +10,7 @@ export type {
   CaptionDocument,
   CaptionFormat,
   CaptionPosition,
+  CaptionSpeakerStyle,
   CaptionStyle,
   CaptionTemplateName,
   CaptionWordMode,

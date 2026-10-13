@@ -71,6 +71,58 @@ test("active-word caption mode requires deterministic non-overlapping word timin
   );
 });
 
+test("speaker metadata and visual overrides normalize deterministically", () => {
+  const doc = normalizeCaptionDocument({
+    schemaVersion: 1,
+    format: "vtt",
+    speakerStyles: {
+      " Guest ": { color: "#f97316", position: "top" },
+      Host: { color: "#38bdf8", activeWordColor: "#0ea5e9", fontSize: 44 }
+    },
+    cues: [{ id: "speaker", start: 0, end: 1, text: "Hello", speaker: " Host " }]
+  });
+  assert.equal(doc.cues[0]?.speaker, "Host");
+  assert.deepEqual(Object.keys(doc.speakerStyles ?? {}), ["Guest", "Host"]);
+  assert.equal(doc.speakerStyles?.Host?.color, "#38bdf8");
+
+  assert.throws(
+    () => normalizeCaptionDocument({
+      schemaVersion: 1,
+      format: "vtt",
+      speakerStyles: { " Host ": { color: "red" }, Host: { color: "blue" } },
+      cues: [{ id: "speaker", start: 0, end: 1, text: "Hello", speaker: "Host" }]
+    }),
+    /Duplicate caption speaker style: Host/
+  );
+  assert.throws(
+    () => normalizeCaptionDocument({
+      schemaVersion: 1,
+      format: "vtt",
+      cues: [{ id: "speaker", start: 0, end: 1, text: "Hello", speaker: "   " }]
+    }),
+    /speaker cannot be empty/
+  );
+
+  assert.throws(
+    () => normalizeCaptionDocument({
+      schemaVersion: 1,
+      format: "vtt",
+      speakerStyles: { Host: { fontFile: "speaker.ttf" } as never },
+      cues: [{ id: "speaker", start: 0, end: 1, text: "Hello", speaker: "Host" }]
+    }),
+    /cannot override fontFile/
+  );
+  assert.throws(
+    () => normalizeCaptionDocument({
+      schemaVersion: 1,
+      format: "vtt",
+      speakerStyles: { Host: { wordMode: "active-word" } as never },
+      cues: [{ id: "speaker", start: 0, end: 1, text: "Hello", speaker: "Host" }]
+    }),
+    /cannot override wordMode/
+  );
+});
+
 test("caption templates and word timings are validated", () => {
   const doc = normalizeCaptionDocument({ schemaVersion: 1, format: "srt", cues: [{ id: "c1", start: 0, end: 2, text: "hello world", words: [{ text: "hello", start: 0, end: 0.8 }, { text: "world", start: 0.8, end: 2 }] }] });
   const styled = applyCaptionTemplate(doc, "subtitle");

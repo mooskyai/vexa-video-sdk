@@ -584,6 +584,10 @@ Cover deterministic `CaptionDocument` normalization on programmable scenes and `
 
 Cover browser-safe `wordMode: "active-word"` normalization, optional `activeWordColor`, required word timings, deterministic sort order, and rejection of overlapping active-word intervals. FFmpeg compilation must emit one drawtext primitive per word interval, preserve the cue's font/size/outline/background/position and animation semantics, use the deterministic active-word color fallback when no override is supplied, omit the whole sentence from active-word rendering, and expose `ACTIVE_WORD_CAPTION_GRAPH` plus `WORD_LEVEL_TIMING_MODEL`. The real bundled shape-showcase render must exercise active-word captions after renderer-owned rasterization and succeed through frame/range/video planning. Do not accept approximate inline word placement based on character counts or guessed glyph widths.
 
+### Speaker-aware caption tests
+
+Cover trimmed `CaptionCue.speaker` identity, deterministic/sorted `speakerStyles`, duplicate normalized speaker ids, browser serialization parity, scene/project preservation, and rejection of speaker overrides for `fontFile` or `wordMode`. FFmpeg compilation must apply a matching speaker style after cue/template visual defaults, preserve cue-owned font/timing semantics, support speaker-specific `activeWordColor`, and expose `SPEAKER_AWARE_CAPTION_GRAPH` only when a mapped speaker is actually used. Automatic AI caption generation must preserve normalized transcription `segment.speaker` values and caller-provided speaker styles. Real renderer integration must exercise the same speaker-aware active-word fixture after shape/primitive rasterization.
+
 ### Visual fixtures
 
 Create Vexa-owned frames for:
@@ -594,7 +598,8 @@ Create Vexa-owned frames for:
 - local font;
 - missing font;
 - caption sentence mode;
-- active-word mode.
+- active-word mode;
+- speaker-aware caption style.
 
 ### Snapshot strategy
 

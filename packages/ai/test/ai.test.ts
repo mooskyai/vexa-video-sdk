@@ -16,6 +16,7 @@ const transcriber: TranscriptionAdapter = {
         start: 0.25,
         end: 1.75,
         text: "Hello world",
+        speaker: "Host",
         words: [
           { text: "Hello", start: 0.25, end: 0.8, confidence: 0.99 },
           { text: "world", start: 0.85, end: 1.75, confidence: 0.98 }
@@ -29,7 +30,8 @@ test("transcription adapters generate normalized styled captions", async () => {
   const ai = new VexaAI({ transcription: transcriber });
   const result = await ai.captions("input.mp4", {
     template: "headline",
-    style: { color: "yellow" }
+    style: { color: "yellow" },
+    speakerStyles: { Host: { color: "#38bdf8", activeWordColor: "#0ea5e9" } }
   });
   assert.equal(result.transcription.language, "en");
   assert.equal(result.captions.cues.length, 1);
@@ -37,6 +39,8 @@ test("transcription adapters generate normalized styled captions", async () => {
   assert.equal(result.captions.cues[0]?.words?.length, 2);
   assert.equal(result.captions.cues[0]?.style?.position, "center");
   assert.equal(result.captions.cues[0]?.style?.color, "yellow");
+  assert.equal(result.captions.cues[0]?.speaker, "Host");
+  assert.equal(result.captions.speakerStyles?.Host?.color, "#38bdf8");
 });
 
 test("transcription validation rejects word timings outside their segment", async () => {

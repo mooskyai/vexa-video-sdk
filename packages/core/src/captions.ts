@@ -27,11 +27,14 @@ export interface CaptionStyle {
   activeWordColor?: string;
 }
 
+export type CaptionSpeakerStyle = Omit<CaptionStyle, "fontFile" | "wordMode">;
+
 export interface CaptionCue {
   id: string;
   start: number;
   end: number;
   text: string;
+  speaker?: string;
   words?: readonly CaptionWordTiming[];
   style?: CaptionStyle;
 }
@@ -40,6 +43,7 @@ export interface CaptionDocument {
   schemaVersion: 1;
   format: CaptionFormat;
   language?: string;
+  speakerStyles?: Readonly<Record<string, CaptionSpeakerStyle>>;
   cues: readonly CaptionCue[];
 }
 
@@ -97,12 +101,56 @@ function formatTimestamp(seconds: number, separator = ","): string {
   return `${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:${String(secs).padStart(2,"0")}${separator}${String(millis).padStart(3,"0")}`;
 }
 
+
+function validateCaptionStyle(style: CaptionStyle | undefined, label: string): void {
+  if (style?.fontSize !== undefined && (!Number.isFinite(style.fontSize) || style.fontSize <= 0)) {
+    throw new InvalidCaptionError(`${label} fontSize must be greater than 0.`);
+  }
+  if (style?.outlineWidth !== undefined && (!Number.isFinite(style.outlineWidth) || style.outlineWidth < 0)) {
+    throw new InvalidCaptionError(`${label} outlineWidth must be non-negative.`);
+  }
+  if (style?.wordMode !== undefined && style.wordMode !== "sentence" && style.wordMode !== "active-word") {
+    throw new InvalidCaptionError(`${label} wordMode is not supported.`);
+  }
+  if (style?.activeWordColor !== undefined && !style.activeWordColor.trim()) {
+    throw new InvalidCaptionError(`${label} activeWordColor cannot be empty.`);
+  }
+}
+
+function normalizeSpeakerStyles(
+  styles: CaptionDocument["speakerStyles"]
+): CaptionDocument["speakerStyles"] | undefined {
+  if (!styles) return undefined;
+  const entries: Array<[string, CaptionSpeakerStyle]> = [];
+  const speakers = new Set<string>();
+  for (const [rawSpeaker, speakerStyle] of Object.entries(styles).sort(([a],[b]) => a.trim().localeCompare(b.trim()))) {
+    const speaker = rawSpeaker.trim();
+    if (!speaker) throw new InvalidCaptionError("Caption speaker style keys cannot be empty.");
+    if (speakers.has(speaker)) throw new InvalidCaptionError(`Duplicate caption speaker style: ${speaker}.`);
+    speakers.add(speaker);
+    const unsafe = speakerStyle as CaptionStyle;
+    if (unsafe.fontFile !== undefined) {
+      throw new InvalidCaptionError(`Caption speaker style "${speaker}" cannot override fontFile.`);
+    }
+    if (unsafe.wordMode !== undefined) {
+      throw new InvalidCaptionError(`Caption speaker style "${speaker}" cannot override wordMode.`);
+    }
+    validateCaptionStyle(unsafe, `Caption speaker style "${speaker}"`);
+    entries.push([speaker, { ...speakerStyle }]);
+  }
+  return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
 function normalizeCue(cue: CaptionCue, index: number): CaptionCue {
   if (!cue.id.trim()) throw new InvalidCaptionError(`Caption cue ${index + 1} requires a non-empty id.`);
   finiteNonNegative(cue.start, `caption ${cue.id}.start`);
   finiteNonNegative(cue.end, `caption ${cue.id}.end`);
   if (cue.end <= cue.start) throw new InvalidCaptionError(`Caption cue "${cue.id}" must end after it starts.`);
   if (!cue.text.trim()) throw new InvalidCaptionError(`Caption cue "${cue.id}" requires text.`);
+  const speaker = cue.speaker?.trim();
+  if (cue.speaker !== undefined && !speaker) {
+    throw new InvalidCaptionError(`Caption cue "${cue.id}" speaker cannot be empty.`);
+  }
   const words = cue.words?.map((word, wordIndex) => {
     if (!word.text.trim()) throw new InvalidCaptionError(`Caption cue "${cue.id}" word ${wordIndex + 1} requires text.`);
     finiteNonNegative(word.start, `caption ${cue.id}.words[${wordIndex}].start`);
@@ -115,14 +163,7 @@ function normalizeCue(cue: CaptionCue, index: number): CaptionCue {
   });
   if (words) words.sort((a,b)=>a.start-b.start);
   const style = cue.style ? { ...cue.style } : undefined;
-  if (style?.fontSize !== undefined && (!Number.isFinite(style.fontSize) || style.fontSize <= 0)) throw new InvalidCaptionError(`Caption cue "${cue.id}" fontSize must be greater than 0.`);
-  if (style?.outlineWidth !== undefined && (!Number.isFinite(style.outlineWidth) || style.outlineWidth < 0)) throw new InvalidCaptionError(`Caption cue "${cue.id}" outlineWidth must be non-negative.`);
-  if (style?.wordMode !== undefined && style.wordMode !== "sentence" && style.wordMode !== "active-word") {
-    throw new InvalidCaptionError(`Caption cue "${cue.id}" wordMode is not supported.`);
-  }
-  if (style?.activeWordColor !== undefined && !style.activeWordColor.trim()) {
-    throw new InvalidCaptionError(`Caption cue "${cue.id}" activeWordColor cannot be empty.`);
-  }
+  validateCaptionStyle(style, `Caption cue "${cue.id}"`);
   if (style?.wordMode === "active-word") {
     if (!words?.length) {
       throw new InvalidCaptionError(`Caption cue "${cue.id}" active-word mode requires word timings.`);
@@ -135,11 +176,18 @@ function normalizeCue(cue: CaptionCue, index: number): CaptionCue {
       }
     }
   }
-  return { ...cue, text: cue.text.trim(), ...(words ? { words } : {}), ...(style ? { style } : {}) };
+  return {
+    ...cue,
+    text: cue.text.trim(),
+    ...(speaker ? { speaker } : {}),
+    ...(words ? { words } : {}),
+    ...(style ? { style } : {})
+  };
 }
 
 export function normalizeCaptionDocument(document: CaptionDocument): CaptionDocument {
   if (document.schemaVersion !== 1) throw new InvalidCaptionError(`Unsupported caption schema version: ${String(document.schemaVersion)}.`);
+  const speakerStyles = normalizeSpeakerStyles(document.speakerStyles);
   const ids = new Set<string>();
   const cues = document.cues.map((cue,index)=>{
     const normalized = normalizeCue(cue,index);
@@ -147,7 +195,13 @@ export function normalizeCaptionDocument(document: CaptionDocument): CaptionDocu
     ids.add(normalized.id);
     return normalized;
   }).sort((a,b)=>a.start-b.start || a.end-b.end || a.id.localeCompare(b.id));
-  return { schemaVersion: 1, format: document.format, ...(document.language ? { language: document.language } : {}), cues };
+  return {
+    schemaVersion: 1,
+    format: document.format,
+    ...(document.language ? { language: document.language } : {}),
+    ...(speakerStyles ? { speakerStyles } : {}),
+    cues
+  };
 }
 
 export function captionTemplate(name: CaptionTemplateName, overrides: CaptionStyle = {}): CaptionStyle {

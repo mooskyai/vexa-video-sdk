@@ -34,7 +34,7 @@ Vexa keeps those concerns behind a typed SDK:
 | Planning | Serializable ASTs, deterministic execution plans, validation, stream-copy optimization |
 | Timeline | Video/audio/image/text tracks, transforms, keyframes, transitions, blend modes, track ordering |
 | Audio | Loudness normalization, fades, channel mapping, ducking, silence detection, waveforms |
-| Captions | SRT, WebVTT, ASS, styling, templates, word timings, sentence and active-word burn-in |
+| Captions | SRT, WebVTT, ASS, styling, templates, word timings, sentence/active-word burn-in, speaker metadata and deterministic speaker style overrides |
 | Streaming | HLS, MPEG-DASH, rendition ladders, segments, manifests, preview sprites |
 | Hardware | CPU, NVIDIA NVENC, Intel Quick Sync, AMD AMF, Apple VideoToolbox |
 | Storage | Local files, safe HTTPS, managed workspaces, S3/GCS/Azure adapter hooks |
@@ -48,7 +48,7 @@ Vexa keeps those concerns behind a typed SDK:
 | Programmable authoring | Deterministic composition metadata, frame/time math, scene graphs, serializable shape/effect/transition/typography contracts, visual scene nodes, and React authoring primitives |
 | Browser player | Framework-neutral playback state, seek/step/loop/rate/buffering, responsive host, events, and fullscreen |
 | Composition bundling | TypeScript/TSX browser bundles, CSS/assets, deterministic manifests/discovery, source maps, and environment allowlists |
-| Composition rendering | Bundle-backed still/frame/range/video rendering with progress, cancellation, hardware selection, managed storage assets, renderer-owned shape plus fill/solid SVG-to-PNG rasterization, ordered programmable effects, easing-aware programmable fade/slide/wipe/zoom/circular-iris transitions, paired programmable push transitions, deterministic text stroke/shadow/alignment/line-spacing, readable local-font readiness, opt-in provider-keyed remote-font adapters, composition-level caption cue rendering, and precise active-word timing before FFmpeg planning |
+| Composition rendering | Bundle-backed still/frame/range/video rendering with progress, cancellation, hardware selection, managed storage assets, renderer-owned shape plus fill/solid SVG-to-PNG rasterization, ordered programmable effects, easing-aware programmable fade/slide/wipe/zoom/circular-iris transitions, paired programmable push transitions, deterministic text stroke/shadow/alignment/line-spacing, readable local-font readiness, opt-in provider-keyed remote-font adapters, composition-level caption cue rendering, precise active-word timing, and speaker-aware caption styling before FFmpeg planning |
 | Studio runtime | Browser-safe composition session state that coordinates Player preview, Editor timeline state, draft props, resolved metadata, and hot-reload frame preservation |
 | Creative playground UI | Unified Vexa Editor and Vexa Studio dark creative-tool shell with media search/filtering, scene navigation, timeline visualization, inspector tooling, and responsive layouts |
 | Studio development host | Recursive composition-source watching, SSE hot reload, dirty-props/frame preservation, diagnostics overlay, and browser-driven render success/failure acceptance including Windows paths with spaces |

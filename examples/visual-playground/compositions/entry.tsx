@@ -153,11 +153,15 @@ function shapeShowcaseScene(
     captions: {
       schemaVersion: 1,
       format: "vtt",
+      speakerStyles: {
+        narrator: { color: "#e2e8f0", activeWordColor: "#38bdf8" }
+      },
       cues: [{
         id: "shape-caption",
         start: 0,
         end: 1,
         text: "Vexa shapes",
+        speaker: "narrator",
         words: [
           { text: "Vexa", start: 0, end: 0.5 },
           { text: "shapes", start: 0.5, end: 1 }
@@ -166,8 +170,7 @@ function shapeShowcaseScene(
           fontSize: 18,
           position: "bottom",
           marginBottom: 12,
-          wordMode: "active-word",
-          activeWordColor: "#facc15"
+          wordMode: "active-word"
         }
       }]
     },

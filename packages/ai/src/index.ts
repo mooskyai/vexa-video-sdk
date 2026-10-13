@@ -40,12 +40,14 @@ function captionsFromTranscription(result: TranscriptionResult, options: Automat
     start: segment.start,
     end: segment.end,
     text: segment.text,
+    ...(segment.speaker ? { speaker: segment.speaker } : {}),
     ...(segment.words?.length ? { words: segment.words.map((word) => ({ text: word.text, start: word.start, end: word.end })) } : {})
   }));
   const base: CaptionDocument = {
     schemaVersion: 1,
     format: options.format ?? "srt",
     ...(result.language ? { language: result.language } : {}),
+    ...(options.speakerStyles ? { speakerStyles: options.speakerStyles } : {}),
     cues
   };
   return Captions.applyTemplate(base, options.template ?? "subtitle", options.style ?? {});

@@ -26,18 +26,22 @@ type ResolvedCaptionStyle =
   Required<Pick<CaptionStyle,"fontSize"|"color"|"outlineColor"|"outlineWidth"|"position"|"marginBottom"|"animation"|"wordMode"|"activeWordColor">> &
   CaptionStyle;
 
-function styleForCue(style: CaptionStyle | undefined): ResolvedCaptionStyle {
+function styleForCue(
+  style: CaptionStyle | undefined,
+  speakerStyle: NonNullable<CaptionDocument["speakerStyles"]>[string] | undefined
+): ResolvedCaptionStyle {
+  const resolved = speakerStyle ? { ...(style ?? {}), ...speakerStyle } : style;
   return {
-    fontSize: style?.fontSize ?? 42,
-    color: style?.color ?? "white",
-    outlineColor: style?.outlineColor ?? "black",
-    outlineWidth: style?.outlineWidth ?? 2,
-    position: style?.position ?? "bottom",
-    marginBottom: style?.marginBottom ?? 48,
-    animation: style?.animation ?? "none",
-    ...style,
-    wordMode: style?.wordMode ?? "sentence",
-    activeWordColor: style?.activeWordColor ?? "#facc15"
+    fontSize: resolved?.fontSize ?? 42,
+    color: resolved?.color ?? "white",
+    outlineColor: resolved?.outlineColor ?? "black",
+    outlineWidth: resolved?.outlineWidth ?? 2,
+    position: resolved?.position ?? "bottom",
+    marginBottom: resolved?.marginBottom ?? 48,
+    animation: resolved?.animation ?? "none",
+    ...resolved,
+    wordMode: resolved?.wordMode ?? "sentence",
+    activeWordColor: resolved?.activeWordColor ?? "#facc15"
   };
 }
 
@@ -103,10 +107,17 @@ export function compileCaptionFilterGraph(document: CaptionDocument, defaultFont
   const optimizations = ["CAPTION_DRAW_TEXT_GRAPH"];
   if (normalized.cues.some(cue => cue.words?.length)) optimizations.push("WORD_LEVEL_TIMING_MODEL");
   if (normalized.cues.some(cue => cue.style?.wordMode === "active-word")) optimizations.push("ACTIVE_WORD_CAPTION_GRAPH");
-  if (normalized.cues.some(cue => (cue.style?.animation ?? "none") !== "none")) optimizations.push("ANIMATED_CAPTION_PRIMITIVES");
+  if (normalized.cues.some(cue => cue.speaker && normalized.speakerStyles?.[cue.speaker])) {
+    optimizations.push("SPEAKER_AWARE_CAPTION_GRAPH");
+  }
+  if (normalized.cues.some((cue) => {
+    const speakerStyle = cue.speaker ? normalized.speakerStyles?.[cue.speaker] : undefined;
+    return (speakerStyle?.animation ?? cue.style?.animation ?? "none") !== "none";
+  })) optimizations.push("ANIMATED_CAPTION_PRIMITIVES");
 
   for (const cue of normalized.cues) {
-    const style = styleForCue(cue.style);
+    const speakerStyle = cue.speaker ? normalized.speakerStyles?.[cue.speaker] : undefined;
+    const style = styleForCue(cue.style, speakerStyle);
     const fontFile = style.fontFile ?? defaultFontFile;
     if (!fontFile) {
       throw new InvalidCaptionError(

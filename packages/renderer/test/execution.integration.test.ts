@@ -169,9 +169,10 @@ test("bundled executable compositions resolve storage assets and render stills, 
     assert.ok(shapeVideo.executionPlan.optimizations.includes("CAPTION_DRAW_TEXT_GRAPH"));
     assert.ok(shapeVideo.executionPlan.optimizations.includes("WORD_LEVEL_TIMING_MODEL"));
     assert.ok(shapeVideo.executionPlan.optimizations.includes("ACTIVE_WORD_CAPTION_GRAPH"));
+    assert.ok(shapeVideo.executionPlan.optimizations.includes("SPEAKER_AWARE_CAPTION_GRAPH"));
     assert.match(shapeVideo.executionPlan.filterComplex, /drawtext=text='Vexa'/u);
     assert.match(shapeVideo.executionPlan.filterComplex, /drawtext=text='shapes'/u);
-    assert.match(shapeVideo.executionPlan.filterComplex, /fontcolor=#facc15/u);
+    assert.match(shapeVideo.executionPlan.filterComplex, /fontcolor=#38bdf8/u);
     assert.doesNotMatch(shapeVideo.executionPlan.filterComplex, /Vexa shapes/u);
     assert.equal(shapeVideo.executionPlan.durationSeconds, 1);
     const shapeMp4 = await readFile(shapeVideoOutput);

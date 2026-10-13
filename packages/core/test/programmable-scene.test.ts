@@ -569,12 +569,16 @@ test("composition captions stay browser-safe, enter the render graph, and lower 
       schemaVersion: 1 as const,
       format: "vtt" as const,
       language: "en",
+      speakerStyles: {
+        narrator: { color: "#38bdf8", activeWordColor: "#0ea5e9" }
+      },
       cues: [
         {
           id: "second",
           start: 1,
           end: 2,
           text: "Second cue",
+          speaker: "narrator",
           words: [{ text: "Second", start: 1, end: 1.5 }, { text: "cue", start: 1.5, end: 2 }],
           style: { wordMode: "active-word" as const, activeWordColor: "#facc15" }
         },
@@ -587,6 +591,8 @@ test("composition captions stay browser-safe, enter the render graph, and lower 
   const browserScene = defineBrowserProgrammableScene(options);
   assert.deepEqual(scene.captions?.cues.map((cue) => cue.id), ["first", "second"]);
   assert.equal(scene.captions?.cues[1]?.style?.wordMode, "active-word");
+  assert.equal(scene.captions?.cues[1]?.speaker, "narrator");
+  assert.equal(scene.captions?.speakerStyles?.narrator?.activeWordColor, "#0ea5e9");
   assert.equal(serializeProgrammableScene(scene), serializeBrowserProgrammableScene(browserScene));
   assert.deepEqual(createProgrammableSceneRenderGraph(scene).captions, scene.captions);
 
