@@ -575,7 +575,8 @@ test("composition captions stay browser-safe, enter the render graph, and lower 
           start: 1,
           end: 2,
           text: "Second cue",
-          words: [{ text: "Second", start: 1, end: 1.5 }, { text: "cue", start: 1.5, end: 2 }]
+          words: [{ text: "Second", start: 1, end: 1.5 }, { text: "cue", start: 1.5, end: 2 }],
+          style: { wordMode: "active-word" as const, activeWordColor: "#facc15" }
         },
         { id: "first", start: 0, end: 1, text: "First cue" }
       ]
@@ -585,6 +586,7 @@ test("composition captions stay browser-safe, enter the render graph, and lower 
   const scene = defineProgrammableScene(options);
   const browserScene = defineBrowserProgrammableScene(options);
   assert.deepEqual(scene.captions?.cues.map((cue) => cue.id), ["first", "second"]);
+  assert.equal(scene.captions?.cues[1]?.style?.wordMode, "active-word");
   assert.equal(serializeProgrammableScene(scene), serializeBrowserProgrammableScene(browserScene));
   assert.deepEqual(createProgrammableSceneRenderGraph(scene).captions, scene.captions);
 

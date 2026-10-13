@@ -12,6 +12,7 @@ export type {
   CaptionPosition,
   CaptionStyle,
   CaptionTemplateName,
+  CaptionWordMode,
   CaptionWordTiming
 } from "./captions.js";
 export type {

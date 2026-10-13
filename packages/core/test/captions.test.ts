@@ -17,6 +17,60 @@ test("ASS parsing extracts dialogue text", () => {
   assert.match(serializeCaptions(ass, "ass"), /Dialogue:/u);
 });
 
+test("active-word caption mode requires deterministic non-overlapping word timings", () => {
+  const active = normalizeCaptionDocument({
+    schemaVersion: 1,
+    format: "vtt",
+    cues: [{
+      id: "active",
+      start: 0,
+      end: 1,
+      text: "Hello Vexa",
+      words: [
+        { text: "Hello", start: 0, end: 0.4 },
+        { text: "Vexa", start: 0.4, end: 1 }
+      ],
+      style: { wordMode: "active-word", activeWordColor: "#facc15" }
+    }]
+  });
+  assert.equal(active.cues[0]?.style?.wordMode, "active-word");
+  assert.equal(active.cues[0]?.style?.activeWordColor, "#facc15");
+
+  assert.throws(
+    () => normalizeCaptionDocument({
+      schemaVersion: 1,
+      format: "vtt",
+      cues: [{
+        id: "missing-words",
+        start: 0,
+        end: 1,
+        text: "Missing words",
+        style: { wordMode: "active-word" }
+      }]
+    }),
+    /active-word mode requires word timings/
+  );
+
+  assert.throws(
+    () => normalizeCaptionDocument({
+      schemaVersion: 1,
+      format: "vtt",
+      cues: [{
+        id: "overlap",
+        start: 0,
+        end: 1,
+        text: "Overlapping words",
+        words: [
+          { text: "Overlapping", start: 0, end: 0.7 },
+          { text: "words", start: 0.6, end: 1 }
+        ],
+        style: { wordMode: "active-word" }
+      }]
+    }),
+    /active-word timings cannot overlap/
+  );
+});
+
 test("caption templates and word timings are validated", () => {
   const doc = normalizeCaptionDocument({ schemaVersion: 1, format: "srt", cues: [{ id: "c1", start: 0, end: 2, text: "hello world", words: [{ text: "hello", start: 0, end: 0.8 }, { text: "world", start: 0.8, end: 2 }] }] });
   const styled = applyCaptionTemplate(doc, "subtitle");

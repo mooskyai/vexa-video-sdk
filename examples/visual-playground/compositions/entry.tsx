@@ -158,7 +158,17 @@ function shapeShowcaseScene(
         start: 0,
         end: 1,
         text: "Vexa shapes",
-        style: { fontSize: 18, position: "bottom", marginBottom: 12 }
+        words: [
+          { text: "Vexa", start: 0, end: 0.5 },
+          { text: "shapes", start: 0.5, end: 1 }
+        ],
+        style: {
+          fontSize: 18,
+          position: "bottom",
+          marginBottom: 12,
+          wordMode: "active-word",
+          activeWordColor: "#facc15"
+        }
       }]
     },
     children: [

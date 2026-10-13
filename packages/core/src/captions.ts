@@ -3,6 +3,7 @@ import { InvalidCaptionError } from "./errors.js";
 export type CaptionFormat = "srt" | "vtt" | "ass";
 export type CaptionAnimation = "none" | "fade" | "pop";
 export type CaptionPosition = "top" | "center" | "bottom";
+export type CaptionWordMode = "sentence" | "active-word";
 
 export interface CaptionWordTiming {
   text: string;
@@ -22,6 +23,8 @@ export interface CaptionStyle {
   position?: CaptionPosition;
   marginBottom?: number;
   animation?: CaptionAnimation;
+  wordMode?: CaptionWordMode;
+  activeWordColor?: string;
 }
 
 export interface CaptionCue {
@@ -114,6 +117,24 @@ function normalizeCue(cue: CaptionCue, index: number): CaptionCue {
   const style = cue.style ? { ...cue.style } : undefined;
   if (style?.fontSize !== undefined && (!Number.isFinite(style.fontSize) || style.fontSize <= 0)) throw new InvalidCaptionError(`Caption cue "${cue.id}" fontSize must be greater than 0.`);
   if (style?.outlineWidth !== undefined && (!Number.isFinite(style.outlineWidth) || style.outlineWidth < 0)) throw new InvalidCaptionError(`Caption cue "${cue.id}" outlineWidth must be non-negative.`);
+  if (style?.wordMode !== undefined && style.wordMode !== "sentence" && style.wordMode !== "active-word") {
+    throw new InvalidCaptionError(`Caption cue "${cue.id}" wordMode is not supported.`);
+  }
+  if (style?.activeWordColor !== undefined && !style.activeWordColor.trim()) {
+    throw new InvalidCaptionError(`Caption cue "${cue.id}" activeWordColor cannot be empty.`);
+  }
+  if (style?.wordMode === "active-word") {
+    if (!words?.length) {
+      throw new InvalidCaptionError(`Caption cue "${cue.id}" active-word mode requires word timings.`);
+    }
+    for (let wordIndex = 1; wordIndex < words.length; wordIndex += 1) {
+      const previous = words[wordIndex - 1]!;
+      const current = words[wordIndex]!;
+      if (current.start < previous.end - 1e-6) {
+        throw new InvalidCaptionError(`Caption cue "${cue.id}" active-word timings cannot overlap.`);
+      }
+    }
+  }
   return { ...cue, text: cue.text.trim(), ...(words ? { words } : {}), ...(style ? { style } : {}) };
 }
 

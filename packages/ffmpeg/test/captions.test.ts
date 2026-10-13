@@ -25,6 +25,35 @@ test("caption compiler emits explicit-font drawtext and animation markers", () =
   assert.ok(graph.optimizations.includes("ANIMATED_CAPTION_PRIMITIVES"));
 });
 
+test("active-word caption mode emits one precisely timed highlighted drawtext per word", () => {
+  const active: CaptionDocument = {
+    schemaVersion: 1,
+    format: "vtt",
+    cues: [{
+      id: "active",
+      start: 0,
+      end: 1,
+      text: "Hello Vexa",
+      words: [
+        { text: "Hello", start: 0, end: 0.4 },
+        { text: "Vexa", start: 0.4, end: 1 }
+      ],
+      style: {
+        fontSize: 40,
+        wordMode: "active-word",
+        activeWordColor: "#facc15"
+      }
+    }]
+  };
+  const graph = compileCaptionFilterGraph(active, "/tmp/font.ttf");
+  assert.equal(graph.filters.length, 2);
+  assert.match(graph.expression, /drawtext=text='Hello'.*fontcolor=#facc15.*between\(t,0,0\.4\)/u);
+  assert.match(graph.expression, /drawtext=text='Vexa'.*fontcolor=#facc15.*between\(t,0\.4,1\)/u);
+  assert.doesNotMatch(graph.expression, /Hello Vexa/u);
+  assert.ok(graph.optimizations.includes("WORD_LEVEL_TIMING_MODEL"));
+  assert.ok(graph.optimizations.includes("ACTIVE_WORD_CAPTION_GRAPH"));
+});
+
 test("caption execution plan forces video encode and preserves audio planning", () => {
   const plan = createCaptionExecutionPlan("input.mp4",[],document,"output.mp4",{},probe,"/tmp/font.ttf");
   assert.equal(plan.video?.mode,"encode");

@@ -22,7 +22,11 @@ function escapeFilterPath(value: string): string {
   return escapeDrawtext(value.replaceAll("\\", "/"));
 }
 
-function styleForCue(style: CaptionStyle | undefined): Required<Pick<CaptionStyle,"fontSize"|"color"|"outlineColor"|"outlineWidth"|"position"|"marginBottom"|"animation">> & CaptionStyle {
+type ResolvedCaptionStyle =
+  Required<Pick<CaptionStyle,"fontSize"|"color"|"outlineColor"|"outlineWidth"|"position"|"marginBottom"|"animation"|"wordMode"|"activeWordColor">> &
+  CaptionStyle;
+
+function styleForCue(style: CaptionStyle | undefined): ResolvedCaptionStyle {
   return {
     fontSize: style?.fontSize ?? 42,
     color: style?.color ?? "white",
@@ -31,11 +35,13 @@ function styleForCue(style: CaptionStyle | undefined): Required<Pick<CaptionStyl
     position: style?.position ?? "bottom",
     marginBottom: style?.marginBottom ?? 48,
     animation: style?.animation ?? "none",
-    ...style
+    ...style,
+    wordMode: style?.wordMode ?? "sentence",
+    activeWordColor: style?.activeWordColor ?? "#facc15"
   };
 }
 
-function positionExpressions(style: ReturnType<typeof styleForCue>): {x:string;y:string} {
+function positionExpressions(style: ResolvedCaptionStyle): {x:string;y:string} {
   const x = "(w-text_w)/2";
   if (style.position === "top") return { x, y: formatNumber(style.marginBottom) };
   if (style.position === "center") return { x, y: "(h-text_h)/2" };
@@ -54,6 +60,36 @@ function alphaExpression(start: number, end: number, animation: CaptionStyle["an
   return null;
 }
 
+function drawtextFilter(
+  text: string,
+  start: number,
+  end: number,
+  style: ResolvedCaptionStyle,
+  fontFile: string,
+  color: string
+): string {
+  const position = positionExpressions(style);
+  const parts = [
+    `drawtext=text='${escapeDrawtext(text.replace(/\n/gu," "))}'`,
+    `fontfile='${escapeFilterPath(fontFile)}'`,
+    `fontsize=${formatNumber(style.fontSize)}`,
+    `fontcolor=${escapeDrawtext(color)}`,
+    `x='${position.x}'`,
+    `y='${position.y}'`,
+    `enable='between(t,${formatNumber(start)},${formatNumber(end)})'`
+  ];
+  if (style.bold) parts.push("borderw=1");
+  if (style.outlineWidth > 0) {
+    parts.push(`borderw=${formatNumber(style.outlineWidth)}`, `bordercolor=${escapeDrawtext(style.outlineColor)}`);
+  }
+  if (style.backgroundColor) {
+    parts.push("box=1", `boxcolor=${escapeDrawtext(style.backgroundColor)}`, "boxborderw=12");
+  }
+  const alpha = alphaExpression(start,end,style.animation);
+  if (alpha) parts.push(`alpha='${alpha}'`);
+  return parts.join(":");
+}
+
 export interface CompiledCaptionGraph {
   filters: readonly string[];
   expression: string;
@@ -66,6 +102,7 @@ export function compileCaptionFilterGraph(document: CaptionDocument, defaultFont
   const filters: string[] = [];
   const optimizations = ["CAPTION_DRAW_TEXT_GRAPH"];
   if (normalized.cues.some(cue => cue.words?.length)) optimizations.push("WORD_LEVEL_TIMING_MODEL");
+  if (normalized.cues.some(cue => cue.style?.wordMode === "active-word")) optimizations.push("ACTIVE_WORD_CAPTION_GRAPH");
   if (normalized.cues.some(cue => (cue.style?.animation ?? "none") !== "none")) optimizations.push("ANIMATED_CAPTION_PRIMITIVES");
 
   for (const cue of normalized.cues) {
@@ -76,26 +113,23 @@ export function compileCaptionFilterGraph(document: CaptionDocument, defaultFont
         `Caption cue "${cue.id}" requires an explicit readable font file on this platform. Set style.fontFile or VEXA_VIDEO_FONT_FILE.`
       );
     }
-    const position = positionExpressions(style);
-    const parts = [
-      `drawtext=text='${escapeDrawtext(cue.text.replace(/\n/gu," "))}'`,
-      `fontfile='${escapeFilterPath(fontFile)}'`,
-      `fontsize=${formatNumber(style.fontSize)}`,
-      `fontcolor=${escapeDrawtext(style.color)}`,
-      `x='${position.x}'`,
-      `y='${position.y}'`,
-      `enable='between(t,${formatNumber(cue.start)},${formatNumber(cue.end)})'`
-    ];
-    if (style.bold) parts.push("borderw=1");
-    if (style.outlineWidth > 0) {
-      parts.push(`borderw=${formatNumber(style.outlineWidth)}`, `bordercolor=${escapeDrawtext(style.outlineColor)}`);
+    if (style.wordMode === "active-word") {
+      if (!cue.words?.length) {
+        throw new InvalidCaptionError(`Caption cue "${cue.id}" active-word mode requires word timings.`);
+      }
+      for (const word of cue.words) {
+        filters.push(drawtextFilter(
+          word.text,
+          word.start,
+          word.end,
+          style,
+          fontFile,
+          style.activeWordColor
+        ));
+      }
+    } else {
+      filters.push(drawtextFilter(cue.text, cue.start, cue.end, style, fontFile, style.color));
     }
-    if (style.backgroundColor) {
-      parts.push("box=1", `boxcolor=${escapeDrawtext(style.backgroundColor)}`, "boxborderw=12");
-    }
-    const alpha = alphaExpression(cue.start,cue.end,style.animation);
-    if (alpha) parts.push(`alpha='${alpha}'`);
-    filters.push(parts.join(":"));
   }
   return { filters, expression: filters.join(","), optimizations };
 }

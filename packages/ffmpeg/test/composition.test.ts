@@ -90,7 +90,9 @@ test("project compiler appends composition captions after the composed visual gr
         style: {
           fontFile: "C:\\Windows\\Fonts\\segoeui.ttf",
           fontSize: 32,
-          animation: "fade"
+          animation: "fade",
+          wordMode: "active-word",
+          activeWordColor: "#facc15"
         }
       }]
     }
@@ -103,9 +105,12 @@ test("project compiler appends composition captions after the composed visual gr
 
   assert.equal(plan.videoMap, "captionout");
   assert.match(plan.filterComplex, /\[vout\]drawtext=/u);
-  assert.match(plan.filterComplex, /Composition caption/u);
+  assert.match(plan.filterComplex, /drawtext=text='Composition'/u);
+  assert.match(plan.filterComplex, /drawtext=text='caption'/u);
+  assert.doesNotMatch(plan.filterComplex, /Composition caption/u);
   assert.ok(plan.optimizations.includes("CAPTION_DRAW_TEXT_GRAPH"));
   assert.ok(plan.optimizations.includes("WORD_LEVEL_TIMING_MODEL"));
+  assert.ok(plan.optimizations.includes("ACTIVE_WORD_CAPTION_GRAPH"));
   assert.ok(plan.optimizations.includes("ANIMATED_CAPTION_PRIMITIVES"));
 });
 
