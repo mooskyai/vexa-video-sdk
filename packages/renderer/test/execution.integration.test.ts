@@ -178,9 +178,24 @@ test("bundled executable compositions resolve storage assets and render stills, 
     });
     assert.equal(still.metadata.kind, "still");
     assert.equal(still.executionPlan.task, "project-frame-render");
+    assert.match(still.executionPlan.filterComplex, /fontfile='/u);
     assert.deepEqual(stillProgress.map((progress) => progress.phase), ["starting", "complete"]);
     const png = await readFile(stillOutput);
     assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+
+    await assert.rejects(
+      () => renderer.renderStill({
+        compositionId: "social-square",
+        output: join(tempRoot, "social-square-missing-font.png"),
+        inputProps: {
+          background: "#14213d",
+          fontFile: join(tempRoot, "missing-font.ttf")
+        }
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError &&
+        error.code === "RENDER_FONT_UNAVAILABLE"
+    );
 
     const frame = await renderer.renderFrame({
       compositionId: "product-demo",

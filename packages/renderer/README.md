@@ -47,6 +47,8 @@ Execution controls reuse the existing Vexa process and hardware contracts: video
 
 Storage-backed scene assets are resolved through `@vexa-video/sdk` `Storage` before project lowering. The same Vexa-managed workspace holds renderer-owned shape and primitive PNGs, so storage downloads and generated raster assets stay alive for the complete render and are removed together on success or failure. Caller-provided `resolvedAssets` remain an explicit override for already-materialized storage paths and cannot collide with generated renderer asset ids. Storage acquisition failures surface as `RENDER_ASSET_RESOLUTION_FAILED`.
 
+Before any still/frame/range/video FFmpeg plan is created, the renderer prepares every enabled text font through `resolveProjectFontFiles()`. Explicit relative `fontFile` paths are resolved from the persisted bundle directory, explicit absolute paths are checked as-is, and text without a font receives Vexa's controlled platform default. Missing or unreadable fonts fail deterministically as `RENDER_FONT_UNAVAILABLE` instead of relying on FFmpeg/fontconfig fallback.
+
 Inject a configured `Storage` when a scene uses custom object providers or a custom workspace root:
 
 ```ts

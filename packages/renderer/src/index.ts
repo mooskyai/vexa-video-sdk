@@ -34,14 +34,17 @@ import {
   type ProgrammableShape,
   type ProgrammableShapeStyle,
   type ResolvedProgrammableCompositionMetadata,
-  type StorageResolveOptions
+  type StorageResolveOptions,
+  type VideoProjectAst
 } from "@vexa-video/core";
 import {
   FfmpegProgressParser,
+  ProjectFontResolutionError,
   createProjectFrameExecutionPlan,
   createProjectRangeExecutionPlan,
   detectHardwareAcceleration,
   resolveMediaBinaries,
+  resolveProjectFontFiles,
   runProcess,
   type ProjectFrameExecutionPlan,
   type ProjectRangeExecutionPlan
@@ -68,6 +71,7 @@ export type VexaRendererErrorCode =
   | "RENDER_TIMEOUT"
   | "RENDER_HARDWARE_UNAVAILABLE"
   | "RENDER_ASSET_RESOLUTION_FAILED"
+  | "RENDER_FONT_UNAVAILABLE"
   | "RENDER_SHAPE_UNSUPPORTED"
   | "RENDER_PRIMITIVE_UNSUPPORTED"
   | "RENDER_EXECUTION_FAILED";
@@ -1211,7 +1215,10 @@ export class VexaCompositionRenderer {
         options,
         plan.timeoutMs,
         async (renderScene, resolvedAssets) => {
-          const project = lowerProgrammableSceneToVideoProject(renderScene, { resolvedAssets });
+          const project = await this.#prepareProjectFonts(
+            lowerProgrammableSceneToVideoProject(renderScene, { resolvedAssets }),
+            composition.id
+          );
           const outputDirectory = resolve(plan.output);
           await mkdir(outputDirectory, { recursive: true });
           const binaries = await resolveMediaBinaries({
@@ -1306,7 +1313,10 @@ export class VexaCompositionRenderer {
         options,
         plan.timeoutMs,
         async (renderScene, resolvedAssets) => {
-          const project = lowerProgrammableSceneToVideoProject(renderScene, { resolvedAssets });
+          const project = await this.#prepareProjectFonts(
+            lowerProgrammableSceneToVideoProject(renderScene, { resolvedAssets }),
+            composition.id
+          );
 
           await mkdir(dirname(resolve(plan.output)), { recursive: true });
           const binaries = await resolveMediaBinaries({
@@ -1432,7 +1442,10 @@ export class VexaCompositionRenderer {
         options,
         plan.timeoutMs,
         async (renderScene, resolvedAssets) => {
-          const project = lowerProgrammableSceneToVideoProject(renderScene, { resolvedAssets });
+          const project = await this.#prepareProjectFonts(
+            lowerProgrammableSceneToVideoProject(renderScene, { resolvedAssets }),
+            composition.id
+          );
           const executionPlan = createProjectFrameExecutionPlan(project, plan.output, frame, {
             ...(options.overwrite !== undefined ? { overwrite: options.overwrite } : {})
           });
@@ -1460,6 +1473,26 @@ export class VexaCompositionRenderer {
       );
     } catch (cause) {
       throwRendererExecutionError(target, composition.id, cause);
+    }
+  }
+
+  async #prepareProjectFonts(
+    project: VideoProjectAst,
+    compositionId: string
+  ): Promise<VideoProjectAst> {
+    try {
+      return await resolveProjectFontFiles(project, {
+        ...(this.#bundleRoot ? { baseDirectory: this.#bundleRoot } : {})
+      });
+    } catch (cause) {
+      if (cause instanceof ProjectFontResolutionError) {
+        throw new VexaRendererError(
+          `Font readiness failed for composition "${compositionId}": ${cause.message}`,
+          "RENDER_FONT_UNAVAILABLE",
+          { compositionId, cause }
+        );
+      }
+      throw cause;
     }
   }
 

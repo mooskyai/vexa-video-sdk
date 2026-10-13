@@ -608,6 +608,8 @@ The fifteenth implementation slice completes the declared programmable transitio
 
 The sixteenth implementation slice starts typography execution by extending the shared text-style contract with deterministic stroke, shadow, horizontal alignment, and line-spacing intent. Scene normalization validates and freezes those values, representable text lowers them unchanged into `VideoProjectAst`, and both direct and isolated FFmpeg drawtext paths compile the same styling. Explicit `textAlign` treats authored `transform.x` as the selected left/center/right anchor while preserving the historical x-position behavior when alignment is omitted. Existing local `fontFile` handling remains compatible; managed font readiness and optional remote font adapters stay separate follow-up work rather than being mixed into the styling contract.
 
+The seventeenth implementation slice makes local-font readiness deterministic at the Node execution boundary. `@vexa-video/ffmpeg` now resolves every enabled/renderable text clip to an absolute readable local font before planning: explicit `style.fontFile` paths are checked, relative paths resolve against the caller-provided execution root, text without an explicit font receives the existing Vexa platform default, and absence/unreadability fails with `ProjectFontResolutionError` instead of leaking into FFmpeg. `VideoProject` uses the same preparation path, while the bundle-backed renderer resolves relative fonts from the persisted bundle directory and maps font failures to `RENDER_FONT_UNAVAILABLE`. Hidden tracks and disabled text clips do not block readiness. Optional remote font adapters remain later work.
+
 ### Goal
 
 Provide a Vexa-owned motion-graphics component library.

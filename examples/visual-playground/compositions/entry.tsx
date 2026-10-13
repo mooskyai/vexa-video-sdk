@@ -15,6 +15,10 @@ interface BackgroundProps extends JsonObject {
   readonly background: string;
 }
 
+interface SocialSquareProps extends BackgroundProps {
+  readonly fontFile?: string;
+}
+
 interface ProductDemoProps extends BackgroundProps {
   readonly fps: number;
   readonly storageAssetKey: string;
@@ -50,7 +54,7 @@ const shapeShowcase = defineComposition<ShapeShowcaseProps>({
   }
 });
 
-const socialSquare = defineStill<BackgroundProps>({
+const socialSquare = defineStill<SocialSquareProps>({
   id: "social-square",
   width: 1080,
   height: 1080,
@@ -77,6 +81,31 @@ function sceneFromResolvedMetadata(
     fps: metadata.kind === "video" ? metadata.fps : 1,
     durationInFrames: metadata.kind === "video" ? metadata.durationInFrames : 1,
     background
+  });
+}
+
+function socialSquareScene(
+  metadata: ResolvedProgrammableCompositionMetadata,
+  props: SocialSquareProps
+) {
+  return defineProgrammableScene({
+    id: metadata.id,
+    width: metadata.width,
+    height: metadata.height,
+    fps: 1,
+    durationInFrames: 1,
+    background: props.background,
+    children: [{
+      id: "font-readiness-title",
+      kind: "text",
+      text: "Vexa",
+      transform: { x: metadata.width / 2, y: metadata.height / 2 },
+      style: {
+        fontSize: 72,
+        textAlign: "center",
+        ...(props.fontFile ? { fontFile: props.fontFile } : {})
+      }
+    }]
   });
 }
 
@@ -290,7 +319,7 @@ export const vexaExecutableCompositions = defineExecutableCompositions([
   defineExecutableComposition({
     definition: socialSquare,
     createScene({ metadata, props }) {
-      return sceneFromResolvedMetadata(metadata, props.background);
+      return socialSquareScene(metadata, props);
     }
   }),
   defineExecutableComposition({

@@ -566,7 +566,11 @@ Cover scene-to-project iris preservation, in/out frame-to-second timing, all sha
 
 ### Programmable typography styling tests
 
-Cover text-style normalization for stroke, shadow, horizontal alignment, and integer line spacing; immutable scene values; browser serialization parity; unchanged scene-to-project lowering; and deterministic invalid-value failures. FFmpeg planning must verify left/center/right anchor semantics, border/shadow drawtext options, multiline spacing, Windows font-path preservation, and parity between the direct text path and the isolated text path used by effects/transitions. Font readiness and remote font adapters remain a separate acceptance area.
+Cover text-style normalization for stroke, shadow, horizontal alignment, and integer line spacing; immutable scene values; browser serialization parity; unchanged scene-to-project lowering; and deterministic invalid-value failures. FFmpeg planning must verify left/center/right anchor semantics, border/shadow drawtext options, multiline spacing, Windows font-path preservation, and parity between the direct text path and the isolated text path used by effects/transitions.
+
+### Local-font readiness tests
+
+Cover explicit absolute and relative local fonts, execution-root resolution, default-font injection, immutable project input, hidden/disabled text behavior, missing explicit fonts, missing platform defaults, and invalid `VEXA_VIDEO_FONT_FILE` overrides. `VideoProject` and the bundle-backed composition renderer must use the same resolver before FFmpeg planning; renderer failures must surface as `RENDER_FONT_UNAVAILABLE`. A successfully prepared renderer plan must contain an explicit `fontfile` rather than relying on FFmpeg/fontconfig fallback. Remote font adapters remain a separate acceptance area.
 
 ### Visual fixtures
 
