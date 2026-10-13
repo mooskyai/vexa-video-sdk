@@ -26,6 +26,8 @@ export type {
   ProjectCanvas,
   ProjectTrack,
   ProjectTrackType,
+  RemoteFontReference,
+  RemoteFontStyle,
   TextStyle,
   TextTimelineClip,
   TimelineClip,

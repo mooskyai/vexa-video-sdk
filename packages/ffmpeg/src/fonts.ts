@@ -195,6 +195,13 @@ export async function resolveProjectFontFiles(
         continue;
       }
 
+      if (clip.style?.remoteFont) {
+        throw new ProjectFontResolutionError(
+          clip.id,
+          `remote font "${clip.style.remoteFont.provider}:${clip.style.remoteFont.family}" must be materialized by a renderer font adapter before FFmpeg planning.`
+        );
+      }
+
       const fontFile = clip.style?.fontFile
         ? await resolveClipFont(clip.id, clip.style.fontFile, "font file")
         : await defaultForClip(clip.id);

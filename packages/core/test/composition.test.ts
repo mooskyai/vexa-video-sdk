@@ -291,3 +291,78 @@ test("project text typography normalizes deterministic styling and rejects inval
     /style.shadow offsets must be integers/
   );
 });
+
+
+test("project remote font references normalize deterministically and conflict with local font files", () => {
+  const normalized = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "titles",
+      type: "text",
+      clips: [{
+        id: "remote-title",
+        kind: "text",
+        text: "Remote",
+        start: 0,
+        duration: 1,
+        style: {
+          remoteFont: {
+            provider: " fixture ",
+            family: " Fixture Sans ",
+            weight: 700,
+            style: "italic"
+          }
+        }
+      }]
+    }]
+  });
+  const clip = normalized.tracks[0]?.clips[0];
+  assert.equal(clip?.kind, "text");
+  assert.deepEqual(clip?.kind === "text" ? clip.style?.remoteFont : undefined, {
+    provider: "fixture",
+    family: "Fixture Sans",
+    weight: 700,
+    style: "italic"
+  });
+
+  assert.throws(
+    () => normalizeVideoProject({
+      ...project,
+      tracks: [{
+        id: "titles",
+        type: "text",
+        clips: [{
+          id: "font-conflict",
+          kind: "text",
+          text: "Conflict",
+          start: 0,
+          duration: 1,
+          style: {
+            fontFile: "local.ttf",
+            remoteFont: { provider: "fixture", family: "Fixture Sans" }
+          }
+        }]
+      }]
+    }),
+    /cannot combine fontFile with remoteFont/
+  );
+
+  assert.throws(
+    () => normalizeVideoProject({
+      ...project,
+      tracks: [{
+        id: "titles",
+        type: "text",
+        clips: [{
+          id: "bad-remote-weight",
+          kind: "text",
+          text: "Remote",
+          start: 0,
+          duration: 1,
+          style: { remoteFont: { provider: "fixture", family: "Fixture Sans", weight: 1001 } }
+        }]
+      }]
+    }),
+    /remoteFont.weight must be an integer between 1 and 1000/
+  );
+});

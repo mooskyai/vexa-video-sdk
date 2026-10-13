@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { Script } from "node:vm";
 import test from "node:test";
 import { bundleCompositions } from "@vexa-video/bundler";
+import { resolveDefaultFontFile } from "@vexa-video/ffmpeg";
 import { Storage } from "@vexa-video/sdk";
 import {
   VexaCompositionRenderer,
@@ -182,6 +183,124 @@ test("bundled executable compositions resolve storage assets and render stills, 
     assert.deepEqual(stillProgress.map((progress) => progress.phase), ["starting", "complete"]);
     const png = await readFile(stillOutput);
     assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+
+    const remoteFontFile = await resolveDefaultFontFile();
+    assert.ok(remoteFontFile, "renderer integration requires a readable platform default font");
+    let remoteFontCalls = 0;
+    const remoteFontOutput = join(tempRoot, "social-square-remote-font.png");
+    const remoteStill = await renderer.renderStill({
+      compositionId: "social-square",
+      output: remoteFontOutput,
+      inputProps: {
+        background: "#14213d",
+        remoteFontProvider: "fixture-fonts",
+        remoteFontFamily: "Fixture Sans"
+      },
+      fontAdapters: [{
+        provider: "fixture-fonts",
+        async resolveFont(reference, context) {
+          remoteFontCalls += 1;
+          assert.equal(reference.family, "Fixture Sans");
+          assert.equal(reference.weight, 700);
+          assert.equal(context.compositionId, "social-square");
+          assert.equal(context.clipId, "font-readiness-title");
+          return remoteFontFile;
+        }
+      }]
+    });
+    assert.equal(remoteFontCalls, 1);
+    assert.match(remoteStill.executionPlan.filterComplex, /fontfile='/u);
+    const remotePng = await readFile(remoteFontOutput);
+    assert.deepEqual([...remotePng.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+
+    const remoteProps = {
+      background: "#14213d",
+      remoteFontProvider: "fixture-fonts",
+      remoteFontFamily: "Fixture Sans"
+    };
+
+    await assert.rejects(
+      () => renderer.renderStill({
+        compositionId: "social-square",
+        output: join(tempRoot, "social-square-remote-font-missing-adapter.png"),
+        inputProps: { ...remoteProps, remoteFontProvider: "missing-provider" }
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError &&
+        error.code === "RENDER_FONT_UNAVAILABLE" &&
+        /No remote font adapter is registered/u.test(error.message)
+    );
+
+    await assert.rejects(
+      () => renderer.renderStill({
+        compositionId: "social-square",
+        output: join(tempRoot, "social-square-remote-font-relative.png"),
+        inputProps: remoteProps,
+        fontAdapters: [{ provider: "fixture-fonts", resolveFont: () => "relative-font.ttf" }]
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError &&
+        error.code === "RENDER_FONT_UNAVAILABLE" &&
+        /absolute local font path/u.test(error.message)
+    );
+
+    await assert.rejects(
+      () => renderer.renderStill({
+        compositionId: "social-square",
+        output: join(tempRoot, "social-square-remote-font-unreadable.png"),
+        inputProps: remoteProps,
+        fontAdapters: [{
+          provider: "fixture-fonts",
+          resolveFont: () => join(tempRoot, "missing-remote-font.ttf")
+        }]
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError && error.code === "RENDER_FONT_UNAVAILABLE"
+    );
+
+    await assert.rejects(
+      () => renderer.renderStill({
+        compositionId: "social-square",
+        output: join(tempRoot, "social-square-remote-font-provider-failure.png"),
+        inputProps: remoteProps,
+        fontAdapters: [{
+          provider: "fixture-fonts",
+          resolveFont() { throw new Error("provider unavailable"); }
+        }]
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError &&
+        error.code === "RENDER_FONT_UNAVAILABLE" &&
+        /provider unavailable/u.test(error.message)
+    );
+
+    await assert.rejects(
+      () => renderer.renderStill({
+        compositionId: "social-square",
+        output: join(tempRoot, "social-square-remote-font-duplicate.png"),
+        inputProps: remoteProps,
+        fontAdapters: [
+          { provider: "fixture-fonts", resolveFont: () => remoteFontFile },
+          { provider: "fixture-fonts", resolveFont: () => remoteFontFile }
+        ]
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError && error.code === "INVALID_RENDERER_OPTIONS"
+    );
+
+    const abortedFontRender = new AbortController();
+    abortedFontRender.abort();
+    await assert.rejects(
+      () => renderer.renderStill({
+        compositionId: "social-square",
+        output: join(tempRoot, "social-square-remote-font-aborted.png"),
+        inputProps: remoteProps,
+        signal: abortedFontRender.signal,
+        fontAdapters: [{ provider: "fixture-fonts", resolveFont: () => remoteFontFile }]
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError && error.code === "RENDER_ABORTED"
+    );
 
     await assert.rejects(
       () => renderer.renderStill({

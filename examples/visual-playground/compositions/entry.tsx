@@ -17,6 +17,8 @@ interface BackgroundProps extends JsonObject {
 
 interface SocialSquareProps extends BackgroundProps {
   readonly fontFile?: string;
+  readonly remoteFontProvider?: string;
+  readonly remoteFontFamily?: string;
 }
 
 interface ProductDemoProps extends BackgroundProps {
@@ -103,7 +105,17 @@ function socialSquareScene(
       style: {
         fontSize: 72,
         textAlign: "center",
-        ...(props.fontFile ? { fontFile: props.fontFile } : {})
+        ...(props.remoteFontProvider && props.remoteFontFamily
+          ? {
+              remoteFont: {
+                provider: props.remoteFontProvider,
+                family: props.remoteFontFamily,
+                weight: 700
+              }
+            }
+          : props.fontFile
+            ? { fontFile: props.fontFile }
+            : {})
       }
     }]
   });

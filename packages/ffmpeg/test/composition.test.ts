@@ -170,6 +170,29 @@ test("isolated text typography keeps the same drawtext styling", () => {
   assert.ok(plan.optimizations.includes("TEXT_ISOLATED_EFFECT_GRAPH"));
 });
 
+test("project compiler fails closed on unresolved remote font references", () => {
+  const remote = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "t1",
+      type: "text",
+      clips: [{
+        id: "remote-title",
+        kind: "text",
+        text: "Remote",
+        start: 0,
+        duration: 1,
+        style: { remoteFont: { provider: "fixture", family: "Fixture Sans" } }
+      }]
+    }]
+  });
+
+  assert.throws(
+    () => createProjectExecutionPlan(remote, "output.mp4"),
+    /must be materialized to style.fontFile before FFmpeg planning/
+  );
+});
+
 
 test("project compiler emits keyframe expressions for animated transforms and volume", () => {
   const animated = normalizeVideoProject({

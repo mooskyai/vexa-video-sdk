@@ -33,6 +33,7 @@ import {
   type ProgrammableSceneTransform,
   type ProgrammableShape,
   type ProgrammableShapeStyle,
+  type RemoteFontReference,
   type ResolvedProgrammableCompositionMetadata,
   type StorageResolveOptions,
   type VideoProjectAst
@@ -136,6 +137,24 @@ export interface VexaRenderProgress {
   readonly media?: MediaProgress;
 }
 
+export interface VexaRemoteFontAdapterContext {
+  readonly compositionId: string;
+  readonly clipId: string;
+  readonly signal?: AbortSignal;
+}
+
+export interface VexaRemoteFontAdapter {
+  readonly provider: string;
+  /**
+   * Resolve/cache a remote font reference and return an absolute local font path.
+   * The adapter owns acquisition/caching and must keep the file readable for the render.
+   */
+  resolveFont(
+    reference: RemoteFontReference,
+    context: VexaRemoteFontAdapterContext
+  ): Promise<string> | string;
+}
+
 export interface VexaRenderExecutionOptions {
   readonly inputProps?: JsonObject;
   readonly resolvedAssets?: Readonly<Record<string, string>>;
@@ -150,6 +169,8 @@ export interface VexaRenderExecutionOptions {
   readonly storage?: Storage;
   /** Per-render storage policy for managed asset acquisition. */
   readonly storageResolveOptions?: StorageResolveOptions;
+  /** Optional provider adapters used to materialize serializable remoteFont references. */
+  readonly fontAdapters?: readonly VexaRemoteFontAdapter[];
 }
 
 export interface VexaStillRenderOptions
@@ -918,6 +939,127 @@ async function withRenderAssetWorkspace<T>(
   }
 }
 
+function normalizeRemoteFontAdapters(
+  adapters: readonly VexaRemoteFontAdapter[] | undefined
+): ReadonlyMap<string, VexaRemoteFontAdapter> {
+  const byProvider = new Map<string, VexaRemoteFontAdapter>();
+  for (const adapter of adapters ?? []) {
+    if (!adapter || typeof adapter.provider !== "string" || !adapter.provider.trim()) {
+      throw new VexaRendererError(
+        "Every remote font adapter requires a non-empty provider.",
+        "INVALID_RENDERER_OPTIONS"
+      );
+    }
+    if (typeof adapter.resolveFont !== "function") {
+      throw new VexaRendererError(
+        `Remote font adapter "${adapter.provider.trim()}" requires resolveFont().`,
+        "INVALID_RENDERER_OPTIONS"
+      );
+    }
+    const provider = adapter.provider.trim();
+    if (byProvider.has(provider)) {
+      throw new VexaRendererError(
+        `Remote font adapter provider "${provider}" is duplicated.`,
+        "INVALID_RENDERER_OPTIONS"
+      );
+    }
+    byProvider.set(provider, adapter);
+  }
+  return byProvider;
+}
+
+async function materializeRemoteProjectFonts(
+  project: VideoProjectAst,
+  compositionId: string,
+  adapters: readonly VexaRemoteFontAdapter[] | undefined,
+  signal?: AbortSignal
+): Promise<VideoProjectAst> {
+  const byProvider = normalizeRemoteFontAdapters(adapters);
+  const resolvedFonts = new Map<string, string>();
+  let projectChanged = false;
+  const tracks: VideoProjectAst["tracks"][number][] = [];
+
+  for (const track of project.tracks) {
+    if (track.hidden === true) {
+      tracks.push(track);
+      continue;
+    }
+
+    let trackChanged = false;
+    const clips: VideoProjectAst["tracks"][number]["clips"][number][] = [];
+    for (const clip of track.clips) {
+      if (clip.kind !== "text" || clip.enabled === false) {
+        clips.push(clip);
+        continue;
+      }
+
+      const reference = clip.style?.remoteFont;
+      if (!reference) {
+        clips.push(clip);
+        continue;
+      }
+      if (signal?.aborted) throw new ProcessAbortedError();
+
+      const adapter = byProvider.get(reference.provider);
+      if (!adapter) {
+        throw new VexaRendererError(
+          `No remote font adapter is registered for provider "${reference.provider}" required by text clip "${clip.id}".`,
+          "RENDER_FONT_UNAVAILABLE",
+          { compositionId }
+        );
+      }
+
+      const cacheKey = [
+        reference.provider,
+        reference.family,
+        reference.weight ?? "",
+        reference.style ?? ""
+      ].join("\u0000");
+      let fontFile = resolvedFonts.get(cacheKey);
+      if (!fontFile) {
+        try {
+          const candidate = await adapter.resolveFont(reference, {
+            compositionId,
+            clipId: clip.id,
+            ...(signal ? { signal } : {})
+          });
+          if (typeof candidate !== "string" || !candidate.trim()) {
+            throw new Error("adapter returned an empty font path");
+          }
+          if (!isAbsolute(candidate.trim())) {
+            throw new Error(`adapter must return an absolute local font path: ${candidate.trim()}`);
+          }
+          fontFile = resolve(candidate.trim());
+          resolvedFonts.set(cacheKey, fontFile);
+        } catch (cause) {
+          if (cause instanceof ProcessAbortedError || signal?.aborted) {
+            throw new ProcessAbortedError();
+          }
+          throw new VexaRendererError(
+            `Remote font adapter "${reference.provider}" failed for text clip "${clip.id}": ${cause instanceof Error ? cause.message : String(cause)}.`,
+            "RENDER_FONT_UNAVAILABLE",
+            { compositionId, cause }
+          );
+        }
+      }
+
+      const style = { ...clip.style, fontFile };
+      delete style.remoteFont;
+      trackChanged = true;
+      clips.push({ ...clip, style });
+    }
+
+    if (trackChanged) {
+      projectChanged = true;
+      tracks.push({ ...track, clips });
+    } else {
+      tracks.push(track);
+    }
+  }
+
+  return projectChanged ? { ...project, tracks } : project;
+}
+
 function emitRenderProgress(
   options: VexaRenderExecutionOptions,
   target: VexaRenderTarget,
@@ -1217,7 +1359,8 @@ export class VexaCompositionRenderer {
         async (renderScene, resolvedAssets) => {
           const project = await this.#prepareProjectFonts(
             lowerProgrammableSceneToVideoProject(renderScene, { resolvedAssets }),
-            composition.id
+            composition.id,
+            options
           );
           const outputDirectory = resolve(plan.output);
           await mkdir(outputDirectory, { recursive: true });
@@ -1315,7 +1458,8 @@ export class VexaCompositionRenderer {
         async (renderScene, resolvedAssets) => {
           const project = await this.#prepareProjectFonts(
             lowerProgrammableSceneToVideoProject(renderScene, { resolvedAssets }),
-            composition.id
+            composition.id,
+            options
           );
 
           await mkdir(dirname(resolve(plan.output)), { recursive: true });
@@ -1444,7 +1588,8 @@ export class VexaCompositionRenderer {
         async (renderScene, resolvedAssets) => {
           const project = await this.#prepareProjectFonts(
             lowerProgrammableSceneToVideoProject(renderScene, { resolvedAssets }),
-            composition.id
+            composition.id,
+            options
           );
           const executionPlan = createProjectFrameExecutionPlan(project, plan.output, frame, {
             ...(options.overwrite !== undefined ? { overwrite: options.overwrite } : {})
@@ -1478,10 +1623,17 @@ export class VexaCompositionRenderer {
 
   async #prepareProjectFonts(
     project: VideoProjectAst,
-    compositionId: string
+    compositionId: string,
+    options: VexaRenderExecutionOptions
   ): Promise<VideoProjectAst> {
     try {
-      return await resolveProjectFontFiles(project, {
+      const remotePrepared = await materializeRemoteProjectFonts(
+        project,
+        compositionId,
+        options.fontAdapters,
+        options.signal
+      );
+      return await resolveProjectFontFiles(remotePrepared, {
         ...(this.#bundleRoot ? { baseDirectory: this.#bundleRoot } : {})
       });
     } catch (cause) {

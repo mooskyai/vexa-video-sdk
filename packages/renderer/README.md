@@ -49,6 +49,21 @@ Storage-backed scene assets are resolved through `@vexa-video/sdk` `Storage` bef
 
 Before any still/frame/range/video FFmpeg plan is created, the renderer prepares every enabled text font through `resolveProjectFontFiles()`. Explicit relative `fontFile` paths are resolved from the persisted bundle directory, explicit absolute paths are checked as-is, and text without a font receives Vexa's controlled platform default. Missing or unreadable fonts fail deterministically as `RENDER_FONT_UNAVAILABLE` instead of relying on FFmpeg/fontconfig fallback.
 
+Remote fonts are optional and provider-neutral. A composition may declare `style.remoteFont = { provider, family, weight?, style? }`; rendering that composition requires a matching `fontAdapters` entry. Adapters own provider SDK/network/cache behavior and return an absolute local font path. Vexa validates that path through the same local readiness resolver before FFmpeg starts. Provider packages therefore stay outside core/React/FFmpeg.
+
+```ts
+await renderer.renderStill({
+  compositionId: "social-square",
+  output: "./renders/social-square.png",
+  fontAdapters: [{
+    provider: "my-font-service",
+    async resolveFont(reference, { signal }) {
+      return await myFontCache.materialize(reference, { signal });
+    }
+  }]
+});
+```
+
 Inject a configured `Storage` when a scene uses custom object providers or a custom workspace root:
 
 ```ts

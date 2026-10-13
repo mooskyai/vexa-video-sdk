@@ -167,3 +167,35 @@ test("resolveProjectFontFiles ignores hidden and disabled text while wrapping in
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+
+test("resolveProjectFontFiles fails closed on unresolved remote font references", async () => {
+  const project = textProject();
+  const track = project.tracks[0]!;
+  const clip = track.clips[0]!;
+  const remote: VideoProjectAst = {
+    ...project,
+    tracks: [{
+      ...track,
+      clips: [{
+        ...clip,
+        kind: "text",
+        style: {
+          remoteFont: {
+            provider: "fixture",
+            family: "Fixture Sans",
+            weight: 700
+          }
+        }
+      }]
+    }]
+  };
+
+  await assert.rejects(
+    () => resolveProjectFontFiles(remote, { defaultFontFile: null }),
+    (error: unknown) =>
+      error instanceof ProjectFontResolutionError &&
+      error.clipId === "title" &&
+      /must be materialized by a renderer font adapter/u.test(error.message)
+  );
+});

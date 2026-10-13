@@ -116,10 +116,20 @@ export interface TextShadowStyle {
   offsetY: number;
 }
 
+export type RemoteFontStyle = "normal" | "italic";
+
+export interface RemoteFontReference {
+  provider: string;
+  family: string;
+  weight?: number;
+  style?: RemoteFontStyle;
+}
+
 export interface TextStyle {
   fontSize?: NumericProperty;
   color?: string;
   fontFile?: string;
+  remoteFont?: RemoteFontReference;
   textAlign?: TextAlignment;
   lineSpacing?: number;
   stroke?: TextStrokeStyle;
@@ -371,6 +381,7 @@ function normalizeTextStyle(
     "fontSize",
     "color",
     "fontFile",
+    "remoteFont",
     "textAlign",
     "lineSpacing",
     "stroke",
@@ -405,6 +416,9 @@ function normalizeTextStyle(
   }
   if (style.fontFile !== undefined && !style.fontFile.trim()) {
     throw new InvalidProjectError(`clip ${clipId}.style.fontFile cannot be empty.`);
+  }
+  if (style.fontFile !== undefined && style.remoteFont !== undefined) {
+    throw new InvalidProjectError(`clip ${clipId}.style cannot combine fontFile with remoteFont.`);
   }
   if (style.boxColor !== undefined && !style.boxColor.trim()) {
     throw new InvalidProjectError(`clip ${clipId}.style.boxColor cannot be empty.`);
@@ -452,6 +466,39 @@ function normalizeTextStyle(
     };
   }
 
+  let remoteFont: RemoteFontReference | undefined;
+  if (style.remoteFont !== undefined) {
+    const provider = style.remoteFont.provider.trim();
+    const family = style.remoteFont.family.trim();
+    if (!provider) {
+      throw new InvalidProjectError(`clip ${clipId}.style.remoteFont.provider cannot be empty.`);
+    }
+    if (!family) {
+      throw new InvalidProjectError(`clip ${clipId}.style.remoteFont.family cannot be empty.`);
+    }
+    if (
+      style.remoteFont.weight !== undefined &&
+      (!Number.isInteger(style.remoteFont.weight) || style.remoteFont.weight < 1 || style.remoteFont.weight > 1000)
+    ) {
+      throw new InvalidProjectError(
+        `clip ${clipId}.style.remoteFont.weight must be an integer between 1 and 1000.`
+      );
+    }
+    if (
+      style.remoteFont.style !== undefined &&
+      style.remoteFont.style !== "normal" &&
+      style.remoteFont.style !== "italic"
+    ) {
+      throw new InvalidProjectError(`clip ${clipId}.style.remoteFont.style is not supported.`);
+    }
+    remoteFont = {
+      provider,
+      family,
+      ...(style.remoteFont.weight !== undefined ? { weight: style.remoteFont.weight } : {}),
+      ...(style.remoteFont.style !== undefined ? { style: style.remoteFont.style } : {})
+    };
+  }
+
   if (style.boxPadding !== undefined) {
     assertFiniteNonNegative(style.boxPadding, `clip ${clipId}.style.boxPadding`);
   }
@@ -460,6 +507,7 @@ function normalizeTextStyle(
     ...(fontSize !== undefined ? { fontSize } : {}),
     ...(style.color !== undefined ? { color: style.color } : {}),
     ...(style.fontFile !== undefined ? { fontFile: style.fontFile } : {}),
+    ...(remoteFont !== undefined ? { remoteFont } : {}),
     ...(style.textAlign !== undefined ? { textAlign: style.textAlign } : {}),
     ...(style.lineSpacing !== undefined ? { lineSpacing: style.lineSpacing } : {}),
     ...(stroke !== undefined ? { stroke } : {}),

@@ -570,7 +570,11 @@ Cover text-style normalization for stroke, shadow, horizontal alignment, and int
 
 ### Local-font readiness tests
 
-Cover explicit absolute and relative local fonts, execution-root resolution, default-font injection, immutable project input, hidden/disabled text behavior, missing explicit fonts, missing platform defaults, and invalid `VEXA_VIDEO_FONT_FILE` overrides. `VideoProject` and the bundle-backed composition renderer must use the same resolver before FFmpeg planning; renderer failures must surface as `RENDER_FONT_UNAVAILABLE`. A successfully prepared renderer plan must contain an explicit `fontfile` rather than relying on FFmpeg/fontconfig fallback. Remote font adapters remain a separate acceptance area.
+Cover explicit absolute and relative local fonts, execution-root resolution, default-font injection, immutable project input, hidden/disabled text behavior, missing explicit fonts, missing platform defaults, and invalid `VEXA_VIDEO_FONT_FILE` overrides. `VideoProject` and the bundle-backed composition renderer must use the same resolver before FFmpeg planning; renderer failures must surface as `RENDER_FONT_UNAVAILABLE`. A successfully prepared renderer plan must contain an explicit `fontfile` rather than relying on FFmpeg/fontconfig fallback.
+
+### Remote-font adapter tests
+
+Cover browser-safe normalization/serialization of provider, family, optional weight, and normal/italic style; local/remote mutual exclusion; scene-to-project preservation; and direct FFmpeg/readiness rejection while the reference is unresolved. Bundle-render integration must exercise a provider adapter returning a real absolute local font path and verify the resulting FFmpeg graph contains `fontfile`. Missing providers, duplicate adapter providers, adapter failures, relative returned paths, unreadable returned files, and cancellation must fail deterministically through the renderer's typed boundaries. Provider/network SDKs must not become dependencies of core, React, or FFmpeg.
 
 ### Visual fixtures
 

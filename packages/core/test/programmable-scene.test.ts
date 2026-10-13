@@ -519,6 +519,45 @@ test("text typography normalizes, freezes, serializes, and lowers unchanged", ()
   }), /style.stroke.width/);
 });
 
+test("remote font references stay browser-safe, immutable, and lower unchanged", () => {
+  const options = {
+    id: "remote-font-scene",
+    width: 320,
+    height: 180,
+    fps: 30,
+    durationInFrames: 30,
+    children: [{
+      id: "remote-title",
+      kind: "text" as const,
+      text: "Remote font",
+      style: {
+        remoteFont: {
+          provider: "fixture",
+          family: "Fixture Sans",
+          weight: 700,
+          style: "normal" as const
+        }
+      }
+    }]
+  } as const;
+
+  const scene = defineProgrammableScene(options);
+  const browserScene = defineBrowserProgrammableScene(options);
+  const node = scene.children[0];
+  if (node?.kind !== "text") throw new Error("expected remote-font text node");
+  assert.deepEqual(node.style?.remoteFont, options.children[0].style.remoteFont);
+  assert.equal(Object.isFrozen(node.style?.remoteFont), true);
+  assert.equal(serializeProgrammableScene(scene), serializeBrowserProgrammableScene(browserScene));
+
+  const project = lowerProgrammableSceneToVideoProject(scene);
+  const clip = project.tracks[0]?.clips[0];
+  assert.equal(clip?.kind, "text");
+  assert.deepEqual(
+    clip?.kind === "text" ? clip.style?.remoteFont : undefined,
+    options.children[0].style.remoteFont
+  );
+});
+
 test("asset readiness state updates immutably", () => {
   const scene = defineProgrammableScene({
     id: "readiness", width: 10, height: 10, fps: 30, durationInFrames: 10,

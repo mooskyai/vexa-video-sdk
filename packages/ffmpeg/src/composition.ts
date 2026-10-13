@@ -669,6 +669,11 @@ function appendTextTypographyOptions(
   clip: Extract<TimelineClip, { kind: "text" }>
 ): void {
   const style = clip.style ?? {};
+  if (style.remoteFont) {
+    throw new InvalidProjectError(
+      `Text clip "${clip.id}" remote font "${style.remoteFont.provider}:${style.remoteFont.family}" must be materialized to style.fontFile before FFmpeg planning.`
+    );
+  }
   if (style.fontFile) options.push(`fontfile='${escapeFilterPath(style.fontFile)}'`);
   if (style.lineSpacing !== undefined) {
     options.push(`line_spacing=${formatNumber(style.lineSpacing)}`);

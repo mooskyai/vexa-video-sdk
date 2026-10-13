@@ -1,4 +1,11 @@
-import type { ClipTransform, ProjectTrack, TextStyle, TimelineClip, VideoProjectAst } from "./composition.js";
+import type {
+  ClipTransform,
+  ProjectTrack,
+  RemoteFontReference,
+  TextStyle,
+  TimelineClip,
+  VideoProjectAst
+} from "./composition.js";
 import type { ResizeFit } from "./editing.js";
 import type { JsonObject, JsonValue } from "./programmable-composition.js";
 import {
@@ -178,6 +185,7 @@ export interface ProgrammableSceneTextStyle {
   readonly fontSize?: number;
   readonly color?: string;
   readonly fontFile?: string;
+  readonly remoteFont?: RemoteFontReference;
   readonly textAlign?: "left" | "center" | "right";
   readonly lineSpacing?: number;
   readonly stroke?: {
@@ -609,6 +617,7 @@ function normalizeTextStyle(
     "fontSize",
     "color",
     "fontFile",
+    "remoteFont",
     "textAlign",
     "lineSpacing",
     "stroke",
@@ -626,6 +635,12 @@ function normalizeTextStyle(
   if (style.boxPadding !== undefined) assertFiniteNonNegative(style.boxPadding, `node ${nodeId}.style.boxPadding`);
   if (style.color !== undefined) assertNonEmpty(style.color, `node ${nodeId}.style.color`);
   if (style.fontFile !== undefined) assertNonEmpty(style.fontFile, `node ${nodeId}.style.fontFile`);
+  if (style.fontFile !== undefined && style.remoteFont !== undefined) {
+    throw new InvalidProgrammableSceneError(
+      `node ${nodeId}.style cannot combine fontFile with remoteFont.`,
+      { nodeId }
+    );
+  }
   if (style.boxColor !== undefined) assertNonEmpty(style.boxColor, `node ${nodeId}.style.boxColor`);
   if (
     style.textAlign !== undefined &&
@@ -665,10 +680,54 @@ function normalizeTextStyle(
     });
   }
 
+  let remoteFont: RemoteFontReference | undefined;
+  if (style.remoteFont !== undefined) {
+    const provider = style.remoteFont.provider.trim();
+    const family = style.remoteFont.family.trim();
+    if (!provider) {
+      throw new InvalidProgrammableSceneError(
+        `node ${nodeId}.style.remoteFont.provider cannot be empty.`,
+        { nodeId }
+      );
+    }
+    if (!family) {
+      throw new InvalidProgrammableSceneError(
+        `node ${nodeId}.style.remoteFont.family cannot be empty.`,
+        { nodeId }
+      );
+    }
+    if (
+      style.remoteFont.weight !== undefined &&
+      (!Number.isInteger(style.remoteFont.weight) || style.remoteFont.weight < 1 || style.remoteFont.weight > 1000)
+    ) {
+      throw new InvalidProgrammableSceneError(
+        `node ${nodeId}.style.remoteFont.weight must be an integer between 1 and 1000.`,
+        { nodeId }
+      );
+    }
+    if (
+      style.remoteFont.style !== undefined &&
+      style.remoteFont.style !== "normal" &&
+      style.remoteFont.style !== "italic"
+    ) {
+      throw new InvalidProgrammableSceneError(
+        `node ${nodeId}.style.remoteFont.style is not supported.`,
+        { nodeId }
+      );
+    }
+    remoteFont = Object.freeze({
+      provider,
+      family,
+      ...(style.remoteFont.weight !== undefined ? { weight: style.remoteFont.weight } : {}),
+      ...(style.remoteFont.style !== undefined ? { style: style.remoteFont.style } : {})
+    });
+  }
+
   return Object.freeze({
     ...(style.fontSize !== undefined ? { fontSize: style.fontSize } : {}),
     ...(style.color !== undefined ? { color: style.color } : {}),
     ...(style.fontFile !== undefined ? { fontFile: style.fontFile } : {}),
+    ...(remoteFont !== undefined ? { remoteFont } : {}),
     ...(style.textAlign !== undefined ? { textAlign: style.textAlign } : {}),
     ...(style.lineSpacing !== undefined ? { lineSpacing: style.lineSpacing } : {}),
     ...(stroke !== undefined ? { stroke } : {}),
@@ -1129,6 +1188,7 @@ function lowerTextStyle(style: ProgrammableSceneTextStyle | undefined): TextStyl
     ...(style.fontSize !== undefined ? { fontSize: style.fontSize } : {}),
     ...(style.color !== undefined ? { color: style.color } : {}),
     ...(style.fontFile !== undefined ? { fontFile: style.fontFile } : {}),
+    ...(style.remoteFont !== undefined ? { remoteFont: style.remoteFont } : {}),
     ...(style.textAlign !== undefined ? { textAlign: style.textAlign } : {}),
     ...(style.lineSpacing !== undefined ? { lineSpacing: style.lineSpacing } : {}),
     ...(style.stroke !== undefined ? { stroke: style.stroke } : {}),
