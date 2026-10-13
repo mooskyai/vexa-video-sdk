@@ -105,6 +105,71 @@ test("project compiler normalizes Windows font paths for drawtext", () => {
   assert.match(plan.filterComplex, /fontfile='C\\:\/Windows\/Fonts\/segoeui\.ttf'/u);
 });
 
+test("project compiler executes deterministic text stroke shadow alignment and line spacing", () => {
+  const project = createVideoProjectAst({ id: "typography", width: 320, height: 180, duration: 1 });
+  const withText = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "t1",
+      type: "text",
+      clips: [{
+        id: "title",
+        kind: "text",
+        text: "Vexa\nTypography",
+        start: 0,
+        duration: 1,
+        transform: { x: 160, y: 24 },
+        style: {
+          fontSize: 36,
+          textAlign: "center",
+          lineSpacing: 7,
+          stroke: { color: "black", width: 2 },
+          shadow: { color: "#000000@0.5", offsetX: -3, offsetY: 4 }
+        }
+      }]
+    }]
+  });
+
+  const plan = createProjectExecutionPlan(withText, "output.mp4");
+  assert.match(plan.filterComplex, /x='\(\(160\)-text_w\/2\)'/u);
+  assert.match(plan.filterComplex, /line_spacing=7/u);
+  assert.match(plan.filterComplex, /borderw=2:bordercolor=black/u);
+  assert.match(plan.filterComplex, /shadowcolor=#000000@0\.5:shadowx=-3:shadowy=4/u);
+});
+
+test("isolated text typography keeps the same drawtext styling", () => {
+  const project = createVideoProjectAst({ id: "isolated-typography", width: 320, height: 180, duration: 1 });
+  const withText = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "t1",
+      type: "text",
+      clips: [{
+        id: "title",
+        kind: "text",
+        text: "Vexa",
+        start: 0,
+        duration: 1,
+        effects: [{ kind: "blur", radius: 1 }],
+        style: {
+          textAlign: "right",
+          lineSpacing: 4,
+          stroke: { color: "#111111", width: 1 },
+          shadow: { color: "#000000", offsetX: 2, offsetY: 3 }
+        }
+      }]
+    }]
+  });
+
+  const plan = createProjectExecutionPlan(withText, "output.mp4");
+  assert.match(plan.filterComplex, /color=c=black@0:s=320x180/u);
+  assert.match(plan.filterComplex, /x='w-text_w'/u);
+  assert.match(plan.filterComplex, /line_spacing=4/u);
+  assert.match(plan.filterComplex, /borderw=1:bordercolor=#111111/u);
+  assert.match(plan.filterComplex, /shadowcolor=#000000:shadowx=2:shadowy=3/u);
+  assert.ok(plan.optimizations.includes("TEXT_ISOLATED_EFFECT_GRAPH"));
+});
+
 
 test("project compiler emits keyframe expressions for animated transforms and volume", () => {
   const animated = normalizeVideoProject({

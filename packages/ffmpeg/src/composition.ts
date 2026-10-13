@@ -640,6 +640,60 @@ function videoClipFilter(
   return `[${item.inputIndex}:v]${filters.join(",")}[${label}]`;
 }
 
+function textHorizontalPosition(
+  clip: Extract<TimelineClip, { kind: "text" }>,
+  timeExpression: string
+): string {
+  const authoredX = clip.transform?.x === undefined
+    ? null
+    : numericPropertyExpression(
+        clip.transform.x,
+        0,
+        timeExpression,
+        `clip ${clip.id}.transform.x`
+      );
+
+  if (authoredX === null) {
+    if (clip.style?.textAlign === "left") return "0";
+    if (clip.style?.textAlign === "right") return "w-text_w";
+    return "(w-text_w)/2";
+  }
+
+  if (clip.style?.textAlign === "center") return `((${authoredX})-text_w/2)`;
+  if (clip.style?.textAlign === "right") return `((${authoredX})-text_w)`;
+  return authoredX;
+}
+
+function appendTextTypographyOptions(
+  options: string[],
+  clip: Extract<TimelineClip, { kind: "text" }>
+): void {
+  const style = clip.style ?? {};
+  if (style.fontFile) options.push(`fontfile='${escapeFilterPath(style.fontFile)}'`);
+  if (style.lineSpacing !== undefined) {
+    options.push(`line_spacing=${formatNumber(style.lineSpacing)}`);
+  }
+  if (style.stroke !== undefined) {
+    const color = filterSafeToken(style.stroke.color, `clip ${clip.id}.style.stroke.color`);
+    options.push(
+      `borderw=${formatNumber(style.stroke.width)}`,
+      `bordercolor=${color}`
+    );
+  }
+  if (style.shadow !== undefined) {
+    const color = filterSafeToken(style.shadow.color, `clip ${clip.id}.style.shadow.color`);
+    options.push(
+      `shadowcolor=${color}`,
+      `shadowx=${formatNumber(style.shadow.offsetX)}`,
+      `shadowy=${formatNumber(style.shadow.offsetY)}`
+    );
+  }
+  if (style.boxColor) {
+    const box = filterSafeToken(style.boxColor, `clip ${clip.id}.style.boxColor`);
+    options.push("box=1", `boxcolor=${box}`, `boxborderw=${formatNumber(style.boxPadding ?? 8)}`);
+  }
+}
+
 function textFilter(
   inputLabel: string,
   outputLabel: string,
@@ -660,14 +714,7 @@ function textFilter(
     `clip ${clip.id}.opacity`
   );
   const opacity = numericPropertyValue(clip.opacity, 1, `clip ${clip.id}.opacity`);
-  const x = clip.transform?.x === undefined
-    ? "(w-text_w)/2"
-    : numericPropertyExpression(
-        clip.transform.x,
-        0,
-        localTime,
-        `clip ${clip.id}.transform.x`
-      );
+  const x = textHorizontalPosition(clip, localTime);
   const y = clip.transform?.y === undefined
     ? "(h-text_h)/2"
     : numericPropertyExpression(
@@ -690,11 +737,7 @@ function textFilter(
     `enable='between(t,${start},${end})'`
   ];
 
-  if (style.fontFile) options.push(`fontfile='${escapeFilterPath(style.fontFile)}'`);
-  if (style.boxColor) {
-    const box = filterSafeToken(style.boxColor, `clip ${clip.id}.style.boxColor`);
-    options.push("box=1", `boxcolor=${box}`, `boxborderw=${formatNumber(style.boxPadding ?? 8)}`);
-  }
+  appendTextTypographyOptions(options, clip);
 
   return `[${inputLabel}]drawtext=${options.join(":")}[${outputLabel}]`;
 }
@@ -712,14 +755,7 @@ function textIsolatedClipFilter(
     localTime,
     `clip ${clip.id}.style.fontSize`
   );
-  const x = clip.transform?.x === undefined
-    ? "(w-text_w)/2"
-    : numericPropertyExpression(
-        clip.transform.x,
-        0,
-        localTime,
-        `clip ${clip.id}.transform.x`
-      );
+  const x = textHorizontalPosition(clip, localTime);
   const y = clip.transform?.y === undefined
     ? "(h-text_h)/2"
     : numericPropertyExpression(
@@ -738,11 +774,7 @@ function textIsolatedClipFilter(
     `y=${quotedExpression(y)}`
   ];
 
-  if (style.fontFile) options.push(`fontfile='${escapeFilterPath(style.fontFile)}'`);
-  if (style.boxColor) {
-    const box = filterSafeToken(style.boxColor, `clip ${clip.id}.style.boxColor`);
-    options.push("box=1", `boxcolor=${box}`, `boxborderw=${formatNumber(style.boxPadding ?? 8)}`);
-  }
+  appendTextTypographyOptions(options, clip);
 
   for (const transition of [clip.transitions?.in, clip.transitions?.out]) {
     if (!transition) continue;

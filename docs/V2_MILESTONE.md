@@ -606,6 +606,8 @@ The fourteenth implementation slice adds layer-local programmable zoom execution
 
 The fifteenth implementation slice completes the declared programmable transition families with circular iris execution for image/video/text clips and renderer-materialized shapes/fills/solids. Iris applies a layer-centered radial alpha mask after effects/opacity and the existing programmable alpha transitions; its radius expands for incoming transitions and contracts for outgoing transitions using the shared frame duration and easing contract. The fully-open radius reaches the layer's farthest corner, while the zero-radius boundary is fully closed. Isolated text uses its full transparent canvas as the masked layer. Non-normal blend modes combined with iris remain explicit fail-closed paths. Plans expose `PROGRAMMABLE_IRIS_TRANSITION_GRAPH`.
 
+The sixteenth implementation slice starts typography execution by extending the shared text-style contract with deterministic stroke, shadow, horizontal alignment, and line-spacing intent. Scene normalization validates and freezes those values, representable text lowers them unchanged into `VideoProjectAst`, and both direct and isolated FFmpeg drawtext paths compile the same styling. Explicit `textAlign` treats authored `transform.x` as the selected left/center/right anchor while preserving the historical x-position behavior when alignment is omitted. Existing local `fontFile` handling remains compatible; managed font readiness and optional remote font adapters stay separate follow-up work rather than being mixed into the styling contract.
+
 ### Goal
 
 Provide a Vexa-owned motion-graphics component library.

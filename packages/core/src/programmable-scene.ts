@@ -178,6 +178,17 @@ export interface ProgrammableSceneTextStyle {
   readonly fontSize?: number;
   readonly color?: string;
   readonly fontFile?: string;
+  readonly textAlign?: "left" | "center" | "right";
+  readonly lineSpacing?: number;
+  readonly stroke?: {
+    readonly color: string;
+    readonly width: number;
+  };
+  readonly shadow?: {
+    readonly color: string;
+    readonly offsetX: number;
+    readonly offsetY: number;
+  };
   readonly boxColor?: string;
   readonly boxPadding?: number;
 }
@@ -594,15 +605,74 @@ function normalizeTextStyle(
   nodeId: string
 ): ProgrammableSceneTextStyle | undefined {
   if (!style) return undefined;
+  const allowed = new Set([
+    "fontSize",
+    "color",
+    "fontFile",
+    "textAlign",
+    "lineSpacing",
+    "stroke",
+    "shadow",
+    "boxColor",
+    "boxPadding"
+  ]);
+  for (const key of Object.keys(style)) {
+    if (!allowed.has(key)) {
+      throw new InvalidProgrammableSceneError(`node ${nodeId}.style.${key} is not supported.`, { nodeId });
+    }
+  }
+
   if (style.fontSize !== undefined) assertFinitePositive(style.fontSize, `node ${nodeId}.style.fontSize`);
   if (style.boxPadding !== undefined) assertFiniteNonNegative(style.boxPadding, `node ${nodeId}.style.boxPadding`);
   if (style.color !== undefined) assertNonEmpty(style.color, `node ${nodeId}.style.color`);
   if (style.fontFile !== undefined) assertNonEmpty(style.fontFile, `node ${nodeId}.style.fontFile`);
   if (style.boxColor !== undefined) assertNonEmpty(style.boxColor, `node ${nodeId}.style.boxColor`);
+  if (
+    style.textAlign !== undefined &&
+    style.textAlign !== "left" &&
+    style.textAlign !== "center" &&
+    style.textAlign !== "right"
+  ) {
+    throw new InvalidProgrammableSceneError(`node ${nodeId}.style.textAlign is not supported.`, { nodeId });
+  }
+  if (style.lineSpacing !== undefined) {
+    assertFiniteNonNegative(style.lineSpacing, `node ${nodeId}.style.lineSpacing`);
+    if (!Number.isInteger(style.lineSpacing)) {
+      throw new InvalidProgrammableSceneError(`node ${nodeId}.style.lineSpacing must be an integer.`, { nodeId });
+    }
+  }
+
+  let stroke: ProgrammableSceneTextStyle["stroke"];
+  if (style.stroke !== undefined) {
+    assertNonEmpty(style.stroke.color, `node ${nodeId}.style.stroke.color`);
+    assertFiniteNonNegative(style.stroke.width, `node ${nodeId}.style.stroke.width`);
+    if (!Number.isInteger(style.stroke.width)) {
+      throw new InvalidProgrammableSceneError(`node ${nodeId}.style.stroke.width must be an integer.`, { nodeId });
+    }
+    stroke = Object.freeze({ color: style.stroke.color, width: style.stroke.width });
+  }
+
+  let shadow: ProgrammableSceneTextStyle["shadow"];
+  if (style.shadow !== undefined) {
+    assertNonEmpty(style.shadow.color, `node ${nodeId}.style.shadow.color`);
+    if (!Number.isInteger(style.shadow.offsetX) || !Number.isInteger(style.shadow.offsetY)) {
+      throw new InvalidProgrammableSceneError(`node ${nodeId}.style.shadow offsets must be integers.`, { nodeId });
+    }
+    shadow = Object.freeze({
+      color: style.shadow.color,
+      offsetX: style.shadow.offsetX,
+      offsetY: style.shadow.offsetY
+    });
+  }
+
   return Object.freeze({
     ...(style.fontSize !== undefined ? { fontSize: style.fontSize } : {}),
     ...(style.color !== undefined ? { color: style.color } : {}),
     ...(style.fontFile !== undefined ? { fontFile: style.fontFile } : {}),
+    ...(style.textAlign !== undefined ? { textAlign: style.textAlign } : {}),
+    ...(style.lineSpacing !== undefined ? { lineSpacing: style.lineSpacing } : {}),
+    ...(stroke !== undefined ? { stroke } : {}),
+    ...(shadow !== undefined ? { shadow } : {}),
     ...(style.boxColor !== undefined ? { boxColor: style.boxColor } : {}),
     ...(style.boxPadding !== undefined ? { boxPadding: style.boxPadding } : {})
   });
@@ -1059,6 +1129,10 @@ function lowerTextStyle(style: ProgrammableSceneTextStyle | undefined): TextStyl
     ...(style.fontSize !== undefined ? { fontSize: style.fontSize } : {}),
     ...(style.color !== undefined ? { color: style.color } : {}),
     ...(style.fontFile !== undefined ? { fontFile: style.fontFile } : {}),
+    ...(style.textAlign !== undefined ? { textAlign: style.textAlign } : {}),
+    ...(style.lineSpacing !== undefined ? { lineSpacing: style.lineSpacing } : {}),
+    ...(style.stroke !== undefined ? { stroke: style.stroke } : {}),
+    ...(style.shadow !== undefined ? { shadow: style.shadow } : {}),
     ...(style.boxColor !== undefined ? { boxColor: style.boxColor } : {}),
     ...(style.boxPadding !== undefined ? { boxPadding: style.boxPadding } : {})
   };

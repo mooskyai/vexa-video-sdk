@@ -103,10 +103,27 @@ export interface ImageTimelineClip extends TimelineClipBase {
   effects?: readonly ProgrammableEffect[];
 }
 
+export type TextAlignment = "left" | "center" | "right";
+
+export interface TextStrokeStyle {
+  color: string;
+  width: number;
+}
+
+export interface TextShadowStyle {
+  color: string;
+  offsetX: number;
+  offsetY: number;
+}
+
 export interface TextStyle {
   fontSize?: NumericProperty;
   color?: string;
   fontFile?: string;
+  textAlign?: TextAlignment;
+  lineSpacing?: number;
+  stroke?: TextStrokeStyle;
+  shadow?: TextShadowStyle;
   boxColor?: string;
   boxPadding?: number;
 }
@@ -343,6 +360,116 @@ function normalizeTransition(
   return { type: transition.type, duration: transition.duration };
 }
 
+function normalizeTextStyle(
+  style: TextStyle | undefined,
+  clipId: string,
+  clipDuration: number
+): TextStyle | undefined {
+  if (!style) return undefined;
+
+  const allowed = new Set<keyof TextStyle>([
+    "fontSize",
+    "color",
+    "fontFile",
+    "textAlign",
+    "lineSpacing",
+    "stroke",
+    "shadow",
+    "boxColor",
+    "boxPadding"
+  ]);
+  for (const key of Object.keys(style)) {
+    if (!allowed.has(key as keyof TextStyle)) {
+      throw new InvalidProjectError(`clip ${clipId}.style.${key} is not supported.`);
+    }
+  }
+
+  let fontSize: NumericProperty | undefined;
+  if (style.fontSize !== undefined) {
+    fontSize = normalizedNumericProperty(
+      style.fontSize,
+      48,
+      `clip ${clipId}.style.fontSize`,
+      clipDuration
+    );
+    const values = typeof fontSize === "number"
+      ? [fontSize]
+      : [fontSize.value, ...(fontSize.keyframes ?? []).map((keyframe) => keyframe.value)];
+    if (values.some((value) => !Number.isFinite(value) || value <= 0)) {
+      throw new InvalidProjectError(`clip ${clipId}.style.fontSize must stay greater than 0.`);
+    }
+  }
+
+  if (style.color !== undefined && !style.color.trim()) {
+    throw new InvalidProjectError(`clip ${clipId}.style.color cannot be empty.`);
+  }
+  if (style.fontFile !== undefined && !style.fontFile.trim()) {
+    throw new InvalidProjectError(`clip ${clipId}.style.fontFile cannot be empty.`);
+  }
+  if (style.boxColor !== undefined && !style.boxColor.trim()) {
+    throw new InvalidProjectError(`clip ${clipId}.style.boxColor cannot be empty.`);
+  }
+  if (
+    style.textAlign !== undefined &&
+    style.textAlign !== "left" &&
+    style.textAlign !== "center" &&
+    style.textAlign !== "right"
+  ) {
+    throw new InvalidProjectError(`clip ${clipId}.style.textAlign is not supported.`);
+  }
+
+  if (style.lineSpacing !== undefined) {
+    assertFiniteNonNegative(style.lineSpacing, `clip ${clipId}.style.lineSpacing`);
+    if (!Number.isInteger(style.lineSpacing)) {
+      throw new InvalidProjectError(`clip ${clipId}.style.lineSpacing must be an integer.`);
+    }
+  }
+
+  let stroke: TextStrokeStyle | undefined;
+  if (style.stroke !== undefined) {
+    if (!style.stroke.color.trim()) {
+      throw new InvalidProjectError(`clip ${clipId}.style.stroke.color cannot be empty.`);
+    }
+    assertFiniteNonNegative(style.stroke.width, `clip ${clipId}.style.stroke.width`);
+    if (!Number.isInteger(style.stroke.width)) {
+      throw new InvalidProjectError(`clip ${clipId}.style.stroke.width must be an integer.`);
+    }
+    stroke = { color: style.stroke.color, width: style.stroke.width };
+  }
+
+  let shadow: TextShadowStyle | undefined;
+  if (style.shadow !== undefined) {
+    if (!style.shadow.color.trim()) {
+      throw new InvalidProjectError(`clip ${clipId}.style.shadow.color cannot be empty.`);
+    }
+    if (!Number.isInteger(style.shadow.offsetX) || !Number.isInteger(style.shadow.offsetY)) {
+      throw new InvalidProjectError(`clip ${clipId}.style.shadow offsets must be integers.`);
+    }
+    shadow = {
+      color: style.shadow.color,
+      offsetX: style.shadow.offsetX,
+      offsetY: style.shadow.offsetY
+    };
+  }
+
+  if (style.boxPadding !== undefined) {
+    assertFiniteNonNegative(style.boxPadding, `clip ${clipId}.style.boxPadding`);
+  }
+
+  const normalized: TextStyle = {
+    ...(fontSize !== undefined ? { fontSize } : {}),
+    ...(style.color !== undefined ? { color: style.color } : {}),
+    ...(style.fontFile !== undefined ? { fontFile: style.fontFile } : {}),
+    ...(style.textAlign !== undefined ? { textAlign: style.textAlign } : {}),
+    ...(style.lineSpacing !== undefined ? { lineSpacing: style.lineSpacing } : {}),
+    ...(stroke !== undefined ? { stroke } : {}),
+    ...(shadow !== undefined ? { shadow } : {}),
+    ...(style.boxColor !== undefined ? { boxColor: style.boxColor } : {}),
+    ...(style.boxPadding !== undefined ? { boxPadding: style.boxPadding } : {})
+  };
+  return Object.keys(normalized).length ? normalized : undefined;
+}
+
 function normalizeClip(clip: TimelineClip, track: ProjectTrack, fps: number): TimelineClip {
   if (!clip.id.trim()) throw new InvalidProjectError("Every clip requires a non-empty id.");
   if (clip.kind !== track.type) {
@@ -485,22 +612,8 @@ function normalizeClip(clip: TimelineClip, track: ProjectTrack, fps: number): Ti
   }
 
   if (!base.text.trim()) throw new InvalidProjectError(`Text clip "${base.id}" requires text.`);
-  if (base.style?.fontSize !== undefined) {
-    const fontSize = normalizedNumericProperty(
-      base.style.fontSize,
-      48,
-      `clip ${base.id}.style.fontSize`,
-      base.duration
-    );
-    const values = typeof fontSize === "number"
-      ? [fontSize]
-      : [fontSize.value, ...(fontSize.keyframes ?? []).map((keyframe) => keyframe.value)];
-    if (values.some((value) => !Number.isFinite(value) || value <= 0)) {
-      throw new InvalidProjectError(`clip ${base.id}.style.fontSize must stay greater than 0.`);
-    }
-    return { ...base, style: { ...base.style, fontSize } };
-  }
-  return base;
+  const style = normalizeTextStyle(base.style, base.id, base.duration);
+  return style ? { ...base, style } : base;
 }
 
 export function normalizeVideoProject(project: VideoProjectAst): VideoProjectAst {

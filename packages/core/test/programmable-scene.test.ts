@@ -466,6 +466,59 @@ test("programmable zoom and iris transitions lower into project clips without ch
   assert.equal(clip?.duration, 1);
 });
 
+test("text typography normalizes, freezes, serializes, and lowers unchanged", () => {
+  const options = {
+    id: "typography-scene",
+    width: 320,
+    height: 180,
+    fps: 30,
+    durationInFrames: 60,
+    children: [{
+      id: "title",
+      kind: "text" as const,
+      text: "Vexa\nTypography",
+      style: {
+        fontSize: 42,
+        color: "white",
+        fontFile: "fonts/Inter.ttf",
+        textAlign: "center" as const,
+        lineSpacing: 8,
+        stroke: { color: "black", width: 2 },
+        shadow: { color: "#000000@0.5", offsetX: 3, offsetY: 4 }
+      }
+    }]
+  } as const;
+
+  const scene = defineProgrammableScene(options);
+  const browserScene = defineBrowserProgrammableScene(options);
+  const node = scene.children[0];
+  if (node?.kind !== "text") throw new Error("expected typography text node");
+  assert.deepEqual(node.style, options.children[0].style);
+  assert.equal(Object.isFrozen(node.style), true);
+  assert.equal(Object.isFrozen(node.style?.stroke), true);
+  assert.equal(Object.isFrozen(node.style?.shadow), true);
+  assert.equal(serializeProgrammableScene(scene), serializeBrowserProgrammableScene(browserScene));
+
+  const project = lowerProgrammableSceneToVideoProject(scene);
+  const clip = project.tracks[0]?.clips[0];
+  assert.equal(clip?.kind, "text");
+  assert.deepEqual(clip?.kind === "text" ? clip.style : undefined, options.children[0].style);
+
+  assert.throws(() => defineProgrammableScene({
+    id: "invalid-typography",
+    width: 100,
+    height: 100,
+    fps: 30,
+    durationInFrames: 30,
+    children: [{
+      id: "title",
+      kind: "text",
+      text: "Vexa",
+      style: { stroke: { color: "black", width: -1 } }
+    }]
+  }), /style.stroke.width/);
+});
+
 test("asset readiness state updates immutably", () => {
   const scene = defineProgrammableScene({
     id: "readiness", width: 10, height: 10, fps: 30, durationInFrames: 10,

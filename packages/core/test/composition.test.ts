@@ -192,3 +192,102 @@ test("project schema preserves programmable fade transitions and validates frame
     /cannot use programmable visual transitions on an audio track/
   );
 });
+
+
+test("project text typography normalizes deterministic styling and rejects invalid values", () => {
+  const normalized = normalizeVideoProject({
+    ...project,
+    tracks: [{
+      id: "titles",
+      type: "text",
+      clips: [{
+        id: "title",
+        kind: "text",
+        text: "Vexa\nTypography",
+        start: 0,
+        duration: 2,
+        style: {
+          fontSize: 40,
+          color: "white",
+          fontFile: "fonts/Inter.ttf",
+          textAlign: "right",
+          lineSpacing: 6,
+          stroke: { color: "black", width: 2 },
+          shadow: { color: "#000000@0.5", offsetX: -3, offsetY: 4 },
+          boxColor: "#111111@0.6",
+          boxPadding: 10
+        }
+      }]
+    }]
+  });
+  const clip = normalized.tracks[0]?.clips[0];
+  assert.equal(clip?.kind, "text");
+  assert.deepEqual(clip?.kind === "text" ? clip.style : undefined, {
+    fontSize: 40,
+    color: "white",
+    fontFile: "fonts/Inter.ttf",
+    textAlign: "right",
+    lineSpacing: 6,
+    stroke: { color: "black", width: 2 },
+    shadow: { color: "#000000@0.5", offsetX: -3, offsetY: 4 },
+    boxColor: "#111111@0.6",
+    boxPadding: 10
+  });
+
+  assert.throws(
+    () => normalizeVideoProject({
+      ...project,
+      tracks: [{
+        id: "titles",
+        type: "text",
+        clips: [{
+          id: "bad-align",
+          kind: "text",
+          text: "Vexa",
+          start: 0,
+          duration: 1,
+          style: { textAlign: "justify" as never }
+        }]
+      }]
+    }),
+    /style.textAlign is not supported/
+  );
+
+  assert.throws(
+    () => normalizeVideoProject({
+      ...project,
+      tracks: [{
+        id: "titles",
+        type: "text",
+        clips: [{
+          id: "bad-spacing",
+          kind: "text",
+          text: "Vexa",
+          start: 0,
+          duration: 1,
+          style: { lineSpacing: 1.5 }
+        }]
+      }]
+    }),
+    /style.lineSpacing must be an integer/
+  );
+
+  assert.throws(
+    () => normalizeVideoProject({
+      ...project,
+      tracks: [{
+        id: "titles",
+        type: "text",
+        clips: [{
+          id: "bad-shadow",
+          kind: "text",
+          text: "Vexa",
+          start: 0,
+          duration: 1,
+          style: { shadow: { color: "black", offsetX: 0.5, offsetY: 1 } }
+        }]
+      }]
+    }),
+    /style.shadow offsets must be integers/
+  );
+});

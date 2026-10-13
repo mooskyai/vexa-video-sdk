@@ -564,6 +564,10 @@ Cover scene-to-project zoom preservation, in/out frame-to-second timing, all sha
 
 Cover scene-to-project iris preservation, in/out frame-to-second timing, all shared easing modes, effect -> opacity -> iris ordering, layer-centered radial geometry, fully-closed/open boundary behavior, isolated text execution, renderer-materialized primitives, and the `PROGRAMMABLE_IRIS_TRANSITION_GRAPH` marker. Real FFmpeg integration must exercise iris on a renderer-rasterized visual. Non-normal blend-mode combinations must fail explicitly instead of bypassing the alpha mask.
 
+### Programmable typography styling tests
+
+Cover text-style normalization for stroke, shadow, horizontal alignment, and integer line spacing; immutable scene values; browser serialization parity; unchanged scene-to-project lowering; and deterministic invalid-value failures. FFmpeg planning must verify left/center/right anchor semantics, border/shadow drawtext options, multiline spacing, Windows font-path preservation, and parity between the direct text path and the isolated text path used by effects/transitions. Font readiness and remote font adapters remain a separate acceptance area.
+
 ### Visual fixtures
 
 Create Vexa-owned frames for:
