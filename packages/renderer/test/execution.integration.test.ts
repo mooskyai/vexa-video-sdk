@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Script } from "node:vm";
 import test from "node:test";
+import { Resvg } from "@resvg/resvg-js";
 import { bundleCompositions } from "@vexa-video/bundler";
 import { resolveDefaultFontFile } from "@vexa-video/ffmpeg";
 import { Storage } from "@vexa-video/sdk";
@@ -456,11 +457,12 @@ test("bundled executable compositions resolve storage assets and render stills, 
   }
 });
 
-test("surface renderer adapters materialize static SVG intent with timing and cleanup", async () => {
+test("surface renderer adapters materialize static SVG and PNG intent with timing and cleanup", async () => {
   const tempRoot = await mkdtemp(join(tmpdir(), "vexa-surface-adapter-"));
   const workspaceRoot = join(tempRoot, "workspaces");
   const inactiveOutput = join(tempRoot, "surface-inactive.png");
   const activeOutput = join(tempRoot, "surface-active.png");
+  const pngOutput = join(tempRoot, "surface-png-result.png");
   const videoOutput = join(tempRoot, "surface.mp4");
 
   try {
@@ -497,6 +499,32 @@ test("surface renderer adapters materialize static SVG intent with timing and cl
         };
       }
     };
+    let pngCalls = 0;
+    const pngAdapter: VexaSurfaceRendererAdapter = {
+      rendererId: "fixture.surface",
+      renderSurface(_surface, context) {
+        pngCalls += 1;
+        return {
+          kind: "png",
+          png: new Resvg(
+            [
+              `<svg xmlns="http://www.w3.org/2000/svg" width="${context.width}" height="${context.height}" viewBox="0 0 ${context.width} ${context.height}">`,
+              '<rect x="36" y="18" width="92" height="56" rx="12" fill="#3b82f6" />',
+              "</svg>"
+            ].join(""),
+            { font: { loadSystemFonts: false } }
+          ).render().asPng()
+        };
+      }
+    };
+    const animatedPng = Uint8Array.from([
+      137, 80, 78, 71, 13, 10, 26, 10,
+      0, 0, 0, 13, 73, 72, 68, 82,
+      0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 8, 97, 99, 84, 76,
+      0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 73, 69, 78, 68, 0, 0, 0, 0
+    ]);
 
     await assert.rejects(
       () => renderer.renderFrame({
@@ -572,6 +600,44 @@ test("surface renderer adapters materialize static SVG intent with timing and cl
       () => renderer.renderFrame({
         compositionId: "surface-showcase",
         frame: 6,
+        output: join(tempRoot, "surface-invalid-png.png"),
+        storage,
+        surfaceAdapters: [{
+          rendererId: "fixture.surface",
+          renderSurface: () => ({
+            kind: "png",
+            png: Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10])
+          })
+        }]
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError &&
+        error.code === "RENDER_SURFACE_FAILED" &&
+        /invalid PNG bytes/u.test(error.message)
+    );
+
+    await assert.rejects(
+      () => renderer.renderFrame({
+        compositionId: "surface-showcase",
+        frame: 6,
+        output: join(tempRoot, "surface-animated-png.png"),
+        storage,
+        surfaceAdapters: [{
+          rendererId: "fixture.surface",
+          renderSurface: () => ({ kind: "png", png: animatedPng })
+        }]
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError &&
+        error.code === "RENDER_SURFACE_FAILED" &&
+        /animated PNG is not supported/u.test(error.message)
+    );
+
+
+    await assert.rejects(
+      () => renderer.renderFrame({
+        compositionId: "surface-showcase",
+        frame: 6,
         output: join(tempRoot, "surface-unsupported-transform.png"),
         storage,
         inputProps: { unsupportedRotation: true },
@@ -618,6 +684,30 @@ test("surface renderer adapters materialize static SVG intent with timing and cl
     if (!activeSurfaceInput) throw new Error("expected a renderer-owned surface image input");
     await assert.rejects(
       () => readFile(activeSurfaceInput.source),
+      (error: unknown) =>
+        error instanceof Error &&
+        "code" in error &&
+        (error as NodeJS.ErrnoException).code === "ENOENT"
+    );
+
+    const pngFrame = await renderer.renderFrame({
+      compositionId: "surface-showcase",
+      frame: 6,
+      output: pngOutput,
+      storage,
+      surfaceAdapters: [pngAdapter]
+    });
+    assert.equal(pngCalls, 1);
+    assert.deepEqual(
+      [...(await readFile(pngOutput)).subarray(0, 8)],
+      [137, 80, 78, 71, 13, 10, 26, 10]
+    );
+    const pngSurfaceInput = pngFrame.executionPlan.inputs.find(
+      (input) => input.kind === "image" && /[\\/]surfaces[\\/]/u.test(input.source)
+    );
+    if (!pngSurfaceInput) throw new Error("expected a renderer-owned PNG surface input");
+    await assert.rejects(
+      () => readFile(pngSurfaceInput.source),
       (error: unknown) =>
         error instanceof Error &&
         "code" in error &&

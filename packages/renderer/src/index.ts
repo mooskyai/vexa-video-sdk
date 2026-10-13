@@ -176,13 +176,21 @@ export interface VexaSurfaceSvgRenderResult {
   readonly svg: string;
 }
 
-export type VexaSurfaceRenderResult = VexaSurfaceSvgRenderResult;
+export interface VexaSurfacePngRenderResult {
+  readonly kind: "png";
+  readonly png: Uint8Array;
+}
+
+export type VexaSurfaceRenderResult =
+  | VexaSurfaceSvgRenderResult
+  | VexaSurfacePngRenderResult;
 
 export interface VexaSurfaceRendererAdapter {
   readonly rendererId: string;
   /**
-   * Materialize static surface intent as SVG. Vexa owns SVG rasterization and
-   * keeps the generated PNG inside the managed render workspace.
+   * Materialize static surface intent as SVG text or PNG bytes. Vexa owns
+   * rasterization/file materialization and keeps generated files inside the
+   * managed render workspace.
    */
   renderSurface(
     surface: ProgrammableSceneSurfaceDescriptor,
@@ -940,6 +948,109 @@ function replaceSurfaceNodes(
   }));
 }
 
+const PNG_SIGNATURE = Object.freeze([137, 80, 78, 71, 13, 10, 26, 10] as const);
+
+function readPngUint32(bytes: Uint8Array, offset: number): number {
+  return (
+    bytes[offset]! * 0x1000000 +
+    bytes[offset + 1]! * 0x10000 +
+    bytes[offset + 2]! * 0x100 +
+    bytes[offset + 3]!
+  );
+}
+
+function pngChunkType(bytes: Uint8Array, offset: number): string {
+  return String.fromCharCode(
+    bytes[offset]!,
+    bytes[offset + 1]!,
+    bytes[offset + 2]!,
+    bytes[offset + 3]!
+  );
+}
+
+function invalidSurfacePng(
+  rendererId: string,
+  nodeId: string,
+  compositionId: string,
+  detail: string
+): VexaRendererError {
+  return new VexaRendererError(
+    `Surface renderer adapter "${rendererId}" returned invalid PNG bytes for node "${nodeId}": ${detail}.`,
+    "RENDER_SURFACE_FAILED",
+    { compositionId }
+  );
+}
+
+function validateSurfacePng(
+  png: Uint8Array,
+  rendererId: string,
+  nodeId: string,
+  compositionId: string
+): Uint8Array {
+  if (!(png instanceof Uint8Array) || png.byteLength < 45) {
+    throw invalidSurfacePng(rendererId, nodeId, compositionId, "the PNG container is too short");
+  }
+  for (let index = 0; index < PNG_SIGNATURE.length; index += 1) {
+    if (png[index] !== PNG_SIGNATURE[index]) {
+      throw invalidSurfacePng(rendererId, nodeId, compositionId, "the PNG signature is invalid");
+    }
+  }
+
+  let offset: number = PNG_SIGNATURE.length;
+  let sawHeader = false;
+  let sawImageData = false;
+  let sawEnd = false;
+
+  while (offset + 12 <= png.byteLength) {
+    const length = readPngUint32(png, offset);
+    const chunkEnd = offset + 12 + length;
+    if (chunkEnd > png.byteLength) {
+      throw invalidSurfacePng(rendererId, nodeId, compositionId, "a PNG chunk exceeds the byte buffer");
+    }
+
+    const type = pngChunkType(png, offset + 4);
+    if (!sawHeader) {
+      if (type !== "IHDR" || length !== 13) {
+        throw invalidSurfacePng(rendererId, nodeId, compositionId, "the first PNG chunk must be IHDR");
+      }
+      const width = readPngUint32(png, offset + 8);
+      const height = readPngUint32(png, offset + 12);
+      if (width === 0 || height === 0) {
+        throw invalidSurfacePng(rendererId, nodeId, compositionId, "PNG dimensions must be positive");
+      }
+      sawHeader = true;
+    }
+
+    if (type === "acTL") {
+      throw invalidSurfacePng(
+        rendererId,
+        nodeId,
+        compositionId,
+        "animated PNG is not supported by the static surface result"
+      );
+    }
+    if (type === "IDAT") sawImageData = true;
+    if (type === "IEND") {
+      if (length !== 0 || chunkEnd !== png.byteLength) {
+        throw invalidSurfacePng(rendererId, nodeId, compositionId, "IEND must terminate the PNG");
+      }
+      sawEnd = true;
+      break;
+    }
+    offset = chunkEnd;
+  }
+
+  if (!sawHeader || !sawImageData || !sawEnd) {
+    throw invalidSurfacePng(
+      rendererId,
+      nodeId,
+      compositionId,
+      "PNG requires IHDR, image data, and a terminal IEND chunk"
+    );
+  }
+  return png;
+}
+
 async function materializeProgrammableSceneSurfaces(
   scene: ProgrammableScene,
   items: readonly ProgrammableSurfaceRenderItem[],
@@ -993,22 +1104,31 @@ async function materializeProgrammableSceneSurfaces(
       );
     }
 
-    if (!rendered || rendered.kind !== "svg" || typeof rendered.svg !== "string" || !rendered.svg.trim()) {
+    let png: Uint8Array;
+    if (rendered?.kind === "svg") {
+      if (typeof rendered.svg !== "string" || !rendered.svg.trim()) {
+        throw new VexaRendererError(
+          `Surface renderer adapter "${rendererId}" returned an invalid static SVG result for node "${item.node.id}".`,
+          "RENDER_SURFACE_FAILED",
+          { compositionId }
+        );
+      }
+      try {
+        png = new Resvg(rendered.svg, { font: { loadSystemFonts: false } }).render().asPng();
+      } catch (cause) {
+        throw new VexaRendererError(
+          `Surface renderer adapter "${rendererId}" returned SVG that could not be rasterized for node "${item.node.id}": ${cause instanceof Error ? cause.message : String(cause)}.`,
+          "RENDER_SURFACE_FAILED",
+          { compositionId, cause }
+        );
+      }
+    } else if (rendered?.kind === "png") {
+      png = validateSurfacePng(rendered.png, rendererId, item.node.id, compositionId);
+    } else {
       throw new VexaRendererError(
-        `Surface renderer adapter "${rendererId}" returned an invalid static SVG result for node "${item.node.id}".`,
+        `Surface renderer adapter "${rendererId}" returned an unsupported static surface result for node "${item.node.id}".`,
         "RENDER_SURFACE_FAILED",
         { compositionId }
-      );
-    }
-
-    let png: Uint8Array;
-    try {
-      png = new Resvg(rendered.svg, { font: { loadSystemFonts: false } }).render().asPng();
-    } catch (cause) {
-      throw new VexaRendererError(
-        `Surface renderer adapter "${rendererId}" returned SVG that could not be rasterized for node "${item.node.id}": ${cause instanceof Error ? cause.message : String(cause)}.`,
-        "RENDER_SURFACE_FAILED",
-        { compositionId, cause }
       );
     }
 

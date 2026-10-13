@@ -89,7 +89,7 @@ The planned sequence is:
 | V2.7 | **Complete** | Node composition/still renderer using existing Vexa execution paths |
 | V2.8 | **Complete** | Local Vexa Studio development environment |
 | V2.9 | **Complete** | Shapes, effects, transitions, fonts, and composition captions; deterministic typography, local/remote font readiness, caption cue rendering, active-word timing, and speaker-aware style overrides execute through the shared project/FFmpeg graph |
-| V2.10 | **Next** | Optional extended programmable-media integrations; static surface renderer adapters establish the first isolated execution boundary |
+| V2.10 | **Next** | Optional extended programmable-media integrations; static surface adapters now accept renderer-owned SVG or validated PNG results without leaking integration dependencies into core/SDK |
 | V2.11 | **Planned** | Browser/WebCodecs rendering with typed fallback |
 | V2.12 | **Planned** | Parameterized templates and validated input schemas |
 | V2.13 | **Planned** | Hosted/serverless composition rendering through existing job contracts |
