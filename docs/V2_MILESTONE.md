@@ -669,7 +669,7 @@ Captions:
 
 ## V2.10 — Extended programmable media
 
-**Status:** In progress.
+**Status:** Complete.
 
 The first implementation slices establish the optional Node surface-renderer boundary already anticipated by the browser-safe `surface` scene contract. `VexaRenderExecutionOptions.surfaceAdapters` accepts renderer-id keyed adapters only for bundle rendering; core and the normal SDK gain no dependency on renderer integrations. Static adapters return SVG text or validated PNG bytes and enter the existing image/project path. Frame-aware adapters expose `renderFrame()` instead and receive deterministic local/absolute frame timing plus normalized progress for every authored surface frame. Vexa owns SVG rasterization, PNG validation/materialization, and sequence encoding inside its managed workspace; animated sequences become lossless alpha-capable QTRLE MOV assets, are substituted as muted video nodes, and reuse the existing `VideoProjectAst` timing/effects/transitions path. APNG remains rejected on the static result path so animation is never inferred from image bytes. An adapter must expose exactly one rendering mode. Missing, duplicate, or ambiguous adapters, adapter exceptions, malformed SVG/PNG frame results, cancellation, timeout, and unsupported non-translation transforms fail through typed renderer errors, and all generated frame/intermediary files are cleaned on success or failure. These renderer-owned result paths provide concrete canvas/WebGL/headless-canvas and future Lottie/Rive/Three-style integration boundaries without integration dependencies entering core packages.
 
@@ -683,14 +683,11 @@ The third concrete optional integration is `@vexa-video/sound-effects`. It does 
 
 Cover common programmable-video inputs without bloating core packages.
 
-Possible optional integrations:
+V2.10 is complete once the generic static/frame-aware surface boundary and representative concrete integrations prove the dependency model across animated visuals, audio-derived visuals, and reusable audio authoring. Additional integrations can build on those completed boundaries without reopening this stage.
 
-- animated image/GIF;
 - Lottie;
 - Three.js;
 - Rive or similar animation adapters;
-- audio waveform visualization;
-- reusable sound effects;
 - canvas/WebGL custom drawing.
 
 Each integration should be optional and should not become a dependency of `@vexa-video/core` or the normal Node SDK.

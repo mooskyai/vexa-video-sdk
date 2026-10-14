@@ -148,6 +148,8 @@ V2.10 extends that renderer-owned materialization boundary without changing the 
 
 `@vexa-video/sound-effects` takes a different path because sound playback is already representable by the normalized scene graph. The browser-safe package maps reusable logical IDs to static or storage-backed audio asset sources and emits ordinary `ProgrammableSceneAsset`/`ProgrammableSceneAudioNode` values with deterministic asset IDs plus optional playback defaults. There is no sound-effect renderer, decoder, filesystem boundary, or second audio graph: scene normalization, storage resolution, project lowering, cancellation, and FFmpeg execution remain exactly where existing audio nodes already execute.
 
+Together, the generic surface path plus GIF, waveform, and sound-effect packages complete the V2.10 architectural objective: optional programmable-media integrations can extend rendering or authoring without introducing a second project model or pulling optional execution dependencies into core packages. Future Lottie/Rive/Three/canvas integrations should reuse these boundaries instead of changing them.
+
 The intended boundary is:
 
 ```text

@@ -527,6 +527,8 @@ See [docs/visual-playground.md](./docs/visual-playground.md).
 | `@vexa-video/studio` | Browser-safe Studio session/runtime state for composition selection, preview/timeline coordination, props, metadata, and hot reload |
 | `@vexa-video/cli` | Node.js command-line interface for probing, planning, rendering, hardware, and streaming |
 
+Extended programmable media stays additive: specialized packages integrate through the shared surface or scene/project boundaries, while `@vexa-video/core` and the normal SDK remain free of optional renderer dependencies.
+
 ## Architecture
 
 ```text

@@ -640,6 +640,10 @@ Each optional integration must have:
 
 For 3D/WebGL features, document GPU/browser skips explicitly.
 
+### Completion gate
+
+V2.10 closes when the generic surface-adapter acceptance path, GIF integration, waveform integration, sound-effect catalog coverage, dependency-boundary audits, typecheck, full test suite, build, and repository guards all pass together. The Windows closure run passed the focused sound-effect suite, the complete 331-test suite, `npm run typecheck`, `npm run build`, `npm run verify`, `git diff --check`, the public-README terminology guard, and the repository-wide prohibited-dependency-reference guard. Future Lottie, Rive, Three.js, or custom canvas/WebGL packages remain additive follow-ons rather than prerequisites for V2.10 completion.
+
 ## V2.11 — Browser rendering/WebCodecs
 
 ### Capability tests
