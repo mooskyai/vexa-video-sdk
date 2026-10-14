@@ -171,6 +171,16 @@ export interface VexaSurfaceRendererAdapterContext {
   readonly signal?: AbortSignal;
 }
 
+export interface VexaSurfaceFrameRendererAdapterContext
+  extends VexaSurfaceRendererAdapterContext {
+  /** Zero-based frame relative to the authored surface start. */
+  readonly localFrame: number;
+  /** Composition frame represented by localFrame. */
+  readonly absoluteFrame: number;
+  /** Deterministic 0..1 progress across the authored surface duration. */
+  readonly progress: number;
+}
+
 export interface VexaSurfaceSvgRenderResult {
   readonly kind: "svg";
   readonly svg: string;
@@ -188,13 +198,20 @@ export type VexaSurfaceRenderResult =
 export interface VexaSurfaceRendererAdapter {
   readonly rendererId: string;
   /**
-   * Materialize static surface intent as SVG text or PNG bytes. Vexa owns
-   * rasterization/file materialization and keeps generated files inside the
-   * managed render workspace.
+   * Materialize one static surface result. An adapter must expose exactly one of
+   * renderSurface() or renderFrame().
    */
-  renderSurface(
+  renderSurface?(
     surface: ProgrammableSceneSurfaceDescriptor,
     context: VexaSurfaceRendererAdapterContext
+  ): Promise<VexaSurfaceRenderResult> | VexaSurfaceRenderResult;
+  /**
+   * Materialize one local animation frame. Vexa calls this for the complete
+   * authored surface duration and owns the generated frame/video files.
+   */
+  renderFrame?(
+    surface: ProgrammableSceneSurfaceDescriptor,
+    context: VexaSurfaceFrameRendererAdapterContext
   ): Promise<VexaSurfaceRenderResult> | VexaSurfaceRenderResult;
 }
 
@@ -531,9 +548,11 @@ function normalizeSurfaceAdapters(
         "INVALID_RENDERER_OPTIONS"
       );
     }
-    if (typeof adapter.renderSurface !== "function") {
+    const hasStaticRenderer = typeof adapter.renderSurface === "function";
+    const hasFrameRenderer = typeof adapter.renderFrame === "function";
+    if (hasStaticRenderer === hasFrameRenderer) {
       throw new VexaRendererError(
-        `Surface renderer adapter "${adapter.rendererId.trim()}" requires renderSurface().`,
+        `Surface renderer adapter "${adapter.rendererId.trim()}" requires exactly one of renderSurface() or renderFrame().`,
         "INVALID_RENDERER_OPTIONS"
       );
     }
@@ -901,9 +920,29 @@ async function materializeProgrammableScenePrimitives(
   });
 }
 
-function renderSurfaceFileName(index: number, nodeId: string): string {
+function renderSurfaceBaseName(index: number, nodeId: string): string {
   const safeId = nodeId.replace(/[^a-zA-Z0-9._-]/gu, "-").slice(0, 96) || `surface-${index}`;
-  return join("surfaces", `${String(index).padStart(3, "0")}-${safeId}.png`);
+  return `${String(index).padStart(3, "0")}-${safeId}`;
+}
+
+function renderSurfaceFileName(index: number, nodeId: string): string {
+  return join("surfaces", `${renderSurfaceBaseName(index, nodeId)}.png`);
+}
+
+function renderSurfaceFrameFileName(index: number, nodeId: string, localFrame: number): string {
+  return join(
+    "surfaces",
+    `${renderSurfaceBaseName(index, nodeId)}-frames`,
+    `frame-${String(localFrame).padStart(6, "0")}.png`
+  );
+}
+
+function renderSurfaceFramePattern(index: number, nodeId: string): string {
+  return join("surfaces", `${renderSurfaceBaseName(index, nodeId)}-frames`, "frame-%06d.png");
+}
+
+function renderSurfaceAnimationFileName(index: number, nodeId: string): string {
+  return join("surfaces", `${renderSurfaceBaseName(index, nodeId)}.mov`);
 }
 
 function allocateSurfaceAssetId(index: number, usedAssetIds: Set<string>): string {
@@ -913,28 +952,32 @@ function allocateSurfaceAssetId(index: number, usedAssetIds: Set<string>): strin
   return candidate;
 }
 
+interface MaterializedSurfaceAsset {
+  readonly assetId: string;
+  readonly kind: "image" | "video";
+}
+
 function replaceSurfaceNodes(
   nodes: readonly ProgrammableSceneNode[],
-  surfaceAssetIds: ReadonlyMap<string, string>
+  surfaceAssets: ReadonlyMap<string, MaterializedSurfaceAsset>
 ): readonly ProgrammableSceneNode[] {
   return Object.freeze(nodes.map((node) => {
     if (node.kind === "group" || node.kind === "layer") {
       return Object.freeze({
         ...node,
-        children: replaceSurfaceNodes(node.children, surfaceAssetIds)
+        children: replaceSurfaceNodes(node.children, surfaceAssets)
       });
     }
     if (node.kind !== "surface") return node;
 
-    const assetId = surfaceAssetIds.get(node.id);
-    if (!assetId) {
+    const materialized = surfaceAssets.get(node.id);
+    if (!materialized) {
       throw new VexaRendererError(
         `Renderer surface asset was not materialized for node "${node.id}".`,
         "RENDER_SURFACE_FAILED"
       );
     }
-    return Object.freeze({
-      kind: "image",
+    const common = {
       id: node.id,
       ...(node.startFrame !== undefined ? { startFrame: node.startFrame } : {}),
       ...(node.durationInFrames !== undefined ? { durationInFrames: node.durationInFrames } : {}),
@@ -943,8 +986,11 @@ function replaceSurfaceNodes(
       ...(node.transform !== undefined ? { transform: node.transform } : {}),
       ...(node.effects !== undefined ? { effects: node.effects } : {}),
       ...(node.transitions !== undefined ? { transitions: node.transitions } : {}),
-      assetId
-    });
+      assetId: materialized.assetId
+    };
+    return materialized.kind === "video"
+      ? Object.freeze({ kind: "video" as const, ...common, muted: true })
+      : Object.freeze({ kind: "image" as const, ...common });
   }));
 }
 
@@ -1051,6 +1097,40 @@ function validateSurfacePng(
   return png;
 }
 
+function rasterizeSurfaceResult(
+  rendered: VexaSurfaceRenderResult,
+  rendererId: string,
+  nodeId: string,
+  compositionId: string
+): Uint8Array {
+  if (rendered?.kind === "svg") {
+    if (typeof rendered.svg !== "string" || !rendered.svg.trim()) {
+      throw new VexaRendererError(
+        `Surface renderer adapter "${rendererId}" returned an invalid SVG result for node "${nodeId}".`,
+        "RENDER_SURFACE_FAILED",
+        { compositionId }
+      );
+    }
+    try {
+      return new Resvg(rendered.svg, { font: { loadSystemFonts: false } }).render().asPng();
+    } catch (cause) {
+      throw new VexaRendererError(
+        `Surface renderer adapter "${rendererId}" returned SVG that could not be rasterized for node "${nodeId}": ${cause instanceof Error ? cause.message : String(cause)}.`,
+        "RENDER_SURFACE_FAILED",
+        { compositionId, cause }
+      );
+    }
+  }
+  if (rendered?.kind === "png") {
+    return validateSurfacePng(rendered.png, rendererId, nodeId, compositionId);
+  }
+  throw new VexaRendererError(
+    `Surface renderer adapter "${rendererId}" returned an unsupported surface result for node "${nodeId}".`,
+    "RENDER_SURFACE_FAILED",
+    { compositionId }
+  );
+}
+
 async function materializeProgrammableSceneSurfaces(
   scene: ProgrammableScene,
   items: readonly ProgrammableSurfaceRenderItem[],
@@ -1058,6 +1138,9 @@ async function materializeProgrammableSceneSurfaces(
   reservedAssetIds: readonly string[],
   adapters: ReadonlyMap<string, VexaSurfaceRendererAdapter>,
   compositionId: string,
+  ffmpegPath: string | undefined,
+  ffprobePath: string | undefined,
+  timeoutMs: number,
   signal?: AbortSignal
 ): Promise<ProgrammableScene> {
   if (items.length === 0) return scene;
@@ -1067,7 +1150,7 @@ async function materializeProgrammableSceneSurfaces(
     ...scene.assets.map((asset) => asset.id),
     ...reservedAssetIds
   ]);
-  const surfaceAssetIds = new Map<string, string>();
+  const surfaceAssets = new Map<string, MaterializedSurfaceAsset>();
   const generatedAssets: ProgrammableSceneAsset[] = [];
 
   for (let index = 0; index < items.length; index += 1) {
@@ -1083,18 +1166,108 @@ async function materializeProgrammableSceneSurfaces(
       );
     }
 
+    const adapterContext: VexaSurfaceRendererAdapterContext = {
+      compositionId,
+      nodeId: item.node.id,
+      width: scene.width,
+      height: scene.height,
+      fps: scene.fps,
+      absoluteStartFrame: item.absoluteStartFrame,
+      durationInFrames: item.durationInFrames,
+      ...(signal ? { signal } : {})
+    };
+    const assetId = allocateSurfaceAssetId(index, usedAssetIds);
+
+    if (typeof adapter.renderFrame === "function") {
+      for (let localFrame = 0; localFrame < item.durationInFrames; localFrame += 1) {
+        if (signal?.aborted) throw new ProcessAbortedError();
+        let rendered: VexaSurfaceRenderResult;
+        try {
+          rendered = await adapter.renderFrame(item.node.surface, {
+            ...adapterContext,
+            localFrame,
+            absoluteFrame: item.absoluteStartFrame + localFrame,
+            progress: item.durationInFrames <= 1
+              ? 0
+              : localFrame / (item.durationInFrames - 1)
+          });
+        } catch (cause) {
+          if (signal?.aborted || cause instanceof ProcessAbortedError) throw new ProcessAbortedError();
+          throw new VexaRendererError(
+            `Surface renderer adapter "${rendererId}" failed for node "${item.node.id}" at local frame ${localFrame}: ${cause instanceof Error ? cause.message : String(cause)}.`,
+            "RENDER_SURFACE_FAILED",
+            { compositionId, cause }
+          );
+        }
+        const frameTarget = fileFor(renderSurfaceFrameFileName(index, item.node.id, localFrame));
+        await mkdir(dirname(frameTarget), { recursive: true });
+        await writeFile(
+          frameTarget,
+          rasterizeSurfaceResult(rendered, rendererId, item.node.id, compositionId),
+          { ...(signal ? { signal } : {}) }
+        );
+      }
+
+      const animationTarget = fileFor(renderSurfaceAnimationFileName(index, item.node.id));
+      const framePattern = fileFor(renderSurfaceFramePattern(index, item.node.id));
+      try {
+        const binaries = await resolveMediaBinaries({
+          ...(ffmpegPath ? { ffmpegPath } : {}),
+          ...(ffprobePath ? { ffprobePath } : {})
+        });
+        await runProcess(
+          binaries.ffmpeg,
+          [
+            "-y",
+            "-framerate",
+            formatShapeNumber(scene.fps),
+            "-start_number",
+            "0",
+            "-i",
+            framePattern,
+            "-frames:v",
+            String(item.durationInFrames),
+            "-an",
+            "-c:v",
+            "qtrle",
+            "-pix_fmt",
+            "argb",
+            animationTarget
+          ],
+          {
+            ...(signal ? { signal } : {}),
+            timeoutMs
+          }
+        );
+      } catch (cause) {
+        if (signal?.aborted || cause instanceof ProcessAbortedError) throw new ProcessAbortedError();
+        if (cause instanceof ProcessTimeoutError) throw cause;
+        throw new VexaRendererError(
+          `Surface renderer adapter "${rendererId}" frames could not be encoded for node "${item.node.id}": ${cause instanceof Error ? cause.message : String(cause)}.`,
+          "RENDER_SURFACE_FAILED",
+          { compositionId, cause }
+        );
+      }
+
+      surfaceAssets.set(item.node.id, Object.freeze({ assetId, kind: "video" }));
+      generatedAssets.push(Object.freeze({
+        id: assetId,
+        kind: "video",
+        source: Object.freeze({ kind: "static", src: animationTarget })
+      }));
+      continue;
+    }
+
+    if (typeof adapter.renderSurface !== "function") {
+      throw new VexaRendererError(
+        `Surface renderer adapter "${rendererId}" has no executable renderer for node "${item.node.id}".`,
+        "RENDER_SURFACE_FAILED",
+        { compositionId }
+      );
+    }
     let rendered: VexaSurfaceRenderResult;
     try {
-      rendered = await adapter.renderSurface(item.node.surface, {
-        compositionId,
-        nodeId: item.node.id,
-        width: scene.width,
-        height: scene.height,
-        fps: scene.fps,
-        absoluteStartFrame: item.absoluteStartFrame,
-        durationInFrames: item.durationInFrames,
-        ...(signal ? { signal } : {})
-      });
+      rendered = await adapter.renderSurface(item.node.surface, adapterContext);
     } catch (cause) {
       if (signal?.aborted || cause instanceof ProcessAbortedError) throw new ProcessAbortedError();
       throw new VexaRendererError(
@@ -1104,39 +1277,14 @@ async function materializeProgrammableSceneSurfaces(
       );
     }
 
-    let png: Uint8Array;
-    if (rendered?.kind === "svg") {
-      if (typeof rendered.svg !== "string" || !rendered.svg.trim()) {
-        throw new VexaRendererError(
-          `Surface renderer adapter "${rendererId}" returned an invalid static SVG result for node "${item.node.id}".`,
-          "RENDER_SURFACE_FAILED",
-          { compositionId }
-        );
-      }
-      try {
-        png = new Resvg(rendered.svg, { font: { loadSystemFonts: false } }).render().asPng();
-      } catch (cause) {
-        throw new VexaRendererError(
-          `Surface renderer adapter "${rendererId}" returned SVG that could not be rasterized for node "${item.node.id}": ${cause instanceof Error ? cause.message : String(cause)}.`,
-          "RENDER_SURFACE_FAILED",
-          { compositionId, cause }
-        );
-      }
-    } else if (rendered?.kind === "png") {
-      png = validateSurfacePng(rendered.png, rendererId, item.node.id, compositionId);
-    } else {
-      throw new VexaRendererError(
-        `Surface renderer adapter "${rendererId}" returned an unsupported static surface result for node "${item.node.id}".`,
-        "RENDER_SURFACE_FAILED",
-        { compositionId }
-      );
-    }
-
-    const assetId = allocateSurfaceAssetId(index, usedAssetIds);
     const target = fileFor(renderSurfaceFileName(index, item.node.id));
     await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, png, { ...(signal ? { signal } : {}) });
-    surfaceAssetIds.set(item.node.id, assetId);
+    await writeFile(
+      target,
+      rasterizeSurfaceResult(rendered, rendererId, item.node.id, compositionId),
+      { ...(signal ? { signal } : {}) }
+    );
+    surfaceAssets.set(item.node.id, Object.freeze({ assetId, kind: "image" }));
     generatedAssets.push(Object.freeze({
       id: assetId,
       kind: "image",
@@ -1154,7 +1302,7 @@ async function materializeProgrammableSceneSurfaces(
     ...(scene.background !== undefined ? { background: scene.background } : {}),
     ...(scene.captions !== undefined ? { captions: scene.captions } : {}),
     assets: Object.freeze([...scene.assets, ...generatedAssets]),
-    children: replaceSurfaceNodes(scene.children, surfaceAssetIds)
+    children: replaceSurfaceNodes(scene.children, surfaceAssets)
   });
 }
 
@@ -1266,11 +1414,15 @@ async function createRenderAssetWorkspace(
       Object.keys(resolvedAssets),
       surfaceAdapters,
       compositionId,
+      options.ffmpegPath,
+      options.ffprobePath,
+      timeoutMs,
       signal
     );
   } catch (cause) {
     await workspace.cleanup().catch(() => undefined);
     if (signal?.aborted || cause instanceof ProcessAbortedError) throw new ProcessAbortedError();
+    if (cause instanceof ProcessTimeoutError) throw cause;
     if (cause instanceof VexaRendererError) throw cause;
     throw new VexaRendererError(
       `Failed to materialize programmable raster nodes for composition "${compositionId}": ${cause instanceof Error ? cause.message : String(cause)}.`,

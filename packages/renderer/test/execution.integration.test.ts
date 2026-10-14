@@ -753,6 +753,174 @@ test("surface renderer adapters materialize static SVG and PNG intent with timin
   }
 });
 
+test("frame-aware surface adapters preserve authored animation timing and cleanup", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "vexa-surface-animation-"));
+  const workspaceRoot = join(tempRoot, "workspaces");
+  const frameOutput = join(tempRoot, "surface-animation-frame.png");
+  const rangeOutput = join(tempRoot, "surface-animation-range");
+  const videoOutput = join(tempRoot, "surface-animation.mp4");
+
+  try {
+    await mkdir(workspaceRoot, { recursive: true });
+    const renderer = await createSurfaceBundledRenderer(tempRoot);
+    const storage = new Storage({ workspaceRoot });
+
+    await assert.rejects(
+      () => renderer.renderFrame({
+        compositionId: "surface-showcase",
+        frame: 6,
+        output: join(tempRoot, "surface-ambiguous-adapter.png"),
+        storage,
+        surfaceAdapters: [{
+          rendererId: "fixture.surface",
+          renderSurface: () => ({ kind: "svg", svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" />" }),
+          renderFrame: () => ({ kind: "svg", svg: "<svg xmlns=\"http://www.w3.org/2000/svg\" />" })
+        }]
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError && error.code === "INVALID_RENDERER_OPTIONS"
+    );
+
+    await assert.rejects(
+      () => renderer.renderFrame({
+        compositionId: "surface-showcase",
+        frame: 6,
+        output: join(tempRoot, "surface-corrupt-animation-frame.png"),
+        storage,
+        surfaceAdapters: [{
+          rendererId: "fixture.surface",
+          renderFrame(_surface, context) {
+            if (context.localFrame === 3) {
+              return { kind: "png", png: Uint8Array.from([137, 80, 78, 71]) };
+            }
+            return {
+              kind: "png",
+              png: new Resvg(
+                `<svg xmlns="http://www.w3.org/2000/svg" width="${context.width}" height="${context.height}"><rect width="${context.width}" height="${context.height}" fill="#111827" /></svg>`,
+                { font: { loadSystemFonts: false } }
+              ).render().asPng()
+            };
+          }
+        }]
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError &&
+        error.code === "RENDER_SURFACE_FAILED" &&
+        /invalid PNG bytes/u.test(error.message)
+    );
+
+    const calls: Array<{
+      readonly localFrame: number;
+      readonly absoluteFrame: number;
+      readonly progress: number;
+    }> = [];
+    const adapter: VexaSurfaceRendererAdapter = {
+      rendererId: "fixture.surface",
+      renderFrame(surface, context) {
+        assert.equal(surface.kind, "svg");
+        calls.push({
+          localFrame: context.localFrame,
+          absoluteFrame: context.absoluteFrame,
+          progress: context.progress
+        });
+        const x = 16 + context.localFrame * 10;
+        return {
+          kind: "png",
+          png: new Resvg(
+            [
+              `<svg xmlns="http://www.w3.org/2000/svg" width="${context.width}" height="${context.height}" viewBox="0 0 ${context.width} ${context.height}">`,
+              `<rect x="${x}" y="20" width="40" height="50" rx="8" fill="#f97316" />`,
+              "</svg>"
+            ].join(""),
+            { font: { loadSystemFonts: false } }
+          ).render().asPng()
+        };
+      }
+    };
+
+    const frame = await renderer.renderFrame({
+      compositionId: "surface-showcase",
+      frame: 6,
+      output: frameOutput,
+      storage,
+      surfaceAdapters: [adapter]
+    });
+    const animatedFrameInput = frame.executionPlan.inputs.find(
+      (input) =>
+        input.kind === "video" &&
+        /[\\/]surfaces[\\/]/u.test(input.source) &&
+        input.source.toLowerCase().endsWith(".mov")
+    );
+    if (!animatedFrameInput) throw new Error("expected a renderer-owned animated surface input");
+    assert.match(frame.executionPlan.filterComplex, /a='alpha\(X,Y\)\*/u);
+    await assert.rejects(
+      () => readFile(animatedFrameInput.source),
+      (error: unknown) =>
+        error instanceof Error &&
+        "code" in error &&
+        (error as NodeJS.ErrnoException).code === "ENOENT"
+    );
+
+    const range = await renderer.renderFrameRange({
+      compositionId: "surface-showcase",
+      startFrame: 6,
+      endFrameExclusive: 7,
+      output: rangeOutput,
+      storage,
+      surfaceAdapters: [adapter]
+    });
+    assert.equal(range.frames.length, 1);
+    assert.equal(range.frames[0]!.frame, 6);
+    assert.equal(
+      frame.executionPlan.filterComplex,
+      range.frames[0]!.executionPlan.filterComplex
+    );
+    assert.deepEqual(
+      [...(await readFile(range.frames[0]!.output)).subarray(0, 8)],
+      [137, 80, 78, 71, 13, 10, 26, 10]
+    );
+
+    const video = await renderer.renderVideo({
+      compositionId: "surface-showcase",
+      startFrame: 0,
+      endFrameExclusive: 12,
+      output: videoOutput,
+      storage,
+      surfaceAdapters: [adapter],
+      hardwareAcceleration: "cpu"
+    });
+    assert.ok(video.executionPlan.optimizations.includes("PROGRAMMABLE_TRANSITION_GRAPH"));
+    const animatedVideoInput = video.executionPlan.inputs.find(
+      (input) =>
+        input.kind === "video" &&
+        /[\\/]surfaces[\\/]/u.test(input.source) &&
+        input.source.toLowerCase().endsWith(".mov")
+    );
+    if (!animatedVideoInput) throw new Error("expected an animated surface video input");
+    const mp4 = await readFile(videoOutput);
+    assert.equal(mp4.subarray(4, 8).toString("ascii"), "ftyp");
+    await assert.rejects(
+      () => readFile(animatedVideoInput.source),
+      (error: unknown) =>
+        error instanceof Error &&
+        "code" in error &&
+        (error as NodeJS.ErrnoException).code === "ENOENT"
+    );
+
+    assert.equal(calls.length, 24);
+    for (let renderIndex = 0; renderIndex < 3; renderIndex += 1) {
+      const renderCalls = calls.slice(renderIndex * 8, renderIndex * 8 + 8);
+      assert.deepEqual(renderCalls.map((call) => call.localFrame), [0, 1, 2, 3, 4, 5, 6, 7]);
+      assert.deepEqual(renderCalls.map((call) => call.absoluteFrame), [4, 5, 6, 7, 8, 9, 10, 11]);
+      assert.equal(renderCalls[0]?.progress, 0);
+      assert.equal(renderCalls.at(-1)?.progress, 1);
+    }
+    assert.deepEqual(await readdir(workspaceRoot), []);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test("surface adapter execution stays outside core and normal SDK dependencies", async () => {
   const repoRoot = resolve(fileURLToPath(new URL("../../../", import.meta.url)));
   for (const packagePath of ["packages/core/package.json", "packages/sdk/package.json"]) {
