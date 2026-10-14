@@ -652,6 +652,8 @@ The first V2.11 slice covers capability normalization and deterministic browser/
 
 The second slice adds injectable video-encoder execution coverage for deterministic frame timestamps/keyframes, encoded chunk copying, frame closure, bounded-queue flushes, progress completion, cancellation/reset, audio-plan rejection, and frame-render failure mapping. These tests validate the browser execution contract without misrepresenting raw encoded chunks as a playable container.
 
+The third slice adds deterministic WebM muxing tests for EBML/container identity, VP9/AV1 codec IDs, Blob type/size metadata, browser File creation, keyframe-first/monotonic packet validation, and typed refusal of MP4/H.264 muxing until the required codec-private metadata path is implemented.
+
 Cover:
 
 - WebCodecs unavailable;

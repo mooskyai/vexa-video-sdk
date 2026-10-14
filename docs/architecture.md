@@ -154,6 +154,8 @@ V2.11 begins with `@vexa-video/web-renderer` as a separate browser-safe backend 
 
 The second slice adds video-only execution behind that same plan. A caller-provided frame source is converted into `VideoFrame` instances with deterministic composition-derived microsecond timing, fed into `VideoEncoder` with bounded queue flushes and periodic keyframes, copied into owned encoded-chunk bytes, and closed immediately after enqueue. Progress and `AbortSignal` cancellation remain browser-safe; cancellation resets the encoder before cleanup. The frame-source callback deliberately keeps Canvas/DOM capture policy outside the encoder and preserves the existing composition model. Raw encoded chunks are not treated as an MP4/WebM container; muxing, browser audio, Blob/File output, and concrete capture adapters remain separate follow-on responsibilities.
 
+The third slice keeps muxing in the same browser package but below the encoder contract. Vexa's owned VP9/AV1 chunks are serialized directly into deterministic WebM EBML structures and exposed as byte data plus a `video/webm` Blob; optional File creation is a thin browser API wrapper. This path is deliberately dependency-free and accepts only keyframe-first monotonic packet streams. H.264/MP4 remains typed fail-closed until WebCodecs decoder metadata and AVC codec-private data are preserved through the encoder callback, preventing a fake or unplayable MP4 surface.
+
 `@vexa-video/web-renderer` does not import the SDK, Node renderer, FFmpeg, filesystem, or process execution. Browser execution extends the backend boundary without changing composition semantics.
 
 The intended boundary is:

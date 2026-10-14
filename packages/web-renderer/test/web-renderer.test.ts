@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { detectWebRenderCapabilities, planWebRender } from "../src/index.js";
+import {
+  createWebVideoFile,
+  detectWebRenderCapabilities,
+  muxWebVideo,
+  planWebRender,
+  VexaWebMuxError,
+  type VexaWebVideoEncodeResult
+} from "../src/index.js";
 
 function runtime(video: readonly string[], audio: readonly string[] = []) {
   return {
@@ -225,4 +232,88 @@ test("video execution fails closed for audio plans and frame-render failures", a
     }),
     (error: unknown) => error instanceof VexaWebVideoEncodeError && error.code === "FRAME_RENDER_FAILED"
   );
+});
+
+
+function encodedWebm(videoCodec: "vp9" | "av1" = "vp9"): VexaWebVideoEncodeResult {
+  return {
+    kind: "encoded-video-chunks",
+    targetContainer: "webm",
+    videoCodec,
+    codec: videoCodec === "vp9" ? "vp09.00.10.08" : "av01.0.04M.08",
+    width: 16,
+    height: 16,
+    fps: 30,
+    frameCount: 3,
+    durationSeconds: 0.1,
+    chunks: [
+      { type: "key", timestampUs: 0, durationUs: 33_333, data: new Uint8Array([1, 2, 3]) },
+      { type: "delta", timestampUs: 33_333, durationUs: 33_333, data: new Uint8Array([4, 5]) },
+      { type: "delta", timestampUs: 66_667, durationUs: 33_333, data: new Uint8Array([6]) }
+    ]
+  };
+}
+
+function containsAscii(data: Uint8Array, text: string): boolean {
+  const needle = new TextEncoder().encode(text);
+  outer: for (let offset = 0; offset <= data.length - needle.length; offset += 1) {
+    for (let index = 0; index < needle.length; index += 1) {
+      if (data[offset + index] !== needle[index]) continue outer;
+    }
+    return true;
+  }
+  return false;
+}
+
+test("muxes deterministic VP9 WebM bytes and Blob metadata", () => {
+  const muxed = muxWebVideo(encodedWebm("vp9"));
+  assert.equal(muxed.kind, "muxed-video");
+  assert.equal(muxed.container, "webm");
+  assert.equal(muxed.mimeType, "video/webm");
+  assert.equal(muxed.blob.type, "video/webm");
+  assert.equal(muxed.blob.size, muxed.data.byteLength);
+  assert.deepEqual([...muxed.data.slice(0, 4)], [0x1a, 0x45, 0xdf, 0xa3]);
+  assert.equal(containsAscii(muxed.data, "webm"), true);
+  assert.equal(containsAscii(muxed.data, "V_VP9"), true);
+});
+
+test("muxes AV1 with the WebM codec identity", () => {
+  const muxed = muxWebVideo(encodedWebm("av1"));
+  assert.equal(muxed.videoCodec, "av1");
+  assert.equal(containsAscii(muxed.data, "V_AV1"), true);
+});
+
+test("WebM muxing fails closed for MP4 and invalid packet order", () => {
+  assert.throws(
+    () => muxWebVideo({ ...encodedWebm(), targetContainer: "mp4", videoCodec: "h264", codec: "avc1.42E01E" }),
+    (error: unknown) => error instanceof VexaWebMuxError && error.code === "CONTAINER_MUX_UNSUPPORTED"
+  );
+  const noKey = encodedWebm();
+  assert.throws(
+    () => muxWebVideo({ ...noKey, chunks: [{ ...noKey.chunks[0]!, type: "delta" }, ...noKey.chunks.slice(1)] }),
+    (error: unknown) => error instanceof VexaWebMuxError && error.code === "INVALID_MUX_INPUT"
+  );
+  const reversed = encodedWebm();
+  assert.throws(
+    () => muxWebVideo({ ...reversed, chunks: [reversed.chunks[0]!, reversed.chunks[2]!, reversed.chunks[1]!] }),
+    (error: unknown) => error instanceof VexaWebMuxError && error.code === "INVALID_MUX_INPUT"
+  );
+});
+
+test("creates File output through the browser file boundary", () => {
+  const muxed = muxWebVideo(encodedWebm());
+  const expected = { name: "render.webm", type: "video/webm" } as unknown as File;
+  let receivedName = "";
+  let receivedType = "";
+  const file = createWebVideoFile(muxed, "render.webm", {
+    createFile(parts, fileName, options) {
+      assert.equal(parts.length, 1);
+      receivedName = fileName;
+      receivedType = options.type ?? "";
+      return expected;
+    }
+  });
+  assert.equal(file, expected);
+  assert.equal(receivedName, "render.webm");
+  assert.equal(receivedType, "video/webm");
 });
