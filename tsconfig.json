@@ -50,6 +50,9 @@
       "path": "./packages/waveform"
     },
     {
+      "path": "./packages/sound-effects"
+    },
+    {
       "path": "./packages/cli"
     },
     {

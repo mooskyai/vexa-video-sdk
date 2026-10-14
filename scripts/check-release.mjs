@@ -13,6 +13,7 @@ const releasePackages = [
   "packages/renderer",
   "packages/gif",
   "packages/waveform",
+  "packages/sound-effects",
   "packages/studio",
   "packages/cli"
 ];

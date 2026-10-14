@@ -146,6 +146,8 @@ V2.10 extends that renderer-owned materialization boundary without changing the 
 
 `@vexa-video/core/browser` exposes serializable programmable-composition metadata plus pure composition definition/resolution, timing, and scene runtimes. Composition definition/registry authoring remains on the normal core surface. The browser entry must remain free of Node execution, FFmpeg, Redis, filesystem, and SDK runtime imports so future React/player packages can evaluate the same scene/timing semantics directly.
 
+`@vexa-video/sound-effects` takes a different path because sound playback is already representable by the normalized scene graph. The browser-safe package maps reusable logical IDs to static or storage-backed audio asset sources and emits ordinary `ProgrammableSceneAsset`/`ProgrammableSceneAudioNode` values with deterministic asset IDs plus optional playback defaults. There is no sound-effect renderer, decoder, filesystem boundary, or second audio graph: scene normalization, storage resolution, project lowering, cancellation, and FFmpeg execution remain exactly where existing audio nodes already execute.
+
 The intended boundary is:
 
 ```text

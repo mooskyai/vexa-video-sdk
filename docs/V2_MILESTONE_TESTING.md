@@ -625,6 +625,10 @@ Cover logical source-id resolution, relative host-path resolution, invalid surfa
 
 Cover logical source-id resolution, relative host-path resolution, invalid adapter/surface styling, missing/corrupt/audio-less inputs, deterministic PNG output, per-surface color/background overrides, cancellation, private raster-workspace cleanup, and a dependency audit proving `@vexa-video/waveform` does not enter core or the normal SDK. The generic static surface renderer tests remain the end-to-end timing/effects/transitions acceptance path.
 
+### Sound-effect catalog tests
+
+Cover stable logical-id ordering, deterministic generated audio asset IDs, static and storage-backed asset sources, per-effect preload/playback defaults, per-instance playback overrides, repeated use of one asset without duplicate source definitions, invalid/duplicate normalized IDs, missing-effect lookup, invalid frame/rate/volume values, and a dependency audit proving `@vexa-video/sound-effects` depends only on `@vexa-video/core`. Existing programmable-scene/project tests remain the execution acceptance path because the package emits normal audio assets/nodes rather than introducing another renderer.
+
 Each optional integration must have:
 
 - an isolated package/dependency boundary;
