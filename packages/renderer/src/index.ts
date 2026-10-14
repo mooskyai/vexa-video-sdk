@@ -1193,6 +1193,7 @@ async function materializeProgrammableSceneSurfaces(
           });
         } catch (cause) {
           if (signal?.aborted || cause instanceof ProcessAbortedError) throw new ProcessAbortedError();
+          if (cause instanceof ProcessTimeoutError) throw cause;
           throw new VexaRendererError(
             `Surface renderer adapter "${rendererId}" failed for node "${item.node.id}" at local frame ${localFrame}: ${cause instanceof Error ? cause.message : String(cause)}.`,
             "RENDER_SURFACE_FAILED",
@@ -1270,6 +1271,7 @@ async function materializeProgrammableSceneSurfaces(
       rendered = await adapter.renderSurface(item.node.surface, adapterContext);
     } catch (cause) {
       if (signal?.aborted || cause instanceof ProcessAbortedError) throw new ProcessAbortedError();
+      if (cause instanceof ProcessTimeoutError) throw cause;
       throw new VexaRendererError(
         `Surface renderer adapter "${rendererId}" failed for node "${item.node.id}": ${cause instanceof Error ? cause.message : String(cause)}.`,
         "RENDER_SURFACE_FAILED",

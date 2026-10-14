@@ -44,6 +44,9 @@
       "path": "./packages/renderer"
     },
     {
+      "path": "./packages/gif"
+    },
+    {
       "path": "./packages/cli"
     },
     {

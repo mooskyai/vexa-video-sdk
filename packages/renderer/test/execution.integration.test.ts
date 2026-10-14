@@ -7,6 +7,7 @@ import { Script } from "node:vm";
 import test from "node:test";
 import { Resvg } from "@resvg/resvg-js";
 import { bundleCompositions } from "@vexa-video/bundler";
+import { ProcessTimeoutError } from "@vexa-video/core";
 import { resolveDefaultFontFile } from "@vexa-video/ffmpeg";
 import { Storage } from "@vexa-video/sdk";
 import {
@@ -570,6 +571,21 @@ test("surface renderer adapters materialize static SVG and PNG intent with timin
       () => renderer.renderFrame({
         compositionId: "surface-showcase",
         frame: 6,
+        output: join(tempRoot, "surface-adapter-timeout.png"),
+        storage,
+        surfaceAdapters: [{
+          rendererId: "fixture.surface",
+          renderSurface() { throw new ProcessTimeoutError(1); }
+        }]
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError && error.code === "RENDER_TIMEOUT"
+    );
+
+    await assert.rejects(
+      () => renderer.renderFrame({
+        compositionId: "surface-showcase",
+        frame: 6,
         output: join(tempRoot, "surface-empty-svg.png"),
         storage,
         surfaceAdapters: [{
@@ -807,6 +823,21 @@ test("frame-aware surface adapters preserve authored animation timing and cleanu
         error instanceof VexaRendererError &&
         error.code === "RENDER_SURFACE_FAILED" &&
         /invalid PNG bytes/u.test(error.message)
+    );
+
+    await assert.rejects(
+      () => renderer.renderFrame({
+        compositionId: "surface-showcase",
+        frame: 6,
+        output: join(tempRoot, "surface-animation-timeout.png"),
+        storage,
+        surfaceAdapters: [{
+          rendererId: "fixture.surface",
+          renderFrame() { throw new ProcessTimeoutError(1); }
+        }]
+      }),
+      (error: unknown) =>
+        error instanceof VexaRendererError && error.code === "RENDER_TIMEOUT"
     );
 
     const calls: Array<{

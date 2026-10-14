@@ -617,6 +617,10 @@ The renderer must wait for declared fonts before a frame is considered ready.
 
 Cover renderer-id normalization, duplicate adapters, missing adapters, ambiguous static+frame adapters, adapter exceptions, empty/malformed SVG output, valid PNG-byte output, corrupt/truncated PNG rejection, APNG rejection on the static path, cancellation, translation-only transform enforcement, and managed-workspace cleanup after success or failure. A real bundled surface fixture must render an inactive frame, an active SVG-backed frame, a PNG-result frame, and a video range while preserving authored timing plus effects/transitions after surface-to-image substitution. Frame-aware coverage must render the complete local frame sequence with exact local/absolute frame contexts, reject a corrupt animation frame before the final render, materialize an alpha-capable managed video intermediary, preserve transition execution after surface-to-video substitution, compare a single-frame render with the same frame produced through the frame-range path, and verify frame PNGs plus the temporary animation input are removed after render completion. Audit `@vexa-video/core` and the normal `@vexa-video/sdk` dependency graphs so renderer/integration dependencies do not leak into those packages.
 
+### GIF integration tests
+
+Cover logical source-id resolution, relative host-path resolution, invalid surface/source options, missing/corrupt/non-GIF inputs, deterministic first/second frame differences, loop wrap, non-loop final-frame hold, RGBA PNG results, cancellation, private extraction-workspace cleanup, and a dependency audit proving `@vexa-video/gif` does not enter core or the normal SDK. The generic frame-aware renderer tests remain the end-to-end timing/effects/transitions acceptance path and also verify adapter-thrown process timeouts retain `RENDER_TIMEOUT`.
+
 Each optional integration must have:
 
 - an isolated package/dependency boundary;

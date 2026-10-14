@@ -7,6 +7,7 @@ This repository contains the distribution surfaces around the media SDK:
 - `deploy/docker-worker` as a containerized render-service/worker recipe with FFmpeg;
 - `examples/react-client` and `examples/vue-client` as source-only browser integration examples;
 - `@vexa-video/editor` as framework-neutral timeline state/history/snap foundations;
+- `@vexa-video/gif` as an optional Node-side frame-aware GIF surface integration that keeps source paths and decoding outside core/browser packages;
 - `HostedRenderer` and `HostedRenderAdapter` for provider-neutral hosted rendering;
 - `.github/workflows/release.yml` plus release validation scripts for controlled npm publication.
 

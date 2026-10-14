@@ -11,6 +11,7 @@ const releasePackages = [
   "packages/player",
   "packages/bundler",
   "packages/renderer",
+  "packages/gif",
   "packages/studio",
   "packages/cli"
 ];
