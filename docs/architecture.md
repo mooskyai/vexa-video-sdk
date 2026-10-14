@@ -150,6 +150,8 @@ V2.10 extends that renderer-owned materialization boundary without changing the 
 
 Together, the generic surface path plus GIF, waveform, and sound-effect packages complete the V2.10 architectural objective: optional programmable-media integrations can extend rendering or authoring without introducing a second project model or pulling optional execution dependencies into core packages. Future Lottie/Rive/Three/canvas integrations should reuse these boundaries instead of changing them.
 
+V2.11 begins with `@vexa-video/web-renderer` as a separate browser-safe backend boundary. Its first slice owns only codec capability probing and deterministic browser/backend planning: H.264, VP9, AV1, AAC, and Opus support is queried through injectable WebCodecs-compatible hooks, and unsupported requests return typed fallback reasons suitable for routing to the existing Node/hosted renderer. It does not import the SDK, Node renderer, FFmpeg, filesystem, or process execution. Frame capture, browser encoding, muxing, progress, cancellation, and Blob/File output build behind this boundary in later V2.11 slices rather than changing composition semantics.
+
 The intended boundary is:
 
 ```text

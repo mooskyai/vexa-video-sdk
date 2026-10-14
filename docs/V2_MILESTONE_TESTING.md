@@ -648,6 +648,8 @@ V2.10 closes when the generic surface-adapter acceptance path, GIF integration, 
 
 ### Capability tests
 
+The first V2.11 slice covers capability normalization and deterministic browser/backend planning independently of frame capture and muxing. The probe runtime is injectable so non-browser unit tests can exercise the public contract without pretending that Node provides browser encoder APIs.
+
 Cover:
 
 - WebCodecs unavailable;

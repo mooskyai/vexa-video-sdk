@@ -694,6 +694,10 @@ Each integration should be optional and should not become a dependency of `@vexa
 
 ## V2.11 — Browser rendering and WebCodecs
 
+**Status:** In progress.
+
+The first slice adds `@vexa-video/web-renderer` as a browser-safe capability and planning boundary. It probes H.264/VP9/AV1 plus AAC/Opus support through injectable WebCodecs-compatible hooks, chooses deterministic MP4/WebM codec plans, and returns typed backend-fallback reasons when required browser capabilities are unavailable. This slice intentionally does not claim frame capture, encoding, muxing, progress, cancellation, or Blob/File output yet; those execute in later V2.11 slices behind the same public contract.
+
 ### Goal
 
 Render suitable compositions entirely in the browser.

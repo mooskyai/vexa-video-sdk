@@ -53,6 +53,9 @@
       "path": "./packages/sound-effects"
     },
     {
+      "path": "./packages/web-renderer"
+    },
+    {
       "path": "./packages/cli"
     },
     {

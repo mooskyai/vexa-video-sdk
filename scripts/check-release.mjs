@@ -14,6 +14,7 @@ const releasePackages = [
   "packages/gif",
   "packages/waveform",
   "packages/sound-effects",
+  "packages/web-renderer",
   "packages/studio",
   "packages/cli"
 ];

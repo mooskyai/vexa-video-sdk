@@ -10,6 +10,7 @@ This repository contains the distribution surfaces around the media SDK:
 - `@vexa-video/gif` as an optional Node-side frame-aware GIF surface integration that keeps source paths and decoding outside core/browser packages;
 - `@vexa-video/waveform` as an optional Node-side static audio-waveform surface integration that keeps media paths and FFmpeg rasterization outside core/browser packages;
 - `@vexa-video/sound-effects` as a browser-safe logical sound catalog that emits existing programmable audio assets/nodes instead of adding another execution path;
+- `@vexa-video/web-renderer` as a browser-safe WebCodecs capability and render-planning boundary with deterministic typed fallback to backend rendering;
 - `HostedRenderer` and `HostedRenderAdapter` for provider-neutral hosted rendering;
 - `.github/workflows/release.yml` plus release validation scripts for controlled npm publication.
 

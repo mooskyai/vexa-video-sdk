@@ -58,6 +58,7 @@ const workspaces = [
   "@vexa-video/gif",
   "@vexa-video/waveform",
   "@vexa-video/sound-effects",
+  "@vexa-video/web-renderer",
   "@vexa-video/studio",
   "@vexa-video/cli"
 ];

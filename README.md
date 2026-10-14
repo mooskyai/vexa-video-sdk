@@ -9,7 +9,7 @@ A typed, modular media-processing SDK for Node.js and TypeScript.
 
 Vexa provides high-level APIs for video editing, timeline composition, audio processing, captions, adaptive streaming, hardware-accelerated encoding, remote media, background jobs, and browser-safe Angular integration while keeping FFmpeg behind a backend-neutral API.
 
-> **Project status:** active development. The fifteen public packages are versioned together at 1.0.0; example workspaces remain private.
+> **Project status:** active development. The sixteen public packages are versioned together at 1.0.0; example workspaces remain private.
 
 ## Why Vexa?
 
@@ -47,6 +47,7 @@ Vexa keeps those concerns behind a typed SDK:
 | Hosted rendering | Provider-neutral submit/get/cancel contract for cloud or hosted render services |
 | Programmable authoring | Deterministic composition metadata, frame/time math, scene graphs, serializable shape/effect/transition/typography contracts, reusable logical sound-effect catalogs, visual scene nodes, and React authoring primitives |
 | Browser player | Framework-neutral playback state, seek/step/loop/rate/buffering, responsive host, events, and fullscreen |
+| Browser rendering | Browser-safe WebCodecs capability probing and deterministic typed fallback planning; capture/encode/mux execution follows in later V2.11 slices |
 | Composition bundling | TypeScript/TSX browser bundles, CSS/assets, deterministic manifests/discovery, source maps, and environment allowlists |
 | Composition rendering | Bundle-backed still/frame/range/video rendering with progress, cancellation, hardware selection, managed storage assets, renderer-owned shape plus fill/solid SVG-to-PNG rasterization, opt-in static and frame-aware surface renderer adapters with validated SVG/PNG frame results and managed lossless animation intermediates, optional logical-source GIF frame decoding, optional logical-source audio waveform rasterization, ordered programmable effects, easing-aware programmable fade/slide/wipe/zoom/circular-iris transitions, paired programmable push transitions, deterministic text stroke/shadow/alignment/line-spacing, readable local-font readiness, opt-in provider-keyed remote-font adapters, composition-level caption cue rendering, precise active-word timing, and speaker-aware caption styling before FFmpeg planning |
 | Studio runtime | Browser-safe composition session state that coordinates Player preview, Editor timeline state, draft props, resolved metadata, and hot-reload frame preservation |
@@ -524,6 +525,7 @@ See [docs/visual-playground.md](./docs/visual-playground.md).
 | `@vexa-video/gif` | Optional Node-side GIF surface adapter with logical source IDs, deterministic frame extraction, fit/loop controls, and private temporary-workspace cleanup |
 | `@vexa-video/waveform` | Optional Node-side audio waveform surface adapter with logical source IDs, deterministic FFmpeg rasterization, and private temporary-workspace cleanup |
 | `@vexa-video/sound-effects` | Browser-safe reusable sound-effect catalogs that emit ordinary programmable audio assets and nodes without adding another execution path |
+| `@vexa-video/web-renderer` | Browser-safe WebCodecs capability detection and deterministic browser/backend render planning |
 | `@vexa-video/studio` | Browser-safe Studio session/runtime state for composition selection, preview/timeline coordination, props, metadata, and hot reload |
 | `@vexa-video/cli` | Node.js command-line interface for probing, planning, rendering, hardware, and streaming |
 
