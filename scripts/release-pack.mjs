@@ -54,6 +54,7 @@ const workspaces = [
   ["@vexa-video/bundler", "packages/bundler"],
   ["@vexa-video/renderer", "packages/renderer"],
   ["@vexa-video/gif", "packages/gif"],
+  ["@vexa-video/waveform", "packages/waveform"],
   ["@vexa-video/studio", "packages/studio"],
   ["@vexa-video/cli", "packages/cli"]
 ];

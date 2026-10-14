@@ -621,6 +621,10 @@ Cover renderer-id normalization, duplicate adapters, missing adapters, ambiguous
 
 Cover logical source-id resolution, relative host-path resolution, invalid surface/source options, missing/corrupt/non-GIF inputs, deterministic first/second frame differences, loop wrap, non-loop final-frame hold, RGBA PNG results, cancellation, private extraction-workspace cleanup, and a dependency audit proving `@vexa-video/gif` does not enter core or the normal SDK. The generic frame-aware renderer tests remain the end-to-end timing/effects/transitions acceptance path and also verify adapter-thrown process timeouts retain `RENDER_TIMEOUT`.
 
+### Waveform integration tests
+
+Cover logical source-id resolution, relative host-path resolution, invalid adapter/surface styling, missing/corrupt/audio-less inputs, deterministic PNG output, per-surface color/background overrides, cancellation, private raster-workspace cleanup, and a dependency audit proving `@vexa-video/waveform` does not enter core or the normal SDK. The generic static surface renderer tests remain the end-to-end timing/effects/transitions acceptance path.
+
 Each optional integration must have:
 
 - an isolated package/dependency boundary;

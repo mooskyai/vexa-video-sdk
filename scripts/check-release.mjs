@@ -12,6 +12,7 @@ const releasePackages = [
   "packages/bundler",
   "packages/renderer",
   "packages/gif",
+  "packages/waveform",
   "packages/studio",
   "packages/cli"
 ];
