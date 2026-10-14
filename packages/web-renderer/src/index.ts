@@ -185,3 +185,310 @@ export function planWebRender(
   }
   return Object.freeze({ kind: "browser", container, videoCodec, ...(audioCodec === undefined ? {} : { audioCodec }) });
 }
+
+export type VexaWebVideoEncodeErrorCode =
+  | "AUDIO_EXECUTION_UNAVAILABLE"
+  | "ENCODER_UNAVAILABLE"
+  | "INVALID_ENCODE_REQUEST"
+  | "FRAME_RENDER_FAILED"
+  | "ENCODE_FAILED"
+  | "CANCELLED";
+
+export class VexaWebVideoEncodeError extends Error {
+  readonly code: VexaWebVideoEncodeErrorCode;
+
+  constructor(code: VexaWebVideoEncodeErrorCode, message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "VexaWebVideoEncodeError";
+    this.code = code;
+  }
+}
+
+export interface VexaWebVideoFrameHandle {
+  close(): void;
+}
+
+export interface VexaWebEncodedVideoChunkHandle {
+  readonly type: "key" | "delta";
+  readonly timestamp: number;
+  readonly duration?: number | null;
+  readonly byteLength: number;
+  copyTo(destination: AllowSharedBufferSource): void;
+}
+
+export interface VexaWebVideoEncoderHandle {
+  readonly encodeQueueSize: number;
+  configure(config: Readonly<{ codec: string; width: number; height: number; bitrate: number; framerate: number }>): void;
+  encode(frame: VexaWebVideoFrameHandle, options?: Readonly<{ keyFrame?: boolean }>): void;
+  flush(): Promise<void>;
+  reset(): void;
+  close(): void;
+}
+
+export interface VexaWebVideoEncodingRuntime {
+  createVideoFrame(
+    source: unknown,
+    init: Readonly<{ timestamp: number; duration: number }>
+  ): VexaWebVideoFrameHandle;
+  createVideoEncoder(callbacks: Readonly<{
+    output: (chunk: VexaWebEncodedVideoChunkHandle) => void;
+    error: (error: Error) => void;
+  }>): VexaWebVideoEncoderHandle;
+}
+
+export interface VexaWebVideoFrameContext {
+  readonly frame: number;
+  readonly frameCount: number;
+  readonly width: number;
+  readonly height: number;
+  readonly fps: number;
+  readonly timestampUs: number;
+  readonly durationUs: number;
+}
+
+export interface VexaWebVideoEncodeProgress {
+  readonly phase: "encoding" | "complete";
+  readonly completedFrames: number;
+  readonly totalFrames: number;
+  readonly progress: number;
+}
+
+export interface VexaWebEncodedVideoChunk {
+  readonly type: "key" | "delta";
+  readonly timestampUs: number;
+  readonly durationUs?: number;
+  readonly data: Uint8Array;
+}
+
+export interface VexaWebVideoEncodeOptions {
+  readonly plan: VexaWebRenderBrowserPlan;
+  readonly width: number;
+  readonly height: number;
+  readonly fps: number;
+  readonly frameCount: number;
+  readonly bitrate?: number;
+  readonly keyFrameInterval?: number;
+  readonly maxQueueSize?: number;
+  readonly signal?: AbortSignal;
+  readonly renderFrame: (
+    context: VexaWebVideoFrameContext,
+    signal: AbortSignal | undefined
+  ) => unknown | Promise<unknown>;
+  readonly onProgress?: (progress: VexaWebVideoEncodeProgress) => void;
+  readonly runtime?: VexaWebVideoEncodingRuntime;
+}
+
+export interface VexaWebVideoEncodeResult {
+  readonly kind: "encoded-video-chunks";
+  readonly targetContainer: VexaWebContainer;
+  readonly videoCodec: VexaWebVideoCodec;
+  readonly codec: string;
+  readonly width: number;
+  readonly height: number;
+  readonly fps: number;
+  readonly frameCount: number;
+  readonly durationSeconds: number;
+  readonly chunks: readonly VexaWebEncodedVideoChunk[];
+}
+
+function positiveInteger(value: number, name: string): number {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new VexaWebVideoEncodeError("INVALID_ENCODE_REQUEST", `${name} must be a positive integer.`);
+  }
+  return value;
+}
+
+function positiveFinite(value: number, name: string): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new VexaWebVideoEncodeError("INVALID_ENCODE_REQUEST", `${name} must be a positive finite number.`);
+  }
+  return value;
+}
+
+function defaultEncodingRuntime(): VexaWebVideoEncodingRuntime {
+  const globalValue = globalThis as typeof globalThis & {
+    VideoFrame?: new (
+      source: unknown,
+      init: Readonly<{ timestamp: number; duration: number }>
+    ) => VexaWebVideoFrameHandle;
+    VideoEncoder?: new (callbacks: Readonly<{
+      output: (chunk: VexaWebEncodedVideoChunkHandle) => void;
+      error: (error: Error) => void;
+    }>) => VexaWebVideoEncoderHandle;
+  };
+  if (typeof globalValue.VideoFrame !== "function" || typeof globalValue.VideoEncoder !== "function") {
+    throw new VexaWebVideoEncodeError(
+      "ENCODER_UNAVAILABLE",
+      "Browser VideoFrame/VideoEncoder execution is unavailable."
+    );
+  }
+  return {
+    createVideoFrame(source, init) {
+      return new globalValue.VideoFrame!(source, init);
+    },
+    createVideoEncoder(callbacks) {
+      return new globalValue.VideoEncoder!(callbacks);
+    }
+  };
+}
+
+function cancellationError(): VexaWebVideoEncodeError {
+  return new VexaWebVideoEncodeError("CANCELLED", "Browser video encoding was cancelled.");
+}
+
+export async function encodeWebVideoFrames(
+  options: VexaWebVideoEncodeOptions
+): Promise<VexaWebVideoEncodeResult> {
+  const width = positiveInteger(options.width, "width");
+  const height = positiveInteger(options.height, "height");
+  const frameCount = positiveInteger(options.frameCount, "frameCount");
+  const fps = positiveFinite(options.fps, "fps");
+  const bitrate = positiveInteger(options.bitrate ?? Math.max(500_000, Math.round(width * height * fps * 0.08)), "bitrate");
+  const keyFrameInterval = positiveInteger(options.keyFrameInterval ?? Math.max(1, Math.round(fps * 2)), "keyFrameInterval");
+  const maxQueueSize = positiveInteger(options.maxQueueSize ?? 8, "maxQueueSize");
+
+  if (options.plan.audioCodec !== undefined) {
+    throw new VexaWebVideoEncodeError(
+      "AUDIO_EXECUTION_UNAVAILABLE",
+      "V2.11 browser video execution does not encode or mux audio yet."
+    );
+  }
+  if (options.signal?.aborted) throw cancellationError();
+
+  const runtime = options.runtime ?? defaultEncodingRuntime();
+  const chunks: VexaWebEncodedVideoChunk[] = [];
+  let encoderFailure: Error | undefined;
+  let encoder: VexaWebVideoEncoderHandle | undefined;
+  let closed = false;
+
+  const closeEncoder = () => {
+    if (encoder === undefined || closed) return;
+    closed = true;
+    try {
+      encoder.close();
+    } catch {
+      // Cleanup is best-effort after reset/failure.
+    }
+  };
+  const cancelEncoder = () => {
+    if (encoder === undefined || closed) return;
+    try {
+      encoder.reset();
+    } catch {
+      // The main operation reports cancellation below.
+    }
+  };
+
+  try {
+    encoder = runtime.createVideoEncoder({
+      output(chunk) {
+        const data = new Uint8Array(chunk.byteLength);
+        chunk.copyTo(data);
+        chunks.push(Object.freeze({
+          type: chunk.type,
+          timestampUs: chunk.timestamp,
+          ...(chunk.duration == null ? {} : { durationUs: chunk.duration }),
+          data
+        }));
+      },
+      error(error) {
+        encoderFailure = error;
+      }
+    });
+    options.signal?.addEventListener("abort", cancelEncoder, { once: true });
+    encoder.configure({
+      codec: VIDEO_CODEC_CONFIG[options.plan.videoCodec],
+      width,
+      height,
+      bitrate,
+      framerate: fps
+    });
+
+    const durationUs = Math.max(1, Math.round(1_000_000 / fps));
+    for (let frame = 0; frame < frameCount; frame += 1) {
+      if (options.signal?.aborted) throw cancellationError();
+      if (encoderFailure !== undefined) {
+        throw new VexaWebVideoEncodeError("ENCODE_FAILED", "Browser video encoder failed.", { cause: encoderFailure });
+      }
+
+      const timestampUs = Math.round((frame * 1_000_000) / fps);
+      const context = Object.freeze({ frame, frameCount, width, height, fps, timestampUs, durationUs });
+      let source: unknown;
+      try {
+        source = await options.renderFrame(context, options.signal);
+      } catch (error) {
+        if (options.signal?.aborted) throw cancellationError();
+        throw new VexaWebVideoEncodeError(
+          "FRAME_RENDER_FAILED",
+          `Browser frame ${frame} could not be rendered.`,
+          { cause: error }
+        );
+      }
+      if (options.signal?.aborted) throw cancellationError();
+
+      let videoFrame: VexaWebVideoFrameHandle;
+      try {
+        videoFrame = runtime.createVideoFrame(source, { timestamp: timestampUs, duration: durationUs });
+      } catch (error) {
+        throw new VexaWebVideoEncodeError(
+          "FRAME_RENDER_FAILED",
+          `Browser frame ${frame} could not be converted to VideoFrame.`,
+          { cause: error }
+        );
+      }
+      try {
+        encoder.encode(videoFrame, { keyFrame: frame % keyFrameInterval === 0 });
+      } finally {
+        videoFrame.close();
+      }
+
+      if (encoder.encodeQueueSize >= maxQueueSize) {
+        await encoder.flush();
+      }
+      if (encoderFailure !== undefined) {
+        throw new VexaWebVideoEncodeError("ENCODE_FAILED", "Browser video encoder failed.", { cause: encoderFailure });
+      }
+      if (options.signal?.aborted) throw cancellationError();
+      options.onProgress?.(Object.freeze({
+        phase: "encoding",
+        completedFrames: frame + 1,
+        totalFrames: frameCount,
+        progress: (frame + 1) / frameCount
+      }));
+    }
+
+    await encoder.flush();
+    if (encoderFailure !== undefined) {
+      throw new VexaWebVideoEncodeError("ENCODE_FAILED", "Browser video encoder failed.", { cause: encoderFailure });
+    }
+    if (options.signal?.aborted) throw cancellationError();
+    options.onProgress?.(Object.freeze({
+      phase: "complete",
+      completedFrames: frameCount,
+      totalFrames: frameCount,
+      progress: 1
+    }));
+
+    return Object.freeze({
+      kind: "encoded-video-chunks",
+      targetContainer: options.plan.container,
+      videoCodec: options.plan.videoCodec,
+      codec: VIDEO_CODEC_CONFIG[options.plan.videoCodec],
+      width,
+      height,
+      fps,
+      frameCount,
+      durationSeconds: frameCount / fps,
+      chunks: Object.freeze(chunks.slice())
+    });
+  } catch (error) {
+    if (options.signal?.aborted && !(error instanceof VexaWebVideoEncodeError && error.code === "CANCELLED")) {
+      throw cancellationError();
+    }
+    if (error instanceof VexaWebVideoEncodeError) throw error;
+    throw new VexaWebVideoEncodeError("ENCODE_FAILED", "Browser video encoding failed.", { cause: error });
+  } finally {
+    options.signal?.removeEventListener("abort", cancelEncoder);
+    closeEncoder();
+  }
+}

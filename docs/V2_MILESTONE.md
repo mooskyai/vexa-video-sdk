@@ -696,7 +696,9 @@ Each integration should be optional and should not become a dependency of `@vexa
 
 **Status:** In progress.
 
-The first slice adds `@vexa-video/web-renderer` as a browser-safe capability and planning boundary. It probes H.264/VP9/AV1 plus AAC/Opus support through injectable WebCodecs-compatible hooks, chooses deterministic MP4/WebM codec plans, and returns typed backend-fallback reasons when required browser capabilities are unavailable. This slice intentionally does not claim frame capture, encoding, muxing, progress, cancellation, or Blob/File output yet; those execute in later V2.11 slices behind the same public contract.
+The first slice adds `@vexa-video/web-renderer` as a browser-safe capability and planning boundary. It probes H.264/VP9/AV1 plus AAC/Opus support through injectable WebCodecs-compatible hooks, chooses deterministic MP4/WebM codec plans, and returns typed backend-fallback reasons when required browser capabilities are unavailable.
+
+The second slice executes video-only browser plans through a frame-source callback and the browser `VideoFrame`/`VideoEncoder` path. It owns deterministic microsecond timestamps, periodic keyframes, bounded encoder queues, progress, `AbortSignal` cancellation/reset, frame cleanup, encoded-chunk copying, and typed render/encode failures. The result is explicitly an encoded video-chunk stream rather than a claimed MP4/WebM file because container muxing is not provided by WebCodecs. Canvas/DOM capture adapters, browser audio, muxing, and Blob/File output remain later V2.11 work behind this same boundary.
 
 ### Goal
 

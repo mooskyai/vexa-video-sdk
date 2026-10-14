@@ -55,3 +55,174 @@ test("package dependency boundary stays browser-safe", async () => {
   const source = await (await import("node:fs/promises")).readFile(new URL("../src/index.ts", import.meta.url), "utf8");
   assert.equal(/from ["'](?:node:|@vexa-video\/(?:sdk|ffmpeg|renderer))/.test(source), false);
 });
+
+test("encodes deterministic video chunks with frame timing, keyframes, progress, and cleanup", async () => {
+  const { encodeWebVideoFrames } = await import("../src/index.js");
+  const encoded: Array<{ readonly timestamp: number; readonly keyFrame: boolean }> = [];
+  const closedFrames: number[] = [];
+  const progress: Array<{ readonly phase: string; readonly completedFrames: number }> = [];
+  let encoderClosed = false;
+  let configured: unknown;
+  const runtime = {
+    createVideoFrame(source: unknown, init: { readonly timestamp: number; readonly duration: number }) {
+      const frame = Number(String(source).split("-")[1]);
+      return { close() { closedFrames.push(frame); }, timestamp: init.timestamp };
+    },
+    createVideoEncoder(callbacks: {
+      readonly output: (chunk: {
+        readonly type: "key" | "delta";
+        readonly timestamp: number;
+        readonly duration: number;
+        readonly byteLength: number;
+        copyTo(destination: AllowSharedBufferSource): void;
+      }) => void;
+      readonly error: (error: Error) => void;
+    }) {
+      let queue = 0;
+      return {
+        get encodeQueueSize() { return queue; },
+        configure(config: unknown) { configured = config; },
+        encode(frame: { readonly timestamp?: number }, options?: { readonly keyFrame?: boolean }) {
+          queue += 1;
+          const timestamp = frame.timestamp ?? 0;
+          const keyFrame = options?.keyFrame === true;
+          encoded.push({ timestamp, keyFrame });
+          const bytes = new Uint8Array([encoded.length, keyFrame ? 1 : 0]);
+          callbacks.output({
+            type: keyFrame ? "key" : "delta",
+            timestamp,
+            duration: 100_000,
+            byteLength: bytes.length,
+            copyTo(destination) {
+              const view = ArrayBuffer.isView(destination)
+                ? new Uint8Array(destination.buffer, destination.byteOffset, destination.byteLength)
+                : new Uint8Array(destination);
+              view.set(bytes);
+            }
+          });
+          queue -= 1;
+        },
+        async flush() {},
+        reset() {},
+        close() { encoderClosed = true; }
+      };
+    }
+  };
+  const result = await encodeWebVideoFrames({
+    plan: { kind: "browser", container: "webm", videoCodec: "vp9" },
+    width: 320,
+    height: 180,
+    fps: 10,
+    frameCount: 3,
+    keyFrameInterval: 2,
+    runtime,
+    renderFrame(context) { return `frame-${context.frame}`; },
+    onProgress(value) { progress.push({ phase: value.phase, completedFrames: value.completedFrames }); }
+  });
+
+  assert.deepEqual(configured, {
+    codec: "vp09.00.10.08",
+    width: 320,
+    height: 180,
+    bitrate: 500_000,
+    framerate: 10
+  });
+  assert.deepEqual(encoded, [
+    { timestamp: 0, keyFrame: true },
+    { timestamp: 100_000, keyFrame: false },
+    { timestamp: 200_000, keyFrame: true }
+  ]);
+  assert.deepEqual(closedFrames, [0, 1, 2]);
+  assert.equal(encoderClosed, true);
+  assert.deepEqual(result.chunks.map((chunk) => [chunk.type, chunk.timestampUs, [...chunk.data]]), [
+    ["key", 0, [1, 1]],
+    ["delta", 100_000, [2, 0]],
+    ["key", 200_000, [3, 1]]
+  ]);
+  assert.deepEqual(progress, [
+    { phase: "encoding", completedFrames: 1 },
+    { phase: "encoding", completedFrames: 2 },
+    { phase: "encoding", completedFrames: 3 },
+    { phase: "complete", completedFrames: 3 }
+  ]);
+});
+
+test("cancellation resets the browser encoder and returns a typed error", async () => {
+  const { encodeWebVideoFrames, VexaWebVideoEncodeError } = await import("../src/index.js");
+  const controller = new AbortController();
+  let reset = false;
+  let closed = false;
+  const runtime = {
+    createVideoFrame() { return { close() {} }; },
+    createVideoEncoder() {
+      return {
+        encodeQueueSize: 0,
+        configure() {},
+        encode() {},
+        async flush() {},
+        reset() { reset = true; },
+        close() { closed = true; }
+      };
+    }
+  };
+
+  await assert.rejects(
+    encodeWebVideoFrames({
+      plan: { kind: "browser", container: "mp4", videoCodec: "h264" },
+      width: 16,
+      height: 16,
+      fps: 30,
+      frameCount: 2,
+      signal: controller.signal,
+      runtime,
+      renderFrame(context) {
+        if (context.frame === 0) controller.abort();
+        return {};
+      }
+    }),
+    (error: unknown) => error instanceof VexaWebVideoEncodeError && error.code === "CANCELLED"
+  );
+  assert.equal(reset, true);
+  assert.equal(closed, true);
+});
+
+test("video execution fails closed for audio plans and frame-render failures", async () => {
+  const { encodeWebVideoFrames, VexaWebVideoEncodeError } = await import("../src/index.js");
+  const runtime = {
+    createVideoFrame() { return { close() {} }; },
+    createVideoEncoder() {
+      return {
+        encodeQueueSize: 0,
+        configure() {},
+        encode() {},
+        async flush() {},
+        reset() {},
+        close() {}
+      };
+    }
+  };
+  await assert.rejects(
+    encodeWebVideoFrames({
+      plan: { kind: "browser", container: "mp4", videoCodec: "h264", audioCodec: "aac" },
+      width: 16,
+      height: 16,
+      fps: 30,
+      frameCount: 1,
+      runtime,
+      renderFrame() { return {}; }
+    }),
+    (error: unknown) => error instanceof VexaWebVideoEncodeError && error.code === "AUDIO_EXECUTION_UNAVAILABLE"
+  );
+  await assert.rejects(
+    encodeWebVideoFrames({
+      plan: { kind: "browser", container: "mp4", videoCodec: "h264" },
+      width: 16,
+      height: 16,
+      fps: 30,
+      frameCount: 1,
+      runtime,
+      renderFrame() { throw new Error("capture failed"); }
+    }),
+    (error: unknown) => error instanceof VexaWebVideoEncodeError && error.code === "FRAME_RENDER_FAILED"
+  );
+});
