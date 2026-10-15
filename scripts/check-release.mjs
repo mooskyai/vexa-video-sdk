@@ -16,7 +16,8 @@ const releasePackages = [
   "packages/sound-effects",
   "packages/web-renderer",
   "packages/studio",
-  "packages/cli"
+  "packages/cli",
+  "packages/mcp"
 ];
 
 const root = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));

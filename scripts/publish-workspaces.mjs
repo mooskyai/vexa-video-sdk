@@ -60,7 +60,8 @@ const workspaces = [
   "@vexa-video/sound-effects",
   "@vexa-video/web-renderer",
   "@vexa-video/studio",
-  "@vexa-video/cli"
+  "@vexa-video/cli",
+  "@vexa-video/mcp"
 ];
 
 for (const workspace of workspaces) {

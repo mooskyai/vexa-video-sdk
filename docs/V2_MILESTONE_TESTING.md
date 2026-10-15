@@ -843,6 +843,12 @@ npm run cli -- inspect product-demo --manifest .\.tmp\v2.14-cli-render-bundle\ve
 node .\packages\cli\dist\bin.js validate product-demo --manifest .\.tmp\v2.14-cli-render-bundle\vexa.bundle.json --props '{"background":"#223344","fps":24}' --json
 ```
 
+The fourth slice introduces the transport-neutral `@vexa-video/mcp` tool adapter. Focused tests must prove a stable six-tool catalog with strict JSON-object input schemas, renderer-backed list/inspect/validate delegation, preservation of renderer validation error codes, `HostedRenderer`-compatible start/get/cancel delegation, rejection of unsupported command/shell fields before hosted submission, and typed failures for malformed or unknown tool calls. Protocol transport is intentionally outside this slice.
+
+```powershell
+node --import tsx --test "packages/mcp/**/*.test.ts"
+```
+
 ### CLI acceptance
 
 PowerShell commands must cover:

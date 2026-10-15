@@ -819,6 +819,8 @@ The second slice connects the CLI directly to `VexaCompositionRenderer`. `vexa r
 
 The third slice exposes executable composition inspection and props resolution on `VexaCompositionRenderer` before adding any agent-specific adapter. `inspectComposition()` returns the authoritative static definition metadata, including default props and any declared input schema, after the existing manifest/executable consistency check. `resolveComposition()` merges defaults, runs the existing schema and custom validators, and calculates dynamic metadata without constructing a scene. `vexa inspect` and `vexa validate` delegate to those methods and emit JSON-safe results; JSON-mode failures include stable renderer error codes. MCP remains a later adapter over these same typed operations.
 
+The fourth slice adds that adapter as the transport-neutral `@vexa-video/mcp` package. It exposes a stable typed tool catalog for composition listing, executable inspection, authoritative prop resolution, hosted render submission, render-state inspection, and cancellation. The package delegates to `VexaCompositionRenderer` and a `HostedRenderer`-compatible runtime, preserves their error codes, and validates only the operation envelope needed to reject unknown fields and raw command surfaces. It does not introduce a second props schema, renderer, queue, hosted request format, or MCP protocol server; protocol transport is a later layer over the same tools.
+
 CLI targets:
 
 ```bash

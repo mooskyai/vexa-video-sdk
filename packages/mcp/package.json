@@ -1,0 +1,50 @@
+{
+  "name": "@vexa-video/mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "private": false,
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.map"
+  ],
+  "dependencies": {
+    "@vexa-video/core": "1.0.0",
+    "@vexa-video/renderer": "1.0.0",
+    "@vexa-video/sdk": "1.0.0"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "engines": {
+    "node": ">=24.21.0"
+  },
+  "description": "Transport-neutral MCP composition tools that reuse Vexa renderer and hosted-render contracts.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mooskyai/vexa-video-sdk.git"
+  },
+  "homepage": "https://github.com/mooskyai/vexa-video-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/mooskyai/vexa-video-sdk/issues"
+  },
+  "keywords": [
+    "video",
+    "mcp",
+    "agents",
+    "composition",
+    "vexa"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}
