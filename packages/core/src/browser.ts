@@ -124,16 +124,21 @@ export {
   defineProgrammableTemplate,
   getProgrammableTemplateCatalogEntry,
   normalizeProgrammableTemplateMetadata,
+  resolveProgrammableTemplateVariant,
   ProgrammableTemplateCatalog,
   ProgrammableTemplateError
 } from "./programmable-template.js";
 export type {
   ProgrammableTemplate,
+  ProgrammableTemplateAspectRatio,
   ProgrammableTemplateCatalogEntry,
   ProgrammableTemplateErrorCode,
   ProgrammableTemplateMetadata,
   ProgrammableTemplateMetadataInput,
   ProgrammableTemplateSchemaVersion,
+  ProgrammableTemplateVariant,
+  ProgrammableTemplateVariantInput,
+  ResolvedProgrammableTemplateVariant,
   StillProgrammableTemplateCatalogEntry,
   VideoProgrammableTemplateCatalogEntry
 } from "./programmable-template.js";

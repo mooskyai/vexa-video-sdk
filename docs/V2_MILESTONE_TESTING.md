@@ -691,7 +691,7 @@ If browser rendering is unsupported, the public API must provide a typed reason 
 
 ## V2.12 — Templates and parameterized compositions
 
-The first slice covers deterministic schema normalization, required/optional object properties, default-prop validation at definition time, runtime validation before custom validators, nested array/object paths, numeric/string bounds, enum values, unknown-property rejection, frozen schema metadata, and deterministic JSON serialization. The second slice adds deterministic template metadata normalization, JSON-safe catalog entries, stable id ordering, duplicate rejection, atomic bulk registration, and missing-template errors while preserving the wrapped composition identity.
+The first slice covers deterministic schema normalization, required/optional object properties, default-prop validation at definition time, runtime validation before custom validators, nested array/object paths, numeric/string bounds, enum values, unknown-property rejection, frozen schema metadata, and deterministic JSON serialization. The second slice adds deterministic template metadata normalization, JSON-safe catalog entries, stable id ordering, duplicate rejection, atomic bulk registration, and missing-template errors while preserving the wrapped composition identity. The third slice adds sorted/frozen variant normalization, JSON-safe variant props, duplicate-id rejection, normal composition/schema validation during variant resolution, and fail-closed aspect-ratio verification.
 
 ### Schema tests
 
@@ -716,7 +716,7 @@ At least one template must render correctly in:
 1:1
 ```
 
-without modifying its code between runs.
+without modifying its code between runs. Variant acceptance must resolve all three through one composition definition and its normal dynamic-metadata path.
 
 ## V2.13 — Hosted/serverless composition rendering
 

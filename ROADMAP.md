@@ -91,7 +91,7 @@ The planned sequence is:
 | V2.9 | **Complete** | Shapes, effects, transitions, fonts, and composition captions; deterministic typography, local/remote font readiness, caption cue rendering, active-word timing, and speaker-aware style overrides execute through the shared project/FFmpeg graph |
 | V2.10 | **Complete** | Extended programmable-media boundary plus concrete GIF, waveform, and reusable sound-effect integrations, all preserving dependency separation from core/normal SDK execution |
 | V2.11 | **Complete** | Browser/WebCodecs rendering with capability/fallback planning, video plus AAC/Opus audio encoding, H.264/AAC MP4 plus VP9-or-AV1/Opus WebM A/V muxing, Canvas/serializable-DOM capture adapters, Blob/File output, progress, cancellation, and typed backend fallback |
-| V2.12 | **In progress** | Parameterized templates and validated input schemas; browser-safe input schemas now cover deterministic normalization/validation and the second slice adds reusable template metadata plus deterministic catalog discovery without a second composition model |
+| V2.12 | **In progress** | Parameterized templates and validated input schemas; browser-safe input schemas now cover deterministic normalization/validation the second slice adds reusable template metadata plus deterministic catalog discovery, and the third adds validated 16:9/9:16/1:1 variants resolved through the same composition metadata path |
 | V2.13 | **Planned** | Hosted/serverless composition rendering through existing job contracts |
 | V2.14 | **Planned** | Agent/MCP/CLI composition workflows |
 | V2.15 | **Planned** | Frame-level visual regression and runtime parity testing |

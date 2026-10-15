@@ -172,6 +172,8 @@ V2.12 begins inside the existing programmable-composition boundary rather than i
 
 The second V2.12 slice keeps templates as discovery descriptors, not executable alternatives. A `ProgrammableTemplate` wraps one existing programmable composition plus normalized presentation metadata; `ProgrammableTemplateCatalog` sorts and exposes JSON-safe catalog entries that reuse that composition's static metadata, defaults, and `inputSchema`. Selecting a template therefore resolves back to the same composition definition used by Studio/player/render paths, preventing catalog concerns from creating another timing, scene, or rendering model.
 
+The third V2.12 slice keeps responsive variants inside that same boundary. Template variants are normalized JSON-safe prop presets with a declared aspect ratio. Resolving one calls the wrapped composition's existing prop/schema validation and dynamic metadata calculator, then verifies the resulting width/height against the declared ratio. This lets one authored composition cover 16:9, 9:16, and 1:1 while preserving the exact player/render execution contract.
+
 The intended boundary is:
 
 ```text

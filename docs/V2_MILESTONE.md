@@ -742,6 +742,8 @@ The first slice adds a browser-safe serializable input-schema contract directly 
 
 The second slice adds reusable template descriptors around those same composition definitions. Template metadata is normalized and frozen, while `ProgrammableTemplateCatalog` provides deterministic discovery entries containing presentation metadata plus the composition kind, dimensions/timing, defaults, and existing `inputSchema`. Catalog descriptors never execute independently: player, still, local render, and future hosted/agent invocation continue to target the wrapped composition.
 
+The third slice adds deterministic aspect-ratio variants to those descriptors. Each variant contains JSON-safe prop overrides and a declared `16:9`, `9:16`, or `1:1` ratio; resolution delegates to the existing composition prop validation and `calculateMetadata` path, then verifies the resolved dimensions match the declared ratio. One composition therefore supports landscape, vertical, and square output without cloned template code or an alternate render contract.
+
 ### Goal
 
 Make compositions reusable by applications, APIs, and agents.

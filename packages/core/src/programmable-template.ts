@@ -2,9 +2,12 @@ import {
   getProgrammableCompositionStaticMetadata,
   ProgrammableCompositionConflictError,
   ProgrammableCompositionNotFoundError,
+  resolveProgrammableComposition,
   type JsonObject,
+  type JsonValue,
   type ProgrammableCompositionDefinition,
-  type ProgrammableCompositionKind
+  type ProgrammableCompositionKind,
+  type ResolvedProgrammableComposition
 } from "./programmable-composition.js";
 import type { ProgrammableInputObjectSchema } from "./programmable-input-schema.js";
 
@@ -23,11 +26,28 @@ export class ProgrammableTemplateError extends Error {
   }
 }
 
+export type ProgrammableTemplateAspectRatio = "16:9" | "9:16" | "1:1";
+
+export interface ProgrammableTemplateVariantInput {
+  readonly id: string;
+  readonly label?: string;
+  readonly aspectRatio: ProgrammableTemplateAspectRatio;
+  readonly props?: JsonObject;
+}
+
+export interface ProgrammableTemplateVariant {
+  readonly id: string;
+  readonly label?: string;
+  readonly aspectRatio: ProgrammableTemplateAspectRatio;
+  readonly props: JsonObject;
+}
+
 export interface ProgrammableTemplateMetadataInput {
   readonly name: string;
   readonly description?: string;
   readonly category?: string;
   readonly tags?: readonly string[];
+  readonly variants?: readonly ProgrammableTemplateVariantInput[];
 }
 
 export interface ProgrammableTemplateMetadata {
@@ -36,6 +56,7 @@ export interface ProgrammableTemplateMetadata {
   readonly description?: string;
   readonly category?: string;
   readonly tags: readonly string[];
+  readonly variants: readonly ProgrammableTemplateVariant[];
 }
 
 export interface ProgrammableTemplate<Props extends JsonObject = JsonObject> {
@@ -53,6 +74,7 @@ interface ProgrammableTemplateCatalogEntryBase {
   readonly description?: string;
   readonly category?: string;
   readonly tags: readonly string[];
+  readonly variants: readonly ProgrammableTemplateVariant[];
   readonly width: number;
   readonly height: number;
   readonly defaultProps: JsonObject;
@@ -98,6 +120,69 @@ function normalizeTags(tags: readonly string[] | undefined): readonly string[] {
   return Object.freeze([...new Set(normalized)].sort(compareStableText));
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function normalizeVariantJson(value: unknown, path: string): JsonValue {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) {
+      throw new ProgrammableTemplateError(`${path} must contain only finite numbers.`);
+    }
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return Object.freeze(value.map((item, index) => normalizeVariantJson(item, `${path}[${index}]`)));
+  }
+  if (isPlainObject(value)) {
+    const normalized = Object.fromEntries(
+      Object.keys(value)
+        .sort(compareStableText)
+        .map((key) => [key, normalizeVariantJson(value[key], `${path}.${key}`)])
+    ) as Record<string, JsonValue>;
+    return Object.freeze(normalized);
+  }
+  throw new ProgrammableTemplateError(`${path} must contain JSON-compatible values only.`);
+}
+
+function normalizeVariantProps(props: JsonObject | undefined, index: number): JsonObject {
+  const normalized = normalizeVariantJson(props ?? {}, `template.variants[${index}].props`);
+  if (!isPlainObject(normalized)) {
+    throw new ProgrammableTemplateError(`template.variants[${index}].props must be a JSON object.`);
+  }
+  return normalized as JsonObject;
+}
+
+function normalizeVariants(
+  variants: readonly ProgrammableTemplateVariantInput[] | undefined
+): readonly ProgrammableTemplateVariant[] {
+  if (variants === undefined) return Object.freeze([]);
+  const seen = new Set<string>();
+  const normalized = variants.map((variant, index) => {
+    const id = requiredText(variant.id, `template.variants[${index}].id`);
+    if (seen.has(id)) {
+      throw new ProgrammableTemplateError(`Duplicate template variant id: ${id}`);
+    }
+    seen.add(id);
+    const label = optionalText(variant.label, `template.variants[${index}].label`);
+    if (!["16:9", "9:16", "1:1"].includes(variant.aspectRatio)) {
+      throw new ProgrammableTemplateError(
+        `template.variants[${index}].aspectRatio must be one of 16:9, 9:16, or 1:1.`
+      );
+    }
+    return Object.freeze({
+      id,
+      ...(label === undefined ? {} : { label }),
+      aspectRatio: variant.aspectRatio,
+      props: normalizeVariantProps(variant.props, index)
+    });
+  });
+  return Object.freeze(normalized.sort((left, right) => compareStableText(left.id, right.id)));
+}
+
 export function normalizeProgrammableTemplateMetadata(
   metadata: ProgrammableTemplateMetadataInput
 ): ProgrammableTemplateMetadata {
@@ -108,7 +193,8 @@ export function normalizeProgrammableTemplateMetadata(
     name: requiredText(metadata.name, "template.name"),
     ...(description === undefined ? {} : { description }),
     ...(category === undefined ? {} : { category }),
-    tags: normalizeTags(metadata.tags)
+    tags: normalizeTags(metadata.tags),
+    variants: normalizeVariants(metadata.variants)
   });
 }
 
@@ -138,6 +224,7 @@ export function getProgrammableTemplateCatalogEntry<Props extends JsonObject>(
       : { description: template.metadata.description }),
     ...(template.metadata.category === undefined ? {} : { category: template.metadata.category }),
     tags: template.metadata.tags,
+    variants: template.metadata.variants,
     width: composition.width,
     height: composition.height,
     defaultProps: composition.defaultProps,
@@ -152,6 +239,41 @@ export function getProgrammableTemplateCatalogEntry<Props extends JsonObject>(
         durationInFrames: composition.durationInFrames
       })
     : Object.freeze({ ...shared, kind: "still" as const });
+}
+
+export interface ResolvedProgrammableTemplateVariant<Props extends JsonObject = JsonObject> {
+  readonly templateId: string;
+  readonly variant: ProgrammableTemplateVariant;
+  readonly composition: ResolvedProgrammableComposition<Props>;
+}
+
+function aspectRatioDimensions(aspectRatio: ProgrammableTemplateAspectRatio): readonly [number, number] {
+  if (aspectRatio === "16:9") return [16, 9];
+  if (aspectRatio === "9:16") return [9, 16];
+  return [1, 1];
+}
+
+export async function resolveProgrammableTemplateVariant<Props extends JsonObject>(
+  template: ProgrammableTemplate<Props>,
+  variantId: string
+): Promise<ResolvedProgrammableTemplateVariant<Props>> {
+  const variant = template.metadata.variants.find((candidate) => candidate.id === variantId);
+  if (!variant) {
+    throw new ProgrammableTemplateError(
+      `Template "${template.id}" does not define variant "${variantId}".`
+    );
+  }
+  const composition = await resolveProgrammableComposition(
+    template.composition,
+    variant.props as Partial<Props>
+  );
+  const [ratioWidth, ratioHeight] = aspectRatioDimensions(variant.aspectRatio);
+  if (composition.metadata.width * ratioHeight !== composition.metadata.height * ratioWidth) {
+    throw new ProgrammableTemplateError(
+      `Template variant "${variant.id}" declares ${variant.aspectRatio} but resolved ${composition.metadata.width}:${composition.metadata.height}.`
+    );
+  }
+  return Object.freeze({ templateId: template.id, variant, composition });
 }
 
 export class ProgrammableTemplateCatalog {

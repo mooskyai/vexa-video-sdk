@@ -9,7 +9,8 @@ import {
   defineProgrammableTemplate,
   defineStill,
   getProgrammableTemplateCatalogEntry,
-  normalizeProgrammableTemplateMetadata
+  normalizeProgrammableTemplateMetadata,
+  resolveProgrammableTemplateVariant
 } from "../src/index.js";
 
 test("template metadata normalizes deterministically around an existing composition", () => {
@@ -41,7 +42,8 @@ test("template metadata normalizes deterministically around an existing composit
     name: "Product Demo",
     description: "Reusable product launch video",
     category: "Marketing",
-    tags: ["launch", "product"]
+    tags: ["launch", "product"],
+    variants: []
   });
   assert.equal(Object.isFrozen(template), true);
   assert.equal(Object.isFrozen(template.metadata), true);
@@ -73,6 +75,7 @@ test("catalog entries expose JSON-safe composition discovery metadata", () => {
     kind: "video",
     name: "Social Card",
     tags: ["social"],
+    variants: [],
     width: 1080,
     height: 1080,
     defaultProps: { title: "Hello" },
@@ -124,5 +127,92 @@ test("invalid template metadata fails before catalog registration", () => {
   assert.throws(
     () => normalizeProgrammableTemplateMetadata({ name: "Valid", category: "   " }),
     /template.category cannot be empty/
+  );
+});
+
+
+test("one template resolves 16:9, 9:16, and 1:1 through the same composition", async () => {
+  const composition = defineComposition({
+    id: "responsive-promo",
+    width: 1920,
+    height: 1080,
+    fps: 30,
+    durationInFrames: 120,
+    defaultProps: { format: "wide" },
+    inputSchema: {
+      type: "object",
+      properties: { format: { type: "enum", values: ["wide", "vertical", "square"] } },
+      required: ["format"],
+      additionalProperties: false
+    },
+    calculateMetadata: ({ props }) => {
+      if (props.format === "vertical") return { width: 1080, height: 1920 };
+      if (props.format === "square") return { width: 1080, height: 1080 };
+      return { width: 1920, height: 1080 };
+    }
+  });
+  const template = defineProgrammableTemplate(composition, {
+    name: "Responsive Promo",
+    variants: [
+      { id: "square", aspectRatio: "1:1", props: { format: "square" } },
+      { id: "vertical", aspectRatio: "9:16", props: { format: "vertical" } },
+      { id: "wide", aspectRatio: "16:9", props: { format: "wide" } }
+    ]
+  });
+
+  assert.equal(template.composition, composition);
+  assert.deepEqual(template.metadata.variants.map((variant) => variant.id), [
+    "square",
+    "vertical",
+    "wide"
+  ]);
+
+  const wide = await resolveProgrammableTemplateVariant(template, "wide");
+  const vertical = await resolveProgrammableTemplateVariant(template, "vertical");
+  const square = await resolveProgrammableTemplateVariant(template, "square");
+
+  assert.deepEqual(
+    [wide, vertical, square].map((result) => [
+      result.variant.aspectRatio,
+      result.composition.metadata.width,
+      result.composition.metadata.height
+    ]),
+    [
+      ["16:9", 1920, 1080],
+      ["9:16", 1080, 1920],
+      ["1:1", 1080, 1080]
+    ]
+  );
+  assert.deepEqual(
+    [wide, vertical, square].map((result) => result.composition.props.format),
+    ["wide", "vertical", "square"]
+  );
+});
+
+test("variant definitions stay deterministic and fail closed on bad ids or ratio mismatches", async () => {
+  const composition = defineStill({ id: "fixed-square", width: 100, height: 100 });
+  assert.throws(
+    () =>
+      defineProgrammableTemplate(composition, {
+        name: "Duplicate",
+        variants: [
+          { id: "same", aspectRatio: "1:1" },
+          { id: "same", aspectRatio: "1:1" }
+        ]
+      }),
+    /Duplicate template variant id/
+  );
+
+  const template = defineProgrammableTemplate(composition, {
+    name: "Fixed Square",
+    variants: [{ id: "wide", aspectRatio: "16:9" }]
+  });
+  await assert.rejects(
+    () => resolveProgrammableTemplateVariant(template, "missing"),
+    /does not define variant/
+  );
+  await assert.rejects(
+    () => resolveProgrammableTemplateVariant(template, "wide"),
+    /declares 16:9 but resolved 100:100/
   );
 });
