@@ -27,11 +27,28 @@ const submitted = await renderer.submit({
   idempotencyKey: "customer-42-render-7"
 });
 
-const terminal = await renderer.wait(submitted.id, {
+const compositionJob = await renderer.submitComposition(
+  {
+    schemaVersion: 1,
+    bundle: { id: "bundle-42", manifest: "s3://bundles/42/vexa.bundle.json" },
+    compositionId: "ProductDemo",
+    target: { kind: "video", startFrame: 30, endFrameExclusive: 90, container: "mp4" },
+    inputProps: { title: "Launch" },
+    output: {
+      artifactId: "customer-42/render-7",
+      destination: "s3://renders/customer-42/render-7.mp4"
+    }
+  },
+  { idempotencyKey: "customer-42-render-7" }
+);
+
+const terminal = await renderer.wait(compositionJob.id, {
   pollIntervalMs: 1000,
   timeoutMs: 30 * 60 * 1000
 });
 ```
+
+`submitComposition()` is only a typed transport boundary. Bundle acquisition, prop validation against the executable composition, worker execution, and remote artifact writes belong to the provider/worker side and later V2.13 integration.
 
 The adapter decides how jobs map to a cloud vendor, hosted Vexa service, Kubernetes job, serverless queue, or another execution plane. Vexa does not embed provider credentials or vendor SDKs in the core contract.
 

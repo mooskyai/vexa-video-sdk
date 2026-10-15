@@ -92,7 +92,7 @@ The planned sequence is:
 | V2.10 | **Complete** | Extended programmable-media boundary plus concrete GIF, waveform, and reusable sound-effect integrations, all preserving dependency separation from core/normal SDK execution |
 | V2.11 | **Complete** | Browser/WebCodecs rendering with capability/fallback planning, video plus AAC/Opus audio encoding, H.264/AAC MP4 plus VP9-or-AV1/Opus WebM A/V muxing, Canvas/serializable-DOM capture adapters, Blob/File output, progress, cancellation, and typed backend fallback |
 | V2.12 | **Complete** | Parameterized templates and validated input schemas; browser-safe schemas, deterministic template discovery, validated 16:9/9:16/1:1 variants, reusable scene/storage asset descriptors, and JSON-safe service/agent invocation resolve through the same composition and asset contracts |
-| V2.13 | **Planned** | Hosted/serverless composition rendering through existing job contracts |
+| V2.13 | **In progress** | Hosted/serverless composition rendering; typed provider-neutral composition requests now reuse the existing hosted adapter contract, with worker execution and remote-output adapters following |
 | V2.14 | **Planned** | Agent/MCP/CLI composition workflows |
 | V2.15 | **Planned** | Frame-level visual regression and runtime parity testing |
 | V2.16 | **Planned** | Version 2 release hardening |
@@ -102,6 +102,8 @@ V2.1 through V2.7 are complete on the Version 2 branch. V2.7 bundle-backed execu
 V2.8 is complete. The public browser-safe `@vexa-video/studio` runtime composes the existing Player and Editor contracts for deterministic composition selection, props drafts, resolved metadata, preview/playhead state, timeline viewport state, and safe current-frame preservation. The normal Playground now provides the responsive Vexa Studio workspace, Node-hosted composition bundling/rendering, recursive source watching with SSE hot reload, diagnostics/log recovery, render progress/output/failure handling, and browser automation. Windows Chrome acceptance additionally verifies composition switching, play/pause/scrubbing, dirty-props/frame preservation across source reload, current-frame rendering, deliberate renderer failure/recovery, and execution through a repository alias containing spaces.
 
 V2.12 is complete. Windows 11 acceptance passed the focused template, scene, and composition suites (9/9, 26/26, and 12/12), the full repository suite (365/365), TypeScript typecheck/build, and `npm run verify`; README/prohibited-runtime guards and `git diff --check` were clean. Templates remain descriptors around the existing composition runtime, variants reuse dynamic metadata, and reusable assets reuse the existing scene/storage contract rather than adding parallel execution or media-resolution models.
+
+V2.13 has started with a provider-neutral composition request envelope. Bundle references, composition ids, JSON-safe input props, still/frame/range/video targets, explicit artifact identity, and idempotency metadata normalize before `HostedRenderer` delegates to the existing submit/get/cancel adapter. No cloud SDK or execution engine enters core; worker rendering remains on the existing renderer/job boundaries.
 
 Detailed scope and acceptance:
 

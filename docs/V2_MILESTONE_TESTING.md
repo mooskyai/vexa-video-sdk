@@ -756,6 +756,8 @@ Windows 11 acceptance for the completed template/parameterization stage:
 
 ## V2.13 — Hosted/serverless composition rendering
 
+The first slice tests request normalization independently of worker execution: bundle/composition/output identities are required, input props remain deterministic JSON, frame/range bounds fail closed, video ranges require both endpoints, idempotency is preserved, and `HostedRenderer.submitComposition()` delegates the normalized request through the existing adapter.
+
 ### Contract tests
 
 Use a fake/in-memory provider to cover:

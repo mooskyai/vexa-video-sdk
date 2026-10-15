@@ -781,6 +781,8 @@ player / still / local render / hosted render
 
 ## V2.13 — Hosted/serverless composition rendering
 
+The first slice extends the existing provider-neutral hosted contract rather than creating a second render service model. `composition.render` requests carry a provider-resolved bundle manifest reference, composition id, JSON-safe input props, a still/frame/range/video target, and explicit output artifact identity. `HostedRenderer.submitComposition()` normalizes that envelope and delegates to the same application-supplied submit/get/cancel adapter used by existing hosted work. Cloud SDKs, bundle acquisition, synchronous renderer execution, durable workers, and remote writes remain outside core and are later V2.13 slices.
+
 ### Goal
 
 Connect composition rendering to the existing hosted-render and job abstractions.
