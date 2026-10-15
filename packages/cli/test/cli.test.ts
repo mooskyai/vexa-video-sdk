@@ -174,6 +174,106 @@ async function createExecutableCliBundle(root: string): Promise<string> {
   return (JSON.parse(stdout[0]!) as { manifestPath: string }).manifestPath;
 }
 
+test("CLI inspects executable composition defaults and schema", async () => {
+  const root = await mkdtemp(join(tmpdir(), "vexa-cli-composition-inspect-"));
+  try {
+    const manifestPath = await createExecutableCliBundle(root);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const code = await runCli(
+      ["inspect", "product-demo", "--manifest", manifestPath, "--json"],
+      {
+        stdout: (value) => stdout.push(value),
+        stderr: (value) => stderr.push(value)
+      }
+    );
+
+    assert.equal(code, 0, stderr.join("\n"));
+    const result = JSON.parse(stdout[0]!) as {
+      defaultProps: Record<string, unknown>;
+      inputSchema?: { properties: Record<string, unknown> };
+    };
+    assert.equal(result.defaultProps.fps, 30);
+    assert.deepEqual(Object.keys(result.inputSchema?.properties ?? {}), [
+      "background",
+      "fps",
+      "storageAssetKey"
+    ]);
+    assert.deepEqual(stderr, []);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("CLI validates props and returns resolved dynamic metadata", async () => {
+  const root = await mkdtemp(join(tmpdir(), "vexa-cli-composition-validate-"));
+  try {
+    const manifestPath = await createExecutableCliBundle(root);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const code = await runCli(
+      [
+        "validate",
+        "product-demo",
+        "--manifest",
+        manifestPath,
+        "--props",
+        '{"background":"#123456","fps":24}',
+        "--json"
+      ],
+      {
+        stdout: (value) => stdout.push(value),
+        stderr: (value) => stderr.push(value)
+      }
+    );
+
+    assert.equal(code, 0, stderr.join("\n"));
+    const result = JSON.parse(stdout[0]!) as {
+      metadata: { fps?: number };
+      props: Record<string, unknown>;
+    };
+    assert.equal(result.metadata.fps, 24);
+    assert.equal(result.props.storageAssetKey, "");
+    assert.deepEqual(stderr, []);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("CLI JSON validation failures expose stable renderer error codes", async () => {
+  const root = await mkdtemp(join(tmpdir(), "vexa-cli-composition-invalid-"));
+  try {
+    const manifestPath = await createExecutableCliBundle(root);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const code = await runCli(
+      [
+        "validate",
+        "product-demo",
+        "--manifest",
+        manifestPath,
+        "--props",
+        '{"background":"#zzzzzz"}',
+        "--json"
+      ],
+      {
+        stdout: (value) => stdout.push(value),
+        stderr: (value) => stderr.push(value)
+      }
+    );
+
+    assert.equal(code, 1);
+    assert.deepEqual(stdout, []);
+    const failure = JSON.parse(stderr[0]!) as {
+      error: { code: string; compositionId?: string };
+    };
+    assert.equal(failure.error.code, "RENDER_INPUT_PROPS_INVALID");
+    assert.equal(failure.error.compositionId, "product-demo");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("CLI renders a bundled video composition through the existing renderer", async () => {
   const root = await mkdtemp(join(tmpdir(), "vexa-cli-composition-video-"));
   try {

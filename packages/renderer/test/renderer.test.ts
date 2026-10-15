@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { bundleCompositions, type VexaBundleManifest } from "@vexa-video/bundler";
 import {
   VexaCompositionRenderer,
   VexaRendererError,
   createCompositionRenderer
 } from "../src/index.js";
-import type { VexaBundleManifest } from "@vexa-video/bundler";
 
 function manifest(): VexaBundleManifest {
   return {
@@ -33,6 +33,31 @@ function expectRendererError(fn: () => unknown, code: VexaRendererError["code"])
     return error as VexaRendererError;
   }
   throw new Error("Expected renderer error.");
+}
+
+async function expectRendererErrorAsync(
+  fn: () => Promise<unknown>,
+  code: VexaRendererError["code"]
+): Promise<VexaRendererError> {
+  try {
+    await fn();
+  } catch (error) {
+    assert.ok(error instanceof VexaRendererError);
+    assert.equal(error.code, code);
+    return error;
+  }
+  throw new Error("Expected renderer error.");
+}
+
+async function bundleExecutableFixture(root: string): Promise<string> {
+  const result = await bundleCompositions({
+    entry: "packages/renderer/test/fixtures/acceptance/entry.tsx",
+    rootDir: process.cwd(),
+    outDir: join(root, "bundle"),
+    mode: "development",
+    sourceMap: "none"
+  });
+  return result.manifestPath;
 }
 
 test("renderer lists bundle compositions in stable ID order", () => {
@@ -180,6 +205,115 @@ test("renderer can load a persisted Vexa bundle manifest", async () => {
     await writeFile(path, `${JSON.stringify(manifest())}\n`, "utf8");
     const renderer = await VexaCompositionRenderer.fromManifest(path);
     assert.deepEqual(renderer.listCompositions().map((item) => item.id), ["still-a", "video-b"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("renderer inspection exposes executable defaults and input schema", async () => {
+  const root = await mkdtemp(join(tmpdir(), "vexa-renderer-inspect-"));
+  try {
+    const manifestPath = await bundleExecutableFixture(root);
+    const renderer = await VexaCompositionRenderer.fromManifest(manifestPath);
+    const inspected = await renderer.inspectComposition("product-demo");
+
+    assert.equal(inspected.kind, "video");
+    assert.deepEqual(inspected.defaultProps, {
+      background: "#0b1220",
+      fps: 30,
+      storageAssetKey: ""
+    });
+    assert.equal(inspected.inputSchema?.type, "object");
+    assert.deepEqual(inspected.inputSchema?.required, ["background", "fps", "storageAssetKey"]);
+    assert.deepEqual(Object.keys(inspected.inputSchema?.properties ?? {}), [
+      "background",
+      "fps",
+      "storageAssetKey"
+    ]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("renderer resolves valid props and reflects dynamic metadata", async () => {
+  const root = await mkdtemp(join(tmpdir(), "vexa-renderer-resolve-"));
+  try {
+    const manifestPath = await bundleExecutableFixture(root);
+    const renderer = await VexaCompositionRenderer.fromManifest(manifestPath);
+    const resolved = await renderer.resolveComposition("product-demo", {
+      background: "#123456",
+      fps: 24
+    });
+
+    assert.deepEqual(resolved.props, {
+      background: "#123456",
+      fps: 24,
+      storageAssetKey: ""
+    });
+    assert.equal(resolved.metadata.kind, "video");
+    if (resolved.metadata.kind === "video") assert.equal(resolved.metadata.fps, 24);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("renderer resolution preserves schema and custom prop validation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "vexa-renderer-validation-"));
+  try {
+    const manifestPath = await bundleExecutableFixture(root);
+    const renderer = await VexaCompositionRenderer.fromManifest(manifestPath);
+
+    const schemaError = await expectRendererErrorAsync(
+      () => renderer.resolveComposition("product-demo", { fps: "fast" }),
+      "RENDER_INPUT_PROPS_INVALID"
+    );
+    assert.equal(schemaError.compositionId, "product-demo");
+
+    const customError = await expectRendererErrorAsync(
+      () => renderer.resolveComposition("product-demo", { background: "#zzzzzz" }),
+      "RENDER_INPUT_PROPS_INVALID"
+    );
+    assert.match(customError.message, /six-digit hex color/u);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("renderer inspection reports missing compositions with the normal typed error", async () => {
+  const root = await mkdtemp(join(tmpdir(), "vexa-renderer-missing-inspect-"));
+  try {
+    const manifestPath = await bundleExecutableFixture(root);
+    const renderer = await VexaCompositionRenderer.fromManifest(manifestPath);
+    const error = await expectRendererErrorAsync(
+      () => renderer.inspectComposition("missing"),
+      "RENDER_COMPOSITION_NOT_FOUND"
+    );
+    assert.equal(error.compositionId, "missing");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("renderer inspection fails closed when executable metadata disagrees with the manifest", async () => {
+  const root = await mkdtemp(join(tmpdir(), "vexa-renderer-inspect-mismatch-"));
+  try {
+    const manifestPath = await bundleExecutableFixture(root);
+    const value = JSON.parse(await readFile(manifestPath, "utf8")) as VexaBundleManifest;
+    const mismatched: VexaBundleManifest = {
+      ...value,
+      compositions: value.compositions.map((composition) =>
+        composition.id === "product-demo"
+          ? { ...composition, width: composition.width - 1 }
+          : composition
+      )
+    };
+    await writeFile(manifestPath, `${JSON.stringify(mismatched)}\n`, "utf8");
+
+    const renderer = await VexaCompositionRenderer.fromManifest(manifestPath);
+    await expectRendererErrorAsync(
+      () => renderer.inspectComposition("product-demo"),
+      "RENDER_EXECUTABLE_EXPORT_INVALID"
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }

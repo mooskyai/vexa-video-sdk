@@ -6,7 +6,12 @@ import {
 } from "@vexa-video/bundler";
 import { Hardware, Streaming, Video } from "@vexa-video/sdk";
 import type { ExportOptions, HardwareAccelerationPreference, JsonObject, ResizeFit, StreamingPresetName, StreamingProtocol } from "@vexa-video/core";
-import { renderCompositionStill, tryRenderCompositionVideo } from "./composition.js";
+import {
+  inspectComposition,
+  renderCompositionStill,
+  resolveCompositionProps,
+  tryRenderCompositionVideo
+} from "./composition.js";
 
 export type CliCommandName =
   | "help"
@@ -15,6 +20,8 @@ export type CliCommandName =
   | "plan"
   | "render"
   | "still"
+  | "inspect"
+  | "validate"
   | "hardware"
   | "stream"
   | "compositions"
@@ -38,6 +45,8 @@ Usage:
   vexa plan <input> <output> [options]
   vexa render <input|composition-id> <output> [options]
   vexa still <composition-id> <output> [--frame <number>] [options]
+  vexa inspect <composition-id> [--manifest <path>]
+  vexa validate <composition-id> [--props <json>] [--manifest <path>]
   vexa hardware
   vexa stream <input> <output-dir> [--protocol hls|dash] [--preset mobile|balanced|hd]
   vexa compositions [entry] [--root-dir <dir>]
@@ -82,6 +91,8 @@ export function parseCliArgs(argv: readonly string[]): CliInvocation {
     "plan",
     "render",
     "still",
+    "inspect",
+    "validate",
     "hardware",
     "stream",
     "compositions",
@@ -192,6 +203,23 @@ function format(value: unknown, invocation: CliInvocation): string {
   return JSON.stringify(value, null, 2);
 }
 
+function formatError(error: unknown, invocation: CliInvocation): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (invocation.options.json !== true) return message;
+  const candidate = error !== null && typeof error === "object"
+    ? error as { readonly code?: unknown; readonly compositionId?: unknown }
+    : {};
+  return JSON.stringify({
+    error: {
+      code: typeof candidate.code === "string" ? candidate.code : "CLI_ERROR",
+      message,
+      ...(typeof candidate.compositionId === "string"
+        ? { compositionId: candidate.compositionId }
+        : {})
+    }
+  });
+}
+
 function requirePositional(invocation: CliInvocation, index: number, label: string): string {
   const value = invocation.positionals[index]?.trim();
   if (!value) throw new Error(`${label} is required.`);
@@ -266,6 +294,28 @@ export async function runCli(
             : {}),
           mode: bundleMode(invocation),
           sourceMap: bundleSourceMap(invocation)
+        });
+        io.stdout(format(result, invocation));
+        return 0;
+      }
+      case "inspect": {
+        const compositionId = requirePositional(invocation, 0, "composition-id");
+        const manifestPath = stringOption(invocation, "manifest");
+        const result = await inspectComposition({
+          compositionId,
+          ...(manifestPath !== undefined ? { manifestPath } : {})
+        });
+        io.stdout(format(result, invocation));
+        return 0;
+      }
+      case "validate": {
+        const compositionId = requirePositional(invocation, 0, "composition-id");
+        const manifestPath = stringOption(invocation, "manifest");
+        const inputProps = jsonObjectOption(invocation, "props");
+        const result = await resolveCompositionProps({
+          compositionId,
+          ...(manifestPath !== undefined ? { manifestPath } : {}),
+          ...(inputProps !== undefined ? { inputProps } : {})
         });
         io.stdout(format(result, invocation));
         return 0;
@@ -362,7 +412,7 @@ export async function runCli(
       }
     }
   } catch (error) {
-    io.stderr(error instanceof Error ? error.message : String(error));
+    io.stderr(formatError(error, invocation));
     return 1;
   }
 }

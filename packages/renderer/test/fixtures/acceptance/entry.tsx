@@ -25,6 +25,21 @@ const productDemo = defineComposition<ProductDemoProps>({
   fps: 30,
   durationInFrames: 300,
   defaultProps: { background: "#0b1220", fps: 30, storageAssetKey: "" },
+  inputSchema: {
+    type: "object",
+    properties: {
+      background: { type: "string", minLength: 7, maxLength: 7 },
+      fps: { type: "number", minimum: 1, maximum: 120 },
+      storageAssetKey: { type: "string" }
+    },
+    required: ["background", "fps", "storageAssetKey"],
+    additionalProperties: false
+  },
+  validateProps(props) {
+    if (!/^#[0-9a-f]{6}$/iu.test(props.background)) {
+      throw new Error("background must be a six-digit hex color.");
+    }
+  },
   calculateMetadata({ props }) {
     return { fps: props.fps };
   }

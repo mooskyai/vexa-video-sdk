@@ -836,12 +836,21 @@ node .\packages\cli\dist\bin.js still social-square .\.tmp\v2.14-social-square.p
   --json
 ```
 
+The third slice adds renderer-level inspection/resolution acceptance and machine-readable CLI coverage. Tests must prove default-prop and schema discovery, valid prop merging, schema rejection, custom `validateProps` rejection, dynamic metadata resolution, typed missing-composition errors, and fail-closed manifest/executable metadata mismatches. CLI acceptance must cover `vexa inspect`, `vexa validate`, and typed JSON failures without adding an MCP-specific schema or validation path.
+
+```powershell
+npm run cli -- inspect product-demo --manifest .\.tmp\v2.14-cli-render-bundle\vexa.bundle.json --json
+node .\packages\cli\dist\bin.js validate product-demo --manifest .\.tmp\v2.14-cli-render-bundle\vexa.bundle.json --props '{"background":"#223344","fps":24}' --json
+```
+
 ### CLI acceptance
 
 PowerShell commands must cover:
 
 ```powershell
 npm run cli -- compositions
+npm run cli -- inspect ProductDemo --json
+node .\packages\cli\dist\bin.js validate ProductDemo --props '{"headline":"Launch"}' --json
 npm run cli -- render ProductDemo output.mp4
 npm run cli -- still ProductDemo thumbnail.png --frame 120
 ```

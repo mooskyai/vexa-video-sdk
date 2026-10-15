@@ -2,7 +2,9 @@ import { access } from "node:fs/promises";
 import { extname, resolve } from "node:path";
 import type {
   HardwareAccelerationPreference,
-  JsonObject
+  JsonObject,
+  ProgrammableCompositionStaticMetadata,
+  ResolvedProgrammableComposition
 } from "@vexa-video/core";
 import {
   VexaCompositionRenderer,
@@ -15,13 +17,16 @@ import {
 
 const DEFAULT_COMPOSITION_MANIFEST = ".vexa/bundle/vexa.bundle.json";
 
-interface CompositionCliCommonOptions {
-  readonly compositionId: string;
-  readonly output: string;
+interface CompositionCliRendererOptions {
   readonly manifestPath?: string;
-  readonly inputProps?: JsonObject;
   readonly concurrency?: number;
   readonly timeoutMs?: number;
+}
+
+interface CompositionCliCommonOptions extends CompositionCliRendererOptions {
+  readonly compositionId: string;
+  readonly output: string;
+  readonly inputProps?: JsonObject;
   readonly hardwareAcceleration?: HardwareAccelerationPreference;
   readonly hardwareFallback?: boolean;
   readonly onProgress?: (progress: VexaRenderProgress) => void;
@@ -34,6 +39,15 @@ export interface CompositionCliVideoOptions extends CompositionCliCommonOptions 
 
 export interface CompositionCliStillOptions extends CompositionCliCommonOptions {
   readonly frame?: number;
+}
+
+export interface CompositionCliInspectOptions extends CompositionCliRendererOptions {
+  readonly compositionId: string;
+}
+
+export interface CompositionCliResolveOptions extends CompositionCliRendererOptions {
+  readonly compositionId: string;
+  readonly inputProps?: JsonObject;
 }
 
 async function pathExists(value: string): Promise<boolean> {
@@ -75,7 +89,7 @@ function videoFormatForOutput(output: string): VexaVideoFormat {
 }
 
 async function loadRenderer(
-  options: CompositionCliCommonOptions
+  options: CompositionCliRendererOptions
 ): Promise<VexaCompositionRenderer> {
   return await VexaCompositionRenderer.fromManifest(
     resolve(options.manifestPath ?? DEFAULT_COMPOSITION_MANIFEST),
@@ -100,6 +114,23 @@ function renderExecutionOptions(options: CompositionCliCommonOptions) {
       : {}),
     ...(options.onProgress !== undefined ? { onProgress: options.onProgress } : {})
   };
+}
+
+export async function inspectComposition(
+  options: CompositionCliInspectOptions
+): Promise<ProgrammableCompositionStaticMetadata> {
+  const renderer = await loadRenderer(options);
+  return await renderer.inspectComposition(options.compositionId);
+}
+
+export async function resolveCompositionProps(
+  options: CompositionCliResolveOptions
+): Promise<ResolvedProgrammableComposition> {
+  const renderer = await loadRenderer(options);
+  return await renderer.resolveComposition(
+    options.compositionId,
+    options.inputProps
+  );
 }
 
 export async function tryRenderCompositionVideo(

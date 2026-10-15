@@ -817,11 +817,15 @@ The first V2.14 slice extends the existing Node CLI with programmable compositio
 
 The second slice connects the CLI directly to `VexaCompositionRenderer`. `vexa render` resolves a plain composition id through the default or explicit bundle manifest while existing paths, URLs, and filename-like media sources continue through `Video`. `--manifest` forces composition resolution when needed. `vexa still` always targets a composition and dispatches true stills to `renderStill()` or video snapshots to `renderFrame()`. JSON props and renderer-native progress, frame ranges, timeout, concurrency, hardware, and format validation are passed through rather than reimplemented.
 
+The third slice exposes executable composition inspection and props resolution on `VexaCompositionRenderer` before adding any agent-specific adapter. `inspectComposition()` returns the authoritative static definition metadata, including default props and any declared input schema, after the existing manifest/executable consistency check. `resolveComposition()` merges defaults, runs the existing schema and custom validators, and calculates dynamic metadata without constructing a scene. `vexa inspect` and `vexa validate` delegate to those methods and emit JSON-safe results; JSON-mode failures include stable renderer error codes. MCP remains a later adapter over these same typed operations.
+
 CLI targets:
 
 ```bash
 vexa compositions
 vexa studio
+vexa inspect ProductDemo --json
+vexa validate ProductDemo --props '{"headline":"Launch"}' --json
 vexa render ProductDemo output.mp4
 vexa still ProductDemo thumbnail.png --frame 120
 vexa bundle ./src/video.tsx

@@ -11,6 +11,7 @@ import {
   HOSTED_COMPOSITION_RENDER_TYPE,
   HardwareAccelerationUnavailableError,
   JobCancelledError,
+  ProgrammableCompositionError,
   ProcessAbortedError,
   ProcessTimeoutError,
   collectProgrammableSceneAssets,
@@ -21,6 +22,7 @@ import {
   getExecutableCompositionStaticMetadata,
   lowerProgrammableSceneToVideoProject,
   programmableShapeToSvgPath,
+  resolveProgrammableComposition,
   type ExecutableProgrammableComposition,
   type HardwareAccelerationPreference,
   type HostedCompositionBundleReference,
@@ -31,6 +33,7 @@ import {
   type JsonObject,
   type MediaProgress,
   type MediaStorageSource,
+  type ProgrammableCompositionStaticMetadata,
   type ProgrammableScene,
   type ProgrammableSceneAsset,
   type ProgrammableSceneFillNode,
@@ -44,6 +47,7 @@ import {
   type ProgrammableShape,
   type ProgrammableShapeStyle,
   type RemoteFontReference,
+  type ResolvedProgrammableComposition,
   type ResolvedProgrammableCompositionMetadata,
   type StorageResolveOptions,
   type StorageTransferOptions,
@@ -79,6 +83,8 @@ export type VexaRendererErrorCode =
   | "INVALID_RENDER_OUTPUT"
   | "RENDER_EXECUTABLE_BUNDLE_REQUIRED"
   | "RENDER_EXECUTABLE_EXPORT_INVALID"
+  | "RENDER_INPUT_PROPS_INVALID"
+  | "RENDER_COMPOSITION_METADATA_FAILED"
   | "RENDER_ABORTED"
   | "RENDER_TIMEOUT"
   | "RENDER_HARDWARE_UNAVAILABLE"
@@ -1702,6 +1708,34 @@ function isExecutableComposition(value: unknown): value is AnyExecutableComposit
   );
 }
 
+function compositionResolutionError(
+  compositionId: string,
+  cause: unknown
+): VexaRendererError {
+  if (cause instanceof ProgrammableCompositionError) {
+    if (cause.code === "INVALID_COMPOSITION_PROPS") {
+      return new VexaRendererError(
+        cause.message,
+        "RENDER_INPUT_PROPS_INVALID",
+        { compositionId, cause }
+      );
+    }
+    if (cause.code === "COMPOSITION_METADATA_FAILED") {
+      return new VexaRendererError(
+        cause.message,
+        "RENDER_COMPOSITION_METADATA_FAILED",
+        { compositionId, cause }
+      );
+    }
+  }
+
+  return new VexaRendererError(
+    `Failed to resolve executable composition "${compositionId}": ${cause instanceof Error ? cause.message : String(cause)}.`,
+    "RENDER_EXECUTION_FAILED",
+    { compositionId, cause }
+  );
+}
+
 export class VexaCompositionRenderer {
   readonly #manifest: VexaBundleManifest;
   readonly #defaults: Required<VexaRendererOptions>;
@@ -1758,6 +1792,28 @@ export class VexaCompositionRenderer {
       );
     }
     return composition;
+  }
+
+  async inspectComposition(id: string): Promise<ProgrammableCompositionStaticMetadata> {
+    const composition = this.requireComposition(id);
+    const executable = await this.#requireExecutableComposition(composition.id);
+    return getExecutableCompositionStaticMetadata(executable);
+  }
+
+  async resolveComposition(
+    id: string,
+    inputProps?: JsonObject
+  ): Promise<ResolvedProgrammableComposition> {
+    const composition = this.requireComposition(id);
+    const executable = await this.#requireExecutableComposition(composition.id);
+    try {
+      return await resolveProgrammableComposition(
+        executable.definition,
+        inputProps as Partial<JsonObject> | undefined
+      );
+    } catch (cause) {
+      throw compositionResolutionError(composition.id, cause);
+    }
   }
 
   planStill(options: VexaStillRenderPlanOptions): VexaRenderPlan {
@@ -2199,6 +2255,9 @@ export class VexaCompositionRenderer {
         inputProps as Partial<JsonObject> | undefined
       );
     } catch (cause) {
+      if (cause instanceof ProgrammableCompositionError) {
+        throw compositionResolutionError(compositionId, cause);
+      }
       throw new VexaRendererError(
         `Failed to evaluate executable composition "${compositionId}": ${cause instanceof Error ? cause.message : String(cause)}.`,
         "RENDER_EXECUTION_FAILED",
