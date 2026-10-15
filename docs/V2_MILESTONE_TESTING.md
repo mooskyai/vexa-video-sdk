@@ -881,6 +881,14 @@ Verify that agent/MCP operations:
 
 ## V2.15 — Visual regression and parity
 
+The first slice establishes the reusable Node-side frame comparison surface before cross-runtime parity is layered on top. Focused tests must cover exact PNG equality, per-channel tolerance, changed-pixel-ratio tolerance, dimension mismatch, malformed/unsupported PNG rejection, typed assertion failures, deterministic checkpoint naming/order, unsafe/duplicate checkpoint rejection, and a real renderer round trip. The real acceptance must bundle the checked-in executable renderer fixture, render named PNG checkpoints through `VexaCompositionRenderer`, prove an unchanged frame is byte-visual-equivalent on repeat, and prove a changed background is detected as a visual mismatch.
+
+```powershell
+node --import tsx --test "packages/test/**/*.test.ts"
+```
+
+The PNG comparator intentionally supports the ordinary 8-bit, non-interlaced grayscale/RGB/grayscale-alpha/RGBA output classes used by Vexa's renderer acceptance. Unsupported bit depths, palette/interlaced images, malformed compressed data, and dimension mismatches must fail closed rather than being silently converted with platform-specific image libraries.
+
 ### Required fixture classes
 
 Maintain small deterministic fixtures for:

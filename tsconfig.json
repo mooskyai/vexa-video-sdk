@@ -44,6 +44,9 @@
       "path": "./packages/renderer"
     },
     {
+      "path": "./packages/test"
+    },
+    {
       "path": "./packages/gif"
     },
     {

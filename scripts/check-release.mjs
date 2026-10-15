@@ -17,7 +17,8 @@ const releasePackages = [
   "packages/web-renderer",
   "packages/studio",
   "packages/cli",
-  "packages/mcp"
+  "packages/mcp",
+  "packages/test"
 ];
 
 const root = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));

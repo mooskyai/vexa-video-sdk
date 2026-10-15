@@ -853,7 +853,9 @@ The `@vexa-video/mcp` package must continue to expose the same typed composition
 
 Make programmable rendering testable at the frame level.
 
-Possible package:
+The first V2.15 slice introduces `@vexa-video/test` as a Node-only visual-regression foundation. Named checkpoints delegate selected frames to `VexaCompositionRenderer.renderFrame()` and always materialize PNG output through the existing renderer path. Snapshot comparison decodes ordinary 8-bit non-interlaced grayscale/RGB/RGBA PNGs into a deterministic RGBA representation, then applies explicit per-channel tolerance and maximum changed-pixel ratio. Renderer behavior, composition evaluation, FFmpeg execution, and browser preview semantics remain in their existing packages.
+
+Package:
 
 ```text
 @vexa-video/test
@@ -869,6 +871,8 @@ Possible package:
 - browser/Node parity fixtures;
 - deterministic test assets;
 - audio duration/sync assertions.
+
+Later V2.15 slices should add checked-in fixture baselines plus Player/Studio/browser-renderer parity on top of this one comparison contract rather than creating runtime-specific snapshot semantics.
 
 Testing requirements are defined in `V2_MILESTONE_TESTING.md`.
 

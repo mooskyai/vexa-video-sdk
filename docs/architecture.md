@@ -22,6 +22,7 @@ The architecture has four primary goals:
 | `@vexa-video/ai` | Node.js (optional) | Provider-neutral transcription/tracking/highlight adapters plus deterministic AI-assisted planning helpers |
 | `@vexa-video/bundler` | Node.js development/build | TypeScript/TSX composition bundling, deterministic discovery/manifests, CSS/assets, source maps, and environment filtering |
 | `@vexa-video/renderer` | Node.js | Bundle-backed composition planning plus executable still, single-frame, frame-range, and video rendering through shared core/FFmpeg contracts |
+| `@vexa-video/test` | Node.js testing | Selected-frame checkpoint rendering through `@vexa-video/renderer` plus deterministic tolerance-aware PNG snapshot comparison |
 | `@vexa-video/mcp` | Node.js integration | Agent-safe composition/render-control tools plus official MCP protocol and stdio adapters over the renderer/hosted-render contracts |
 | `@vexa-video/studio` | Browser | Local Studio session state coordinating composition selection, Player preview, Editor timeline state, props, resolved metadata, and reload preservation |
 
@@ -224,11 +225,14 @@ Likely Version 2 runtime boundaries are:
 | player | browser | Playback/preview only; no Node SDK runtime import |
 | bundler | Node/development | Builds browser-executable composition bundles |
 | renderer | Node | Reuses `@vexa-video/sdk`, storage, hardware, cancellation, progress, and FFmpeg execution |
+| visual regression | Node/testing | Delegates frame materialization to the renderer and owns only deterministic snapshot decoding/comparison/tolerance semantics |
 | agent/MCP | Node/integration | Publishes the existing Vexa tool catalog over MCP; no shell surface or duplicate props/render/job semantics |
 | Studio UI | browser | Reuses player/editor state; Node work goes through a development host |
 | web renderer | browser | Optional Canvas/WebCodecs backend with capability detection and typed fallback |
 
 `@vexa-video/mcp` sits above the renderer and hosted-render abstractions. Its protocol server publishes the transport-neutral tool schemas unchanged and routes MCP calls back into `VexaMcpCompositionTools`; stdio is only a transport adapter. Provider credentials, hosted adapters, renderer construction, and process execution remain application/Node-host responsibilities.
+
+`@vexa-video/test` sits above the renderer as test tooling rather than as another execution backend. Checkpoint rendering calls `VexaCompositionRenderer.renderFrame()` with deterministic PNG outputs; snapshot comparison then normalizes supported PNG pixels to RGBA and applies caller-declared tolerances. Player, Studio, and browser-renderer parity fixtures may consume the same comparison contract later, but this package must not define alternate composition evaluation or media-render semantics.
 
 Whenever a composition can be represented by `VideoProjectAst`, it should lower into that existing model so timeline rendering, captions, storage, hardware selection, and execution planning retain one source of media semantics.
 

@@ -94,7 +94,7 @@ The planned sequence is:
 | V2.12 | **Complete** | Parameterized templates and validated input schemas; browser-safe schemas, deterministic template discovery, validated 16:9/9:16/1:1 variants, reusable scene/storage asset descriptors, and JSON-safe service/agent invocation resolve through the same composition and asset contracts |
 | V2.13 | **Complete** | Hosted/serverless composition rendering; typed requests, existing job-worker execution, deterministic retry-safe artifact publication, progress/cancellation, and provider-neutral deployment boundaries all reuse the normal renderer, job, and Storage contracts |
 | V2.14 | **Complete** | Agent/MCP/CLI composition workflows; CLI, typed agent operations, official MCP protocol handling, and stdio transport all reuse the existing bundler, renderer, and hosted-render contracts |
-| V2.15 | **Planned** | Frame-level visual regression and runtime parity testing |
+| V2.15 | **In progress** | Frame-level visual regression foundation with selected-frame checkpoints and deterministic PNG comparison; cross-runtime parity follows |
 | V2.16 | **Planned** | Version 2 release hardening |
 
 V2.1 through V2.7 are complete on the Version 2 branch. V2.7 bundle-backed execution resolves executable compositions and dynamic metadata, materializes still/single-frame images and bounded frame ranges, encodes exact exclusive-end MP4/WebM ranges, exposes progress/cancellation/timeouts/hardware selection, and resolves storage-backed scene assets through managed workspaces. Windows acceptance verified a 1920x1080 H.264 render at 30fps with exactly 60 frames over 2 seconds.
@@ -110,6 +110,8 @@ V2.14 has started at the CLI boundary without redefining composition semantics. 
 The fourth slice introduces a transport-neutral `@vexa-video/mcp` adapter above the existing renderer and hosted-render surfaces. Its tool catalog and dispatcher expose composition list/inspect/validate plus hosted render start/get/cancel, preserve existing renderer/hosted error codes, and reject unsupported operation fields rather than accepting raw shell/media commands.
 
 The fifth slice closes V2.14 by mounting that unchanged catalog on the official MCP TypeScript SDK. `@vexa-video/mcp/server` publishes the existing JSON schemas through `tools/list` and routes `tools/call` directly into `VexaMcpCompositionTools`; `@vexa-video/mcp/stdio` connects the same server to the official stdio transport. In-memory protocol acceptance and a spawned Node stdio client/server round trip prove the wire boundary without adding a second validator, renderer, queue, hosted request model, or shell surface.
+
+V2.15 has started with the public Node-only `@vexa-video/test` foundation. Its first slice renders named frame checkpoints through `VexaCompositionRenderer.renderFrame()` and compares 8-bit non-interlaced PNG snapshots after deterministic RGBA normalization. Channel tolerance and maximum changed-pixel ratio are explicit test inputs, while malformed snapshots, unsafe checkpoint names, duplicate names, and exceeded tolerances fail with typed diagnostics. The same acceptance path rerenders the existing executable fixture through FFmpeg to prove repeatability before Player/Studio/browser-renderer parity fixtures are added.
 
 Detailed scope and acceptance:
 
