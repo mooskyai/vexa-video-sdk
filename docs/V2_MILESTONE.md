@@ -738,6 +738,8 @@ Browser rendering is an alternate backend, not a reason to weaken Node/browser p
 
 ## V2.12 — Templates and parameterized compositions
 
+**Status:** Complete.
+
 The first slice adds a browser-safe serializable input-schema contract directly to existing programmable composition definitions. Object schemas cover strings, finite numbers/integers, booleans, enums, arrays, nested objects, required keys, bounded lengths/ranges/item counts, and explicit unknown-property policy. `defaultProps` remain the single source of defaults: definitions validate them against the normalized schema at authoring time, resolved props validate before any custom `validateProps`, and static composition metadata exposes the same frozen schema for Studio/API/agent discovery. No external schema library or second composition/template model is introduced.
 
 The second slice adds reusable template descriptors around those same composition definitions. Template metadata is normalized and frozen, while `ProgrammableTemplateCatalog` provides deterministic discovery entries containing presentation metadata plus the composition kind, dimensions/timing, defaults, and existing `inputSchema`. Catalog descriptors never execute independently: player, still, local render, and future hosted/agent invocation continue to target the wrapped composition.
@@ -747,6 +749,8 @@ The third slice adds deterministic aspect-ratio variants to those descriptors. E
 The fourth slice adds a JSON-safe invocation envelope for services and agents. Invocation normalization validates and freezes `templateId`, optional `variantId`, and JSON-only props; catalog resolution merges variant presets before caller overrides, then delegates to the existing composition schema/custom validation and dynamic-metadata path. Variant aspect-ratio verification runs after those final props resolve, so remote callers cannot bypass responsive-template guarantees.
 
 The fifth slice adds reusable template assets by referencing the existing `ProgrammableSceneAsset` contract instead of introducing template-specific media URLs or files. Template asset sets normalize through the same static/storage source validation, preload defaults, deterministic id ordering, duplicate rejection, and storage-security boundary already used by programmable scenes. Catalog entries expose those frozen JSON-safe descriptors so Studio, services, and agents can discover required media without bypassing scene/storage resolution.
+
+Closure acceptance on Windows 11 passed 9/9 focused template tests, 26/26 programmable-scene tests, 12/12 programmable-composition tests, and 365/365 full repository tests. `npm run typecheck`, `npm run build`, and `npm run verify` completed successfully; the verify run repeated the 365/365 suite before the final build. The root README guard, repository prohibited-runtime guard, and `git diff --check` were clean. No second template execution model, render path, or asset-resolution path was introduced.
 
 ### Goal
 

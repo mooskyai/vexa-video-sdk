@@ -178,6 +178,8 @@ The fourth V2.12 slice adds a transport-friendly invocation envelope rather than
 
 The fifth V2.12 slice keeps reusable media declarative. Template metadata accepts the existing `ProgrammableSceneAsset` descriptors and normalizes them through the same static/storage source rules, preload defaults, duplicate-id checks, and deterministic ordering used by programmable scenes. Catalog consumers can therefore discover a template's reusable media requirements without gaining a second fetch/filesystem API; actual storage resolution remains in the existing browser/SDK/renderer boundaries.
 
+V2.12 closes without creating a parallel runtime. Input schemas validate the same composition props, template descriptors wrap the same composition definitions, responsive variants resolve through the same dynamic-metadata path, invocations call the same composition resolver, and reusable assets use the same scene/storage descriptors and security boundary. Player, still, local renderer, future hosted rendering, and agent surfaces therefore share one composition and media-semantics model.
+
 The intended boundary is:
 
 ```text

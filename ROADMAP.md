@@ -91,7 +91,7 @@ The planned sequence is:
 | V2.9 | **Complete** | Shapes, effects, transitions, fonts, and composition captions; deterministic typography, local/remote font readiness, caption cue rendering, active-word timing, and speaker-aware style overrides execute through the shared project/FFmpeg graph |
 | V2.10 | **Complete** | Extended programmable-media boundary plus concrete GIF, waveform, and reusable sound-effect integrations, all preserving dependency separation from core/normal SDK execution |
 | V2.11 | **Complete** | Browser/WebCodecs rendering with capability/fallback planning, video plus AAC/Opus audio encoding, H.264/AAC MP4 plus VP9-or-AV1/Opus WebM A/V muxing, Canvas/serializable-DOM capture adapters, Blob/File output, progress, cancellation, and typed backend fallback |
-| V2.12 | **In progress** | Parameterized templates and validated input schemas; browser-safe schemas, deterministic template discovery, validated 16:9/9:16/1:1 variants, reusable scene/storage asset descriptors, and JSON-safe service/agent invocation now resolve through the same composition and asset contracts |
+| V2.12 | **Complete** | Parameterized templates and validated input schemas; browser-safe schemas, deterministic template discovery, validated 16:9/9:16/1:1 variants, reusable scene/storage asset descriptors, and JSON-safe service/agent invocation resolve through the same composition and asset contracts |
 | V2.13 | **Planned** | Hosted/serverless composition rendering through existing job contracts |
 | V2.14 | **Planned** | Agent/MCP/CLI composition workflows |
 | V2.15 | **Planned** | Frame-level visual regression and runtime parity testing |
@@ -100,6 +100,8 @@ The planned sequence is:
 V2.1 through V2.7 are complete on the Version 2 branch. V2.7 bundle-backed execution resolves executable compositions and dynamic metadata, materializes still/single-frame images and bounded frame ranges, encodes exact exclusive-end MP4/WebM ranges, exposes progress/cancellation/timeouts/hardware selection, and resolves storage-backed scene assets through managed workspaces. Windows acceptance verified a 1920x1080 H.264 render at 30fps with exactly 60 frames over 2 seconds.
 
 V2.8 is complete. The public browser-safe `@vexa-video/studio` runtime composes the existing Player and Editor contracts for deterministic composition selection, props drafts, resolved metadata, preview/playhead state, timeline viewport state, and safe current-frame preservation. The normal Playground now provides the responsive Vexa Studio workspace, Node-hosted composition bundling/rendering, recursive source watching with SSE hot reload, diagnostics/log recovery, render progress/output/failure handling, and browser automation. Windows Chrome acceptance additionally verifies composition switching, play/pause/scrubbing, dirty-props/frame preservation across source reload, current-frame rendering, deliberate renderer failure/recovery, and execution through a repository alias containing spaces.
+
+V2.12 is complete. Windows 11 acceptance passed the focused template, scene, and composition suites (9/9, 26/26, and 12/12), the full repository suite (365/365), TypeScript typecheck/build, and `npm run verify`; README/prohibited-runtime guards and `git diff --check` were clean. Templates remain descriptors around the existing composition runtime, variants reuse dynamic metadata, and reusable assets reuse the existing scene/storage contract rather than adding parallel execution or media-resolution models.
 
 Detailed scope and acceptance:
 

@@ -740,6 +740,20 @@ Cover:
 - static HTTP URLs rejected in favor of the storage/http source boundary;
 - no template-specific filesystem, fetch, or media-resolution path.
 
+### V2.12 closure evidence
+
+Windows 11 acceptance for the completed template/parameterization stage:
+
+- focused template suite: **9/9 passed**;
+- focused programmable-scene suite: **26/26 passed**;
+- focused programmable-composition suite: **12/12 passed**;
+- repository `npm test`: **365/365 passed**;
+- `npm run typecheck`, `npm run build`, and `npm run verify`: passed;
+- the `npm run verify` test phase repeated **365/365 passed** before the final TypeScript build;
+- root `README.md` `Milestone` guard: no matches;
+- repository prohibited-runtime guard: no matches;
+- `git diff --check`: clean.
+
 ## V2.13 — Hosted/serverless composition rendering
 
 ### Contract tests
