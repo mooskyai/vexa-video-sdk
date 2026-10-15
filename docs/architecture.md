@@ -184,6 +184,8 @@ V2.13 starts at the existing hosted adapter boundary. A `composition.render` env
 
 The second V2.13 slice places the execution bridge in `@vexa-video/renderer`, preserving package direction because the renderer already depends on the SDK. `registerHostedCompositionRenderWorker()` attaches the hosted type to the same generic registration shape implemented by local `JobQueue` and distributed workers; provider callbacks resolve abstract manifest/output references to worker-local paths, then the normal `VexaCompositionRenderer` executes the requested target. Its progress callback is serialized into ordinary job progress, and its abort boundary is translated back to the job cancellation contract. Bundle acquisition policy and remote artifact publication remain provider-owned, so core stays cloud-free and no parallel scheduler or render engine appears.
 
+The third V2.13 slice keeps artifact publication on those same boundaries. A hosted request that names `output.destination` publishes only after the normal renderer succeeds. File outputs reuse `@vexa-video/sdk` `Storage.upload()` so local/object destinations, adapter-owned credentials, cancellation, byte counts, and overwrite behavior remain centralized; no cloud SDK enters core or renderer. Frame-range output remains a directory and therefore uses an explicit host publisher for packaging or multi-object upload. Publication returns a normalized hosted artifact reference while retaining the deterministic local output path for worker diagnostics.
+
 The intended boundary is:
 
 ```text

@@ -1,17 +1,26 @@
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import {
   HOSTED_COMPOSITION_RENDER_TYPE,
   createHostedCompositionRenderRequest
 } from "@vexa-video/core";
-import { JobQueue } from "@vexa-video/sdk";
+import { JobQueue, Storage } from "@vexa-video/sdk";
 import {
   VexaRendererError,
   registerHostedCompositionRenderWorker,
   type HostedCompositionWorkerResult
 } from "../src/index.js";
 
-function request(target: Parameters<typeof createHostedCompositionRenderRequest>[0]["target"]) {
+function request(
+  target: Parameters<typeof createHostedCompositionRenderRequest>[0]["target"],
+  output: {
+    destination?: string;
+    contentType?: string;
+  } = {}
+) {
   return createHostedCompositionRenderRequest(
     {
       schemaVersion: 1,
@@ -22,7 +31,10 @@ function request(target: Parameters<typeof createHostedCompositionRenderRequest>
       compositionId: "ProductDemo",
       target,
       inputProps: { title: "Launch", count: 2 },
-      output: { artifactId: "customer/render-1" }
+      output: {
+        artifactId: "customer/render-1",
+        ...output
+      }
     },
     { idempotencyKey: "customer-render-1" }
   );
@@ -184,4 +196,178 @@ test("hosted composition worker validates provider resolvers before registration
       }),
     /resolveOutput/
   );
+});
+
+test("hosted composition worker publishes single-file destinations through Storage", async () => {
+  const root = await mkdtemp(join(tmpdir(), "vexa-hosted-artifact-"));
+  try {
+    const localOutput = join(root, "render.webm");
+    const uploads: Array<{
+      sourcePath: string;
+      destination: string;
+      overwrite: boolean | undefined;
+    }> = [];
+    const storage = new Storage({
+      adapters: [
+        Storage.s3({
+          async download() {
+            throw new Error("unused");
+          },
+          async upload(sourcePath, reference, options) {
+            const bytes = (await readFile(sourcePath)).byteLength;
+            const destination = `s3://${reference.bucket}/${reference.key}`;
+            uploads.push({
+              sourcePath,
+              destination,
+              overwrite: options.overwrite
+            });
+            return {
+              provider: "s3",
+              source: sourcePath,
+              destination,
+              destinationReference: reference,
+              bytesTransferred: bytes,
+              contentType: "video/webm"
+            };
+          }
+        })
+      ]
+    });
+    const queue = new JobQueue({ workerId: "hosted-publish-test" });
+
+    registerHostedCompositionRenderWorker(queue, {
+      resolveManifest: () => "C:\\resolved\\vexa.bundle.json",
+      resolveOutput: () => localOutput,
+      artifactStorage: storage,
+      createRenderer: async () => ({
+        renderStill: async () => ({} as never),
+        renderFrame: async () => ({} as never),
+        renderFrameRange: async () => ({} as never),
+        async renderVideo(options) {
+          await writeFile(options.output, "video");
+          return {} as never;
+        }
+      })
+    });
+
+    const hosted = request(
+      { kind: "video", container: "webm" },
+      { destination: "s3://renders/customer/render-1.webm" }
+    );
+    const handle = queue.submit<typeof hosted.payload, HostedCompositionWorkerResult>(
+      hosted.type,
+      hosted.payload
+    );
+    const terminal = await handle.wait();
+
+    assert.equal(terminal.state, "succeeded");
+    assert.equal(terminal.result?.output, localOutput);
+    assert.equal(
+      terminal.result?.artifact?.url,
+      "s3://renders/customer/render-1.webm"
+    );
+    assert.equal(terminal.result?.artifact?.name, "customer/render-1");
+    assert.equal(terminal.result?.artifact?.contentType, "video/webm");
+    assert.equal(terminal.result?.artifact?.sizeBytes, 5);
+    assert.equal(terminal.progress?.phase, "complete");
+    assert.deepEqual(uploads, [
+      {
+        sourcePath: localOutput,
+        destination: "s3://renders/customer/render-1.webm",
+        overwrite: true
+      }
+    ]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("hosted composition worker uses a general publisher for frame-range destinations", async () => {
+  const queue = new JobQueue({ workerId: "hosted-frame-range-publish-test" });
+  let publishedLocalOutput = "";
+
+  registerHostedCompositionRenderWorker(queue, {
+    resolveManifest: () => "C:\\resolved\\vexa.bundle.json",
+    resolveOutput: () => "C:\\renders\\customer-render-1",
+    publishArtifact(output, payload, context) {
+      publishedLocalOutput = context.localOutput;
+      assert.equal(payload.target.kind, "frame-range");
+      assert.equal(context.contentType, "application/zip");
+      assert.equal(output.destination, "https://cdn.example.com/customer/render-1.zip");
+      return {
+        url: output.destination!,
+        sizeBytes: 123
+      };
+    },
+    createRenderer: async () => ({
+      renderStill: async () => ({} as never),
+      renderFrame: async () => ({} as never),
+      async renderFrameRange() {
+        return {} as never;
+      },
+      renderVideo: async () => ({} as never)
+    })
+  });
+
+  const hosted = request(
+    {
+      kind: "frame-range",
+      startFrame: 3,
+      endFrameExclusive: 6,
+      format: "png"
+    },
+    {
+      destination: "https://cdn.example.com/customer/render-1.zip",
+      contentType: "application/zip"
+    }
+  );
+  const handle = queue.submit<typeof hosted.payload, HostedCompositionWorkerResult>(
+    hosted.type,
+    hosted.payload
+  );
+  const terminal = await handle.wait();
+
+  assert.equal(terminal.state, "succeeded");
+  assert.equal(publishedLocalOutput, "C:\\renders\\customer-render-1");
+  assert.equal(
+    terminal.result?.artifact?.url,
+    "https://cdn.example.com/customer/render-1.zip"
+  );
+  assert.equal(terminal.result?.artifact?.name, "customer/render-1");
+  assert.equal(terminal.result?.artifact?.contentType, "application/zip");
+  assert.equal(terminal.result?.artifact?.sizeBytes, 123);
+});
+
+test("hosted composition worker fails closed when a destination has no publisher", async () => {
+  const queue = new JobQueue({ workerId: "hosted-publish-required-test" });
+  let rendererCreated = false;
+
+  registerHostedCompositionRenderWorker(queue, {
+    resolveManifest: () => "C:\\resolved\\vexa.bundle.json",
+    resolveOutput: () => "C:\\renders\\render.mp4",
+    createRenderer: async () => {
+      rendererCreated = true;
+      return {
+        renderStill: async () => ({} as never),
+        renderFrame: async () => ({} as never),
+        renderFrameRange: async () => ({} as never),
+        renderVideo: async () => ({} as never)
+      };
+    }
+  });
+
+  const hosted = request(
+    { kind: "video", container: "mp4" },
+    { destination: "s3://renders/customer/render-1.mp4" }
+  );
+  const handle = queue.submit<typeof hosted.payload, HostedCompositionWorkerResult>(
+    hosted.type,
+    hosted.payload
+  );
+  const terminal = await handle.wait();
+
+  assert.equal(terminal.state, "failed");
+  assert.equal(rendererCreated, false);
+  assert.equal(terminal.error?.code, "RENDER_ARTIFACT_PUBLISH_FAILED");
+  assert.match(terminal.error?.message ?? "", /artifactStorage or publishArtifact/);
 });

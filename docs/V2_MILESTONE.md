@@ -785,6 +785,8 @@ The first slice extends the existing provider-neutral hosted contract rather tha
 
 The second slice adds the worker bridge inside `@vexa-video/renderer`, where the dependency direction already points toward `@vexa-video/sdk`. `registerHostedCompositionRenderWorker()` registers `composition.render` on the existing local `JobQueue` or distributed-worker registration contract, resolves the provider-owned manifest and local output through injected callbacks, and dispatches still/frame/range/video work to `VexaCompositionRenderer`. Renderer progress is forwarded into the existing job progress snapshot, `AbortSignal` cancellation remains a cancelled job rather than a failed render, and retries reuse the caller's stable artifact id plus a deterministic provider-resolved output path. Remote artifact publication remains a later slice.
 
+The third slice completes deterministic artifact publication without embedding a cloud provider. When `output.destination` is present, the worker must publish after local rendering rather than silently returning only a worker path. Single-file still/frame/video outputs may use `artifactStorage`, which delegates to the existing `Storage.upload()` contract and its application-owned adapters with retry-safe overwrite semantics and the worker cancellation signal. Frame-range output is a directory, so it requires `publishArtifact()` for explicit packaging/upload. The worker returns a normalized hosted artifact reference and fails closed with a typed publication error when a destination cannot be fulfilled.
+
 ### Goal
 
 Connect composition rendering to the existing hosted-render and job abstractions.

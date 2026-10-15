@@ -27,6 +27,7 @@ import {
   type HostedCompositionOutputReference,
   type HostedCompositionRenderPayload,
   type HostedCompositionRenderTarget,
+  type HostedRenderArtifact,
   type JsonObject,
   type MediaProgress,
   type MediaStorageSource,
@@ -45,6 +46,7 @@ import {
   type RemoteFontReference,
   type ResolvedProgrammableCompositionMetadata,
   type StorageResolveOptions,
+  type StorageTransferOptions,
   type VideoProjectAst
 } from "@vexa-video/core";
 import {
@@ -87,6 +89,7 @@ export type VexaRendererErrorCode =
   | "RENDER_SURFACE_UNAVAILABLE"
   | "RENDER_SURFACE_UNSUPPORTED"
   | "RENDER_SURFACE_FAILED"
+  | "RENDER_ARTIFACT_PUBLISH_FAILED"
   | "RENDER_EXECUTION_FAILED";
 
 export class VexaRendererError extends Error {
@@ -2323,6 +2326,18 @@ export type HostedCompositionOutputResolver = (
   context: HostedCompositionWorkerContext
 ) => string | Promise<string>;
 
+export interface HostedCompositionArtifactPublishContext
+  extends HostedCompositionWorkerContext {
+  readonly localOutput: string;
+  readonly contentType: string;
+}
+
+export type HostedCompositionArtifactPublisher = (
+  output: HostedCompositionOutputReference,
+  payload: HostedCompositionRenderPayload,
+  context: HostedCompositionArtifactPublishContext
+) => HostedRenderArtifact | Promise<HostedRenderArtifact>;
+
 export type HostedCompositionWorkerRenderer = Pick<
   VexaCompositionRenderer,
   "renderStill" | "renderFrame" | "renderFrameRange" | "renderVideo"
@@ -2344,6 +2359,15 @@ export interface HostedCompositionWorkerOptions {
     VexaRenderExecutionOptions,
     "inputProps" | "signal" | "onProgress"
   >;
+  /** Upload single-file outputs through the existing Vexa Storage abstraction. */
+  readonly artifactStorage?: Storage;
+  /** Transfer options for artifactStorage; the worker always supplies its cancellation signal. */
+  readonly artifactUploadOptions?: Omit<StorageTransferOptions, "signal">;
+  /**
+   * General publication hook. Required for frame-range destinations because the render output is
+   * a directory; hosts can package/upload it however their provider requires.
+   */
+  readonly publishArtifact?: HostedCompositionArtifactPublisher;
   /** Test/provider seam; normal execution uses VexaCompositionRenderer.fromManifest(). */
   readonly createRenderer?: (
     manifestPath: string,
@@ -2359,6 +2383,7 @@ export interface HostedCompositionWorkerResult {
   readonly target: HostedCompositionRenderTarget["kind"];
   readonly output: string;
   readonly contentType: string;
+  readonly artifact?: HostedRenderArtifact;
 }
 
 function hostedWorkerText(value: unknown, label: string): string {
@@ -2384,6 +2409,154 @@ function hostedWorkerContentType(payload: HostedCompositionRenderPayload): strin
     case "video":
       return payload.target.container === "webm" ? "video/webm" : "video/mp4";
   }
+}
+
+function hostedWorkerPublicationError(
+  payload: HostedCompositionRenderPayload,
+  message: string,
+  cause?: unknown
+): VexaRendererError {
+  return new VexaRendererError(
+    message,
+    "RENDER_ARTIFACT_PUBLISH_FAILED",
+    {
+      compositionId: payload.compositionId,
+      ...(cause === undefined ? {} : { cause })
+    }
+  );
+}
+
+function normalizeHostedWorkerArtifact(
+  artifact: HostedRenderArtifact,
+  payload: HostedCompositionRenderPayload,
+  contentType: string
+): HostedRenderArtifact {
+  if (!artifact || typeof artifact !== "object") {
+    throw hostedWorkerPublicationError(
+      payload,
+      "Hosted composition artifact publisher must return an artifact object."
+    );
+  }
+  if (typeof artifact.url !== "string" || artifact.url.trim() === "") {
+    throw hostedWorkerPublicationError(
+      payload,
+      "Hosted composition artifact publisher must return a non-empty artifact url."
+    );
+  }
+  if (
+    artifact.sizeBytes !== undefined &&
+    (!Number.isSafeInteger(artifact.sizeBytes) || artifact.sizeBytes < 0)
+  ) {
+    throw hostedWorkerPublicationError(
+      payload,
+      "Hosted composition artifact sizeBytes must be a non-negative safe integer."
+    );
+  }
+
+  const name = artifact.name?.trim() || payload.output.artifactId;
+  const normalizedContentType = artifact.contentType?.trim() || contentType;
+  return Object.freeze({
+    url: artifact.url.trim(),
+    name,
+    contentType: normalizedContentType,
+    ...(artifact.sizeBytes === undefined ? {} : { sizeBytes: artifact.sizeBytes }),
+    ...(artifact.metadata ? { metadata: Object.freeze({ ...artifact.metadata }) } : {})
+  });
+}
+
+async function publishHostedWorkerArtifact(
+  localOutput: string,
+  payload: HostedCompositionRenderPayload,
+  context: HostedCompositionWorkerContext,
+  options: HostedCompositionWorkerOptions,
+  contentType: string
+): Promise<HostedRenderArtifact | undefined> {
+  const destination = payload.output.destination;
+  if (!destination) return undefined;
+  if (context.signal.aborted) throw new JobCancelledError(context.jobId);
+
+  const publishContext: HostedCompositionArtifactPublishContext = Object.freeze({
+    ...context,
+    localOutput,
+    contentType
+  });
+
+  const publishWithProvider = async (): Promise<HostedRenderArtifact> => {
+    const publisher = options.publishArtifact;
+    if (!publisher) {
+      throw hostedWorkerPublicationError(
+        payload,
+        "Hosted composition output.destination requires artifactStorage or publishArtifact."
+      );
+    }
+    try {
+      const artifact = await publisher(
+        payload.output,
+        payload,
+        publishContext
+      );
+      if (context.signal.aborted) throw new JobCancelledError(context.jobId);
+      return normalizeHostedWorkerArtifact(artifact, payload, contentType);
+    } catch (cause) {
+      if (cause instanceof JobCancelledError || context.signal.aborted) throw cause;
+      if (
+        cause instanceof VexaRendererError &&
+        cause.code === "RENDER_ARTIFACT_PUBLISH_FAILED"
+      ) {
+        throw cause;
+      }
+      throw hostedWorkerPublicationError(
+        payload,
+        `Failed to publish hosted composition artifact "${payload.output.artifactId}".`,
+        cause
+      );
+    }
+  };
+
+  if (payload.target.kind === "frame-range") {
+    if (!options.publishArtifact) {
+      throw hostedWorkerPublicationError(
+        payload,
+        "Frame-range hosted outputs require publishArtifact() because the local render output is a directory."
+      );
+    }
+    return await publishWithProvider();
+  }
+
+  const artifactStorage = options.artifactStorage;
+  if (artifactStorage) {
+    try {
+      const transfer = await artifactStorage.upload(localOutput, destination, {
+        ...(options.artifactUploadOptions ?? {}),
+        overwrite: options.artifactUploadOptions?.overwrite ?? true,
+        signal: context.signal
+      });
+      if (context.signal.aborted) throw new JobCancelledError(context.jobId);
+      return Object.freeze({
+        url: destination,
+        name: payload.output.artifactId,
+        contentType: transfer.contentType?.trim() || contentType,
+        ...(typeof transfer.bytesTransferred === "number"
+          ? { sizeBytes: transfer.bytesTransferred }
+          : {}),
+        metadata: Object.freeze({
+          artifactId: payload.output.artifactId,
+          bundleId: payload.bundle.id,
+          compositionId: payload.compositionId,
+          target: payload.target.kind
+        })
+      });
+    } catch (cause) {
+      if (cause instanceof JobCancelledError || context.signal.aborted) throw cause;
+      throw hostedWorkerPublicationError(
+        payload,
+        `Failed to upload hosted composition artifact "${payload.output.artifactId}" to "${destination}".`,
+        cause
+      );
+    }
+  }
+
+  return await publishWithProvider();
 }
 
 function hostedWorkerContext(
@@ -2413,6 +2586,11 @@ export function registerHostedCompositionRenderWorker<
   if (typeof options.resolveOutput !== "function") {
     throw new TypeError("Hosted composition workers require resolveOutput().");
   }
+  if (options.artifactUploadOptions && !options.artifactStorage) {
+    throw new TypeError(
+      "Hosted composition artifactUploadOptions require artifactStorage."
+    );
+  }
 
   registry.register<HostedCompositionRenderPayload, HostedCompositionWorkerResult>(
     HOSTED_COMPOSITION_RENDER_TYPE,
@@ -2420,6 +2598,25 @@ export function registerHostedCompositionRenderWorker<
       const payload = createHostedCompositionRenderRequest(rawPayload).payload;
       const context = hostedWorkerContext(jobContext);
       if (context.signal.aborted) throw new JobCancelledError(context.jobId);
+
+      if (payload.output.destination) {
+        if (payload.target.kind === "frame-range" && !options.publishArtifact) {
+          throw hostedWorkerPublicationError(
+            payload,
+            "Frame-range hosted outputs require publishArtifact() because the local render output is a directory."
+          );
+        }
+        if (
+          payload.target.kind !== "frame-range" &&
+          !options.artifactStorage &&
+          !options.publishArtifact
+        ) {
+          throw hostedWorkerPublicationError(
+            payload,
+            "Hosted composition output.destination requires artifactStorage or publishArtifact."
+          );
+        }
+      }
 
       await jobContext.reportProgress({
         percent: 0,
@@ -2470,6 +2667,9 @@ export function registerHostedCompositionRenderWorker<
         onProgress
       } satisfies VexaRenderExecutionOptions;
 
+      const contentType = hostedWorkerContentType(payload);
+      let artifact: HostedRenderArtifact | undefined;
+
       try {
         switch (payload.target.kind) {
           case "still":
@@ -2515,10 +2715,44 @@ export function registerHostedCompositionRenderWorker<
             break;
         }
         await progressChain;
+
+        if (payload.output.destination) {
+          await jobContext.reportProgress({
+            percent: 100,
+            phase: "publishing",
+            message: "Publishing hosted composition artifact.",
+            data: {
+              artifactId: payload.output.artifactId,
+              destination: payload.output.destination
+            }
+          });
+          artifact = await publishHostedWorkerArtifact(
+            output,
+            payload,
+            context,
+            options,
+            contentType
+          );
+          await jobContext.reportProgress({
+            percent: 100,
+            phase: "complete",
+            message: "Hosted composition artifact is ready.",
+            data: {
+              artifactId: payload.output.artifactId,
+              ...(artifact ? { url: artifact.url } : {})
+            }
+          });
+        }
       } catch (cause) {
         await progressChain.catch(() => undefined);
-        const code = (cause as { readonly code?: unknown } | null)?.code;
-        if (context.signal.aborted || code === "RENDER_ABORTED") {
+        const value = cause as { readonly code?: unknown; readonly name?: unknown } | null;
+        if (
+          context.signal.aborted ||
+          value?.code === "RENDER_ABORTED" ||
+          value?.code === "PROCESS_ABORTED" ||
+          value?.code === "JOB_CANCELLED" ||
+          value?.name === "AbortError"
+        ) {
           throw new JobCancelledError(context.jobId);
         }
         throw cause;
@@ -2531,7 +2765,8 @@ export function registerHostedCompositionRenderWorker<
         compositionId: payload.compositionId,
         target: payload.target.kind,
         output,
-        contentType: hostedWorkerContentType(payload)
+        contentType,
+        ...(artifact ? { artifact } : {})
       });
     }
   );

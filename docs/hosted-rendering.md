@@ -62,11 +62,31 @@ registerHostedCompositionRenderWorker(queue, {
   },
   async resolveOutput(output) {
     return renderWorkspace.pathFor(output.artifactId);
+  },
+  artifactStorage: storage
+});
+```
+
+The same registration shape is implemented by Vexa's distributed worker. If `output.destination` is present, publication happens only after the normal renderer succeeds. Still, single-frame, and video outputs can use `artifactStorage`; Vexa calls the existing `Storage.upload()` boundary with the job cancellation signal and overwrite enabled by default so retries target the same deterministic destination.
+
+Frame ranges render as directories rather than one file. Hosts must provide `publishArtifact()` for those destinations so packaging or multi-object upload is explicit:
+
+```ts
+registerHostedCompositionRenderWorker(worker, {
+  resolveManifest,
+  resolveOutput,
+  async publishArtifact(output, payload, context) {
+    const url = await frameArchivePublisher.publishDirectory(
+      context.localOutput,
+      output.destination!,
+      { signal: context.signal, artifactId: output.artifactId }
+    );
+    return { url, contentType: "application/zip" };
   }
 });
 ```
 
-The same registration shape is implemented by Vexa's distributed worker. The bridge deliberately stops at the local render artifact. Uploading that artifact to `output.destination` and returning a portable hosted artifact URL remains provider-owned until the remote-output slice lands.
+A request that specifies `output.destination` fails closed when neither `artifactStorage` nor `publishArtifact()` can fulfill it. Publication returns a normalized artifact URL/name/content type/size record in the worker result; application-owned storage/provider code continues to own credentials and vendor SDKs.
 
 The adapter decides how jobs map to a cloud vendor, hosted Vexa service, Kubernetes job, serverless queue, or another execution plane. Vexa does not embed provider credentials or vendor SDKs in the core contract.
 

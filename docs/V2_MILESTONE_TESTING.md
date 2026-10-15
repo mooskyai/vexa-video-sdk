@@ -760,6 +760,8 @@ The first slice tests request normalization independently of worker execution: b
 
 The second slice tests the real worker boundary without requiring a cloud vendor: an in-memory `JobQueue` receives `composition.render`, injected resolvers map provider bundle/output identities into local worker paths, the existing renderer surface receives still/frame/range/video options, renderer progress becomes job progress, and renderer cancellation maps back to the job's cancelled state. The registration contract is shared with distributed workers, provider callbacks are validated eagerly, and no second queue implementation is introduced.
 
+The third slice covers remote-output publication through provider-neutral seams: single-file renders upload through the existing `Storage` adapter boundary, the caller destination/artifact id remain stable, publication uses overwrite-safe retry behavior and job cancellation, frame-range directories use an explicit publisher callback, returned artifact metadata is normalized, and a request with `output.destination` fails closed when no publisher is configured.
+
 ### Contract tests
 
 Use a fake/in-memory provider to cover:
