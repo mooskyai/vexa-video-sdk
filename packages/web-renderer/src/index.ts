@@ -1,3 +1,5 @@
+import { Mp4MuxInputError, muxH264Mp4 } from "./mp4.js";
+
 export type VexaWebVideoCodec = "h264" | "vp9" | "av1";
 export type VexaWebAudioCodec = "aac" | "opus";
 export type VexaWebContainer = "mp4" | "webm";
@@ -216,9 +218,35 @@ export interface VexaWebEncodedVideoChunkHandle {
   copyTo(destination: AllowSharedBufferSource): void;
 }
 
+export interface VexaWebVideoDecoderConfigHandle {
+  readonly codec: string;
+  readonly codedWidth?: number;
+  readonly codedHeight?: number;
+  readonly description?: AllowSharedBufferSource;
+}
+
+export interface VexaWebEncodedVideoChunkMetadataHandle {
+  readonly decoderConfig?: VexaWebVideoDecoderConfigHandle;
+}
+
+export interface VexaWebVideoDecoderConfig {
+  readonly codec: string;
+  readonly codedWidth?: number;
+  readonly codedHeight?: number;
+  readonly description?: Uint8Array;
+}
+
 export interface VexaWebVideoEncoderHandle {
   readonly encodeQueueSize: number;
-  configure(config: Readonly<{ codec: string; width: number; height: number; bitrate: number; framerate: number }>): void;
+  configure(config: Readonly<{
+    codec: string;
+    width: number;
+    height: number;
+    bitrate: number;
+    framerate: number;
+    latencyMode?: "quality" | "realtime";
+    avc?: Readonly<{ format: "avc" | "annexb" }>;
+  }>): void;
   encode(frame: VexaWebVideoFrameHandle, options?: Readonly<{ keyFrame?: boolean }>): void;
   flush(): Promise<void>;
   reset(): void;
@@ -231,7 +259,7 @@ export interface VexaWebVideoEncodingRuntime {
     init: Readonly<{ timestamp: number; duration: number }>
   ): VexaWebVideoFrameHandle;
   createVideoEncoder(callbacks: Readonly<{
-    output: (chunk: VexaWebEncodedVideoChunkHandle) => void;
+    output: (chunk: VexaWebEncodedVideoChunkHandle, metadata?: VexaWebEncodedVideoChunkMetadataHandle) => void;
     error: (error: Error) => void;
   }>): VexaWebVideoEncoderHandle;
 }
@@ -288,6 +316,7 @@ export interface VexaWebVideoEncodeResult {
   readonly fps: number;
   readonly frameCount: number;
   readonly durationSeconds: number;
+  readonly decoderConfig?: VexaWebVideoDecoderConfig;
   readonly chunks: readonly VexaWebEncodedVideoChunk[];
 }
 
@@ -312,7 +341,7 @@ function defaultEncodingRuntime(): VexaWebVideoEncodingRuntime {
       init: Readonly<{ timestamp: number; duration: number }>
     ) => VexaWebVideoFrameHandle;
     VideoEncoder?: new (callbacks: Readonly<{
-      output: (chunk: VexaWebEncodedVideoChunkHandle) => void;
+      output: (chunk: VexaWebEncodedVideoChunkHandle, metadata?: VexaWebEncodedVideoChunkMetadataHandle) => void;
       error: (error: Error) => void;
     }>) => VexaWebVideoEncoderHandle;
   };
@@ -336,6 +365,22 @@ function cancellationError(): VexaWebVideoEncodeError {
   return new VexaWebVideoEncodeError("CANCELLED", "Browser video encoding was cancelled.");
 }
 
+function copyBufferSource(source: AllowSharedBufferSource): Uint8Array {
+  const view = ArrayBuffer.isView(source)
+    ? new Uint8Array(source.buffer, source.byteOffset, source.byteLength)
+    : new Uint8Array(source);
+  return Uint8Array.from(view);
+}
+
+function copyDecoderConfig(config: VexaWebVideoDecoderConfigHandle): VexaWebVideoDecoderConfig {
+  return Object.freeze({
+    codec: config.codec,
+    ...(config.codedWidth === undefined ? {} : { codedWidth: config.codedWidth }),
+    ...(config.codedHeight === undefined ? {} : { codedHeight: config.codedHeight }),
+    ...(config.description === undefined ? {} : { description: copyBufferSource(config.description) })
+  });
+}
+
 export async function encodeWebVideoFrames(
   options: VexaWebVideoEncodeOptions
 ): Promise<VexaWebVideoEncodeResult> {
@@ -357,6 +402,7 @@ export async function encodeWebVideoFrames(
 
   const runtime = options.runtime ?? defaultEncodingRuntime();
   const chunks: VexaWebEncodedVideoChunk[] = [];
+  let decoderConfig: VexaWebVideoDecoderConfig | undefined;
   let encoderFailure: Error | undefined;
   let encoder: VexaWebVideoEncoderHandle | undefined;
   let closed = false;
@@ -381,7 +427,7 @@ export async function encodeWebVideoFrames(
 
   try {
     encoder = runtime.createVideoEncoder({
-      output(chunk) {
+      output(chunk, metadata) {
         const data = new Uint8Array(chunk.byteLength);
         chunk.copyTo(data);
         chunks.push(Object.freeze({
@@ -390,6 +436,9 @@ export async function encodeWebVideoFrames(
           ...(chunk.duration == null ? {} : { durationUs: chunk.duration }),
           data
         }));
+        if (metadata?.decoderConfig !== undefined) {
+          decoderConfig = copyDecoderConfig(metadata.decoderConfig);
+        }
       },
       error(error) {
         encoderFailure = error;
@@ -401,7 +450,10 @@ export async function encodeWebVideoFrames(
       width,
       height,
       bitrate,
-      framerate: fps
+      framerate: fps,
+      ...(options.plan.videoCodec === "h264"
+        ? { latencyMode: "realtime" as const, avc: { format: "avc" as const } }
+        : {})
     });
 
     const durationUs = Math.max(1, Math.round(1_000_000 / fps));
@@ -479,6 +531,7 @@ export async function encodeWebVideoFrames(
       fps,
       frameCount,
       durationSeconds: frameCount / fps,
+      ...(decoderConfig === undefined ? {} : { decoderConfig }),
       chunks: Object.freeze(chunks.slice())
     });
   } catch (error) {
@@ -511,9 +564,9 @@ export class VexaWebMuxError extends Error {
 
 export interface VexaWebMuxedVideoResult {
   readonly kind: "muxed-video";
-  readonly container: "webm";
-  readonly mimeType: "video/webm";
-  readonly videoCodec: "vp9" | "av1";
+  readonly container: "webm" | "mp4";
+  readonly mimeType: "video/webm" | "video/mp4";
+  readonly videoCodec: VexaWebVideoCodec;
   readonly width: number;
   readonly height: number;
   readonly fps: number;
@@ -694,33 +747,76 @@ function createWebmClusters(encoded: VexaWebVideoEncodeResult): readonly Uint8Ar
 }
 
 export function muxWebVideo(encoded: VexaWebVideoEncodeResult): VexaWebMuxedVideoResult {
-  if (encoded.targetContainer !== "webm" || (encoded.videoCodec !== "vp9" && encoded.videoCodec !== "av1")) {
-    throw new VexaWebMuxError(
-      "CONTAINER_MUX_UNSUPPORTED",
-      "V2.11 browser muxing currently supports VP9/AV1 WebM output only."
-    );
+  if (encoded.targetContainer === "webm" && (encoded.videoCodec === "vp9" || encoded.videoCodec === "av1")) {
+    const segmentPayload = concatByteArrays([
+      createWebmInfo(encoded),
+      createWebmTracks(encoded),
+      ...createWebmClusters(encoded)
+    ]);
+    const data = concatByteArrays([createEbmlHeader(), ebmlElement(EBML_ID.segment, segmentPayload)]);
+    const blobBuffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
+    const blob = new Blob([blobBuffer], { type: "video/webm" });
+    return Object.freeze({
+      kind: "muxed-video",
+      container: "webm",
+      mimeType: "video/webm",
+      videoCodec: encoded.videoCodec,
+      width: encoded.width,
+      height: encoded.height,
+      fps: encoded.fps,
+      frameCount: encoded.frameCount,
+      durationSeconds: encoded.durationSeconds,
+      data,
+      blob
+    });
   }
-  const segmentPayload = concatByteArrays([
-    createWebmInfo(encoded),
-    createWebmTracks(encoded),
-    ...createWebmClusters(encoded)
-  ]);
-  const data = concatByteArrays([createEbmlHeader(), ebmlElement(EBML_ID.segment, segmentPayload)]);
-  const blobBuffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
-  const blob = new Blob([blobBuffer], { type: "video/webm" });
-  return Object.freeze({
-    kind: "muxed-video",
-    container: "webm",
-    mimeType: "video/webm",
-    videoCodec: encoded.videoCodec,
-    width: encoded.width,
-    height: encoded.height,
-    fps: encoded.fps,
-    frameCount: encoded.frameCount,
-    durationSeconds: encoded.durationSeconds,
-    data,
-    blob
-  });
+
+  if (encoded.targetContainer === "mp4" && encoded.videoCodec === "h264") {
+    const decoderDescription = encoded.decoderConfig?.description;
+    if (decoderDescription === undefined) {
+      throw new VexaWebMuxError(
+        "INVALID_MUX_INPUT",
+        "H.264 MP4 muxing requires WebCodecs decoderConfig.description AVC metadata."
+      );
+    }
+    let data: Uint8Array;
+    try {
+      data = muxH264Mp4({
+        width: encoded.width,
+        height: encoded.height,
+        fps: encoded.fps,
+        frameCount: encoded.frameCount,
+        durationSeconds: encoded.durationSeconds,
+        decoderConfig: decoderDescription,
+        chunks: encoded.chunks
+      });
+    } catch (error) {
+      if (error instanceof Mp4MuxInputError) {
+        throw new VexaWebMuxError("INVALID_MUX_INPUT", error.message, { cause: error });
+      }
+      throw error;
+    }
+    const blobBuffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
+    const blob = new Blob([blobBuffer], { type: "video/mp4" });
+    return Object.freeze({
+      kind: "muxed-video",
+      container: "mp4",
+      mimeType: "video/mp4",
+      videoCodec: "h264",
+      width: encoded.width,
+      height: encoded.height,
+      fps: encoded.fps,
+      frameCount: encoded.frameCount,
+      durationSeconds: encoded.durationSeconds,
+      data,
+      blob
+    });
+  }
+
+  throw new VexaWebMuxError(
+    "CONTAINER_MUX_UNSUPPORTED",
+    "Browser muxing supports H.264 MP4 and VP9/AV1 WebM output only."
+  );
 }
 
 function defaultFileRuntime(): VexaWebFileRuntime {

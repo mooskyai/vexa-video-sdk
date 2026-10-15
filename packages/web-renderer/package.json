@@ -24,7 +24,7 @@
   "engines": {
     "node": ">=24.21.0"
   },
-  "description": "Browser-safe capability detection and planning foundation for Vexa WebCodecs rendering.",
+  "description": "Browser-safe WebCodecs encoding and WebM/MP4 muxing for Vexa programmable rendering.",
   "license": "MIT",
   "repository": {
     "type": "git",

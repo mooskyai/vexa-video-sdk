@@ -283,10 +283,10 @@ test("muxes AV1 with the WebM codec identity", () => {
   assert.equal(containsAscii(muxed.data, "V_AV1"), true);
 });
 
-test("WebM muxing fails closed for MP4 and invalid packet order", () => {
+test("muxing fails closed for missing H.264 metadata and invalid packet order", () => {
   assert.throws(
     () => muxWebVideo({ ...encodedWebm(), targetContainer: "mp4", videoCodec: "h264", codec: "avc1.42E01E" }),
-    (error: unknown) => error instanceof VexaWebMuxError && error.code === "CONTAINER_MUX_UNSUPPORTED"
+    (error: unknown) => error instanceof VexaWebMuxError && error.code === "INVALID_MUX_INPUT"
   );
   const noKey = encodedWebm();
   assert.throws(
@@ -316,4 +316,101 @@ test("creates File output through the browser file boundary", () => {
   assert.equal(file, expected);
   assert.equal(receivedName, "render.webm");
   assert.equal(receivedType, "video/webm");
+});
+
+function encodedMp4(): VexaWebVideoEncodeResult {
+  return {
+    kind: "encoded-video-chunks",
+    targetContainer: "mp4",
+    videoCodec: "h264",
+    codec: "avc1.42E01E",
+    width: 16,
+    height: 16,
+    fps: 30,
+    frameCount: 2,
+    durationSeconds: 2 / 30,
+    decoderConfig: {
+      codec: "avc1.42E01E",
+      codedWidth: 16,
+      codedHeight: 16,
+      description: new Uint8Array([
+        1, 0x42, 0xe0, 0x1e, 0xff, 0xe1, 0x00, 0x04,
+        0x67, 0x42, 0xe0, 0x1e, 0x01, 0x00, 0x02, 0x68, 0xce
+      ])
+    },
+    chunks: [
+      { type: "key", timestampUs: 0, durationUs: 33_333, data: new Uint8Array([0, 0, 0, 2, 0x65, 0x88]) },
+      { type: "delta", timestampUs: 33_333, durationUs: 33_333, data: new Uint8Array([0, 0, 0, 2, 0x41, 0x9a]) }
+    ]
+  };
+}
+
+test("muxes H.264 MP4 with preserved AVC decoder configuration", () => {
+  const muxed = muxWebVideo(encodedMp4());
+  assert.equal(muxed.container, "mp4");
+  assert.equal(muxed.mimeType, "video/mp4");
+  assert.equal(muxed.blob.type, "video/mp4");
+  assert.equal(muxed.blob.size, muxed.data.byteLength);
+  for (const boxType of ["ftyp", "moov", "avc1", "avcC", "moof", "mdat"]) {
+    assert.equal(containsAscii(muxed.data, boxType), true, `missing MP4 box ${boxType}`);
+  }
+});
+
+test("H.264 encoding preserves decoder metadata and requests AVC output", async () => {
+  const { encodeWebVideoFrames } = await import("../src/index.js");
+  const description = new Uint8Array([
+    1, 0x42, 0xe0, 0x1e, 0xff, 0xe1, 0x00, 0x04,
+    0x67, 0x42, 0xe0, 0x1e, 0x01, 0x00, 0x02, 0x68, 0xce
+  ]);
+  let configured: unknown;
+  const runtime = {
+    createVideoFrame(_source: unknown, init: { readonly timestamp: number }) {
+      return { timestamp: init.timestamp, close() {} };
+    },
+    createVideoEncoder(callbacks: {
+      readonly output: (chunk: {
+        readonly type: "key" | "delta";
+        readonly timestamp: number;
+        readonly duration: number;
+        readonly byteLength: number;
+        copyTo(destination: AllowSharedBufferSource): void;
+      }, metadata?: { readonly decoderConfig?: { readonly codec: string; readonly codedWidth?: number; readonly codedHeight?: number; readonly description?: AllowSharedBufferSource } }) => void;
+      readonly error: (error: Error) => void;
+    }) {
+      return {
+        encodeQueueSize: 0,
+        configure(config: unknown) { configured = config; },
+        encode(frame: { readonly timestamp?: number }) {
+          const bytes = new Uint8Array([0, 0, 0, 2, 0x65, 0x88]);
+          callbacks.output({
+            type: "key",
+            timestamp: frame.timestamp ?? 0,
+            duration: 33_333,
+            byteLength: bytes.length,
+            copyTo(destination) {
+              const view = ArrayBuffer.isView(destination)
+                ? new Uint8Array(destination.buffer, destination.byteOffset, destination.byteLength)
+                : new Uint8Array(destination);
+              view.set(bytes);
+            }
+          }, { decoderConfig: { codec: "avc1.42E01E", codedWidth: 16, codedHeight: 16, description } });
+        },
+        async flush() {},
+        reset() {},
+        close() {}
+      };
+    }
+  };
+
+  const encoded = await encodeWebVideoFrames({
+    plan: { kind: "browser", container: "mp4", videoCodec: "h264" },
+    width: 16, height: 16, fps: 30, frameCount: 1, runtime, renderFrame() { return {}; }
+  });
+  description[1] = 0;
+  assert.deepEqual(configured, {
+    codec: "avc1.42E01E", width: 16, height: 16, bitrate: 500_000, framerate: 30,
+    latencyMode: "realtime", avc: { format: "avc" }
+  });
+  assert.equal(encoded.decoderConfig?.description?.[1], 0x42);
+  assert.equal(muxWebVideo(encoded).mimeType, "video/mp4");
 });
