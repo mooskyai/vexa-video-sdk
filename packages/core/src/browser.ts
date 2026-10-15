@@ -121,6 +121,24 @@ export type {
 } from "./programmable-input-schema.js";
 
 export {
+  defineProgrammableTemplate,
+  getProgrammableTemplateCatalogEntry,
+  normalizeProgrammableTemplateMetadata,
+  ProgrammableTemplateCatalog,
+  ProgrammableTemplateError
+} from "./programmable-template.js";
+export type {
+  ProgrammableTemplate,
+  ProgrammableTemplateCatalogEntry,
+  ProgrammableTemplateErrorCode,
+  ProgrammableTemplateMetadata,
+  ProgrammableTemplateMetadataInput,
+  ProgrammableTemplateSchemaVersion,
+  StillProgrammableTemplateCatalogEntry,
+  VideoProgrammableTemplateCatalogEntry
+} from "./programmable-template.js";
+
+export {
   defineComposition,
   defineStill,
   getProgrammableCompositionStaticMetadata,

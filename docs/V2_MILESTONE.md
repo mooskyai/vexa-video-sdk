@@ -740,6 +740,8 @@ Browser rendering is an alternate backend, not a reason to weaken Node/browser p
 
 The first slice adds a browser-safe serializable input-schema contract directly to existing programmable composition definitions. Object schemas cover strings, finite numbers/integers, booleans, enums, arrays, nested objects, required keys, bounded lengths/ranges/item counts, and explicit unknown-property policy. `defaultProps` remain the single source of defaults: definitions validate them against the normalized schema at authoring time, resolved props validate before any custom `validateProps`, and static composition metadata exposes the same frozen schema for Studio/API/agent discovery. No external schema library or second composition/template model is introduced.
 
+The second slice adds reusable template descriptors around those same composition definitions. Template metadata is normalized and frozen, while `ProgrammableTemplateCatalog` provides deterministic discovery entries containing presentation metadata plus the composition kind, dimensions/timing, defaults, and existing `inputSchema`. Catalog descriptors never execute independently: player, still, local render, and future hosted/agent invocation continue to target the wrapped composition.
+
 ### Goal
 
 Make compositions reusable by applications, APIs, and agents.

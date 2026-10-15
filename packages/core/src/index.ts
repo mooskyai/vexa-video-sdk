@@ -11,6 +11,7 @@ export * from "./streaming.js";
 export * from "./storage.js";
 export * from "./plugins.js";
 export * from "./programmable-input-schema.js";
+export * from "./programmable-template.js";
 export * from "./programmable-composition.js";
 export * from "./programmable-execution.js";
 export * from "./programmable-timing.js";
