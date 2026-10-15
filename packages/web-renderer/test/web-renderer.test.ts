@@ -618,3 +618,50 @@ test("A/V muxing rejects codec/container mismatches and excessive duration skew"
     (error: unknown) => error instanceof VexaWebMediaMuxError && error.code === "INVALID_MUX_INPUT"
   );
 });
+
+
+test("captures deterministic Canvas frames and rejects dimension mismatches", async () => {
+  const { createCanvasFrameCapture, VexaWebCaptureError } = await import("../src/index.js");
+  const canvas = { width: 16, height: 9 } as unknown as OffscreenCanvas;
+  const painted: number[] = [];
+  const capture = createCanvasFrameCapture({
+    canvas,
+    renderFrame(context) { painted.push(context.frame); }
+  });
+  const context = { frame: 2, frameCount: 3, width: 16, height: 9, fps: 30, timestampUs: 66_667, durationUs: 33_333 };
+  assert.equal(await capture(context, undefined), canvas);
+  assert.deepEqual(painted, [2]);
+  await assert.rejects(
+    capture({ ...context, width: 17 }, undefined),
+    (error: unknown) => error instanceof VexaWebCaptureError && error.code === "INVALID_CAPTURE_SOURCE"
+  );
+});
+
+test("captures serializable DOM into a reusable canvas and closes temporary bitmaps", async () => {
+  const { createDomFrameCapture } = await import("../src/index.js");
+  const canvas = { width: 16, height: 9 } as unknown as OffscreenCanvas;
+  const bitmap = { closeCalled: false, close() { this.closeCalled = true; } } as unknown as ImageBitmap & { closeCalled: boolean };
+  let svg = "";
+  let ready = false;
+  let draws = 0;
+  const capture = createDomFrameCapture({
+    element: {} as Element,
+    runtime: {
+      snapshotElement() { return '<div xmlns="http://www.w3.org/1999/xhtml">frame</div>'; },
+      async createImageBitmap(blob) { svg = await blob.text(); return bitmap; },
+      createCanvas(width, height) { assert.equal(width, 16); assert.equal(height, 9); return canvas; },
+      drawImage(receivedCanvas, receivedBitmap, width, height) {
+        assert.equal(receivedCanvas, canvas); assert.equal(receivedBitmap, bitmap); assert.equal(width, 16); assert.equal(height, 9); draws += 1;
+      },
+      async waitForReady() { ready = true; }
+    }
+  });
+  const context = { frame: 0, frameCount: 2, width: 16, height: 9, fps: 30, timestampUs: 0, durationUs: 33_333 };
+  assert.equal(await capture(context, undefined), canvas);
+  assert.equal(await capture({ ...context, frame: 1, timestampUs: 33_333 }, undefined), canvas);
+  assert.equal(ready, true);
+  assert.equal(draws, 2);
+  assert.equal(bitmap.closeCalled, true);
+  assert.match(svg, /<foreignObject/);
+  assert.match(svg, /width="16" height="9"/);
+});

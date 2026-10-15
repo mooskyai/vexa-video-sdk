@@ -708,6 +708,8 @@ The fifth slice adds an independent browser `AudioEncoder` execution path for AA
 
 The sixth slice muxes those owned audio chunks with the existing browser video outputs. H.264/AAC uses browser-provided AVC and AudioSpecificConfig metadata to build dual-track fragmented MP4, while VP9-or-AV1/Opus writes a second WebM track with `A_OPUS` and `OpusHead` codec-private data. Both paths require zero-origin monotonic streams, validate audio/video duration skew, preserve Blob/File compatibility, and fail closed for mismatched container/codec pairs. Concrete Canvas/DOM capture adapters remain the outstanding V2.11 execution surface.
 
+The seventh slice closes the concrete browser frame-source gap with Canvas and serializable-DOM capture adapters. Canvas capture validates encoder dimensions and runs an optional deterministic per-frame paint callback before returning the browser canvas directly. DOM capture snapshots a cloned element tree with computed styles, wraps it in SVG `foreignObject`, rasterizes it through `createImageBitmap`, draws into a reusable Canvas/OffscreenCanvas, closes each temporary bitmap immediately, waits for document fonts when available, and fails closed for canvas/video/iframe descendants that cannot be faithfully serialized. The resulting canvas plugs directly into the existing `encodeWebVideoFrames` callback without changing composition semantics or adding Node/FFmpeg dependencies.
+
 ### Goal
 
 Render suitable compositions entirely in the browser.

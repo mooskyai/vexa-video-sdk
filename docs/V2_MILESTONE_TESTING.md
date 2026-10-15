@@ -660,6 +660,8 @@ The fifth slice adds injectable `AudioEncoder` coverage for deterministic sample
 
 The sixth slice adds A/V container coverage for AAC `mp4a`/`esds` tracks in fragmented MP4, Opus `A_OPUS`/`OpusHead` tracks in WebM, zero-origin and monotonic stream validation, duration-skew rejection, codec/container mismatch rejection, and Blob metadata for combined audio/video output.
 
+The seventh slice adds capture-adapter coverage for Canvas dimension matching, deterministic per-frame paint hooks, DOM SVG/`foreignObject` snapshot construction, reusable raster canvases, immediate ImageBitmap cleanup, stable dimensions, cancellation, and fail-closed unsupported DOM surfaces.
+
 Cover:
 
 - WebCodecs unavailable;

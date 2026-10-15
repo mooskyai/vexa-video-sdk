@@ -162,6 +162,8 @@ The fifth slice adds audio execution beside, rather than inside, the video encod
 
 The sixth slice joins the independently encoded streams only at the container boundary. The MP4 path adds an `mp4a` audio track with `esds`/AudioSpecificConfig metadata beside the existing `avc1` video track and emits both tracks through one fragmented `moof`/`mdat` sequence. The WebM path adds a second `A_OPUS` track with `OpusHead` codec-private metadata and interleaves timestamp-ordered audio/video SimpleBlocks. Muxing validates zero-origin monotonic timestamps plus bounded duration skew before producing a Blob, while the authoring and composition models remain unchanged.
 
+The seventh slice adds capture below the composition boundary rather than a new renderer model. Canvas capture returns an existing Canvas/OffscreenCanvas after the caller paints the requested frame. DOM capture is intentionally limited to serializable element trees: it clones the tree, inlines computed styles, waits for browser fonts, serializes through SVG `foreignObject`, rasterizes with `createImageBitmap`, and draws into a reusable Canvas/OffscreenCanvas before the existing VideoFrame encoder sees it. Temporary bitmaps are always closed, dimensions remain fixed for an encoder run, and canvas/video/iframe descendants fail closed rather than producing misleading frames.
+
 `@vexa-video/web-renderer` does not import the SDK, Node renderer, FFmpeg, filesystem, or process execution. Browser execution extends the backend boundary without changing composition semantics.
 
 The intended boundary is:
