@@ -5,7 +5,8 @@ import {
   type VexaBundleSourceMapMode
 } from "@vexa-video/bundler";
 import { Hardware, Streaming, Video } from "@vexa-video/sdk";
-import type { ExportOptions, HardwareAccelerationPreference, ResizeFit, StreamingPresetName, StreamingProtocol } from "@vexa-video/core";
+import type { ExportOptions, HardwareAccelerationPreference, JsonObject, ResizeFit, StreamingPresetName, StreamingProtocol } from "@vexa-video/core";
+import { renderCompositionStill, tryRenderCompositionVideo } from "./composition.js";
 
 export type CliCommandName =
   | "help"
@@ -13,6 +14,7 @@ export type CliCommandName =
   | "probe"
   | "plan"
   | "render"
+  | "still"
   | "hardware"
   | "stream"
   | "compositions"
@@ -34,7 +36,8 @@ const HELP = `Vexa Video CLI
 Usage:
   vexa probe <input>
   vexa plan <input> <output> [options]
-  vexa render <input> <output> [options]
+  vexa render <input|composition-id> <output> [options]
+  vexa still <composition-id> <output> [--frame <number>] [options]
   vexa hardware
   vexa stream <input> <output-dir> [--protocol hls|dash] [--preset mobile|balanced|hd]
   vexa compositions [entry] [--root-dir <dir>]
@@ -45,6 +48,13 @@ Composition options:
   --out-dir <dir>           Bundle output (defaults to .vexa/bundle)
   --mode <mode>             development|production
   --source-map <mode>       none|external|inline
+  --manifest <path>         Composition bundle manifest (defaults to .vexa/bundle/vexa.bundle.json)
+  --props <json>            JSON object merged into composition input props
+  --frame <number>          Frame for still when the composition is a video
+  --start-frame <number>    First video frame for composition render
+  --end-frame <number>      Exclusive end frame for composition render
+  --concurrency <number>    Composition frame-render concurrency
+  --timeout-ms <number>     Composition render timeout
 
 Video options:
   --width <px>              Resize width
@@ -71,6 +81,7 @@ export function parseCliArgs(argv: readonly string[]): CliInvocation {
     "probe",
     "plan",
     "render",
+    "still",
     "hardware",
     "stream",
     "compositions",
@@ -126,6 +137,21 @@ function numberOption(invocation: CliInvocation, name: string): number | undefin
 function boolOption(invocation: CliInvocation, name: string, fallback: boolean): boolean {
   const value = invocation.options[name];
   return typeof value === "boolean" ? value : fallback;
+}
+
+function jsonObjectOption(invocation: CliInvocation, name: string): JsonObject | undefined {
+  const raw = stringOption(invocation, name);
+  if (raw === undefined) return undefined;
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw new Error(`--${name} must be valid JSON.`);
+  }
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`--${name} must be a JSON object.`);
+  }
+  return value as JsonObject;
 }
 
 function exportOptions(invocation: CliInvocation): ExportOptions {
@@ -254,11 +280,69 @@ export async function runCli(
       case "render": {
         const input = requirePositional(invocation, 0, "input");
         const output = requirePositional(invocation, 1, "output");
+        const inputProps = jsonObjectOption(invocation, "props");
+        const manifestPath = stringOption(invocation, "manifest");
+        const compositionResult = await tryRenderCompositionVideo({
+          compositionId: input,
+          output,
+          hardwareFallback: boolOption(invocation, "hardware-fallback", true),
+          onProgress: (progress) => io.stderr(`progress ${progress.percent.toFixed(1)}%`),
+          ...(manifestPath !== undefined ? { manifestPath } : {}),
+          ...(inputProps !== undefined ? { inputProps } : {}),
+          ...(numberOption(invocation, "start-frame") !== undefined
+            ? { startFrame: numberOption(invocation, "start-frame")! }
+            : {}),
+          ...(numberOption(invocation, "end-frame") !== undefined
+            ? { endFrameExclusive: numberOption(invocation, "end-frame")! }
+            : {}),
+          ...(numberOption(invocation, "concurrency") !== undefined
+            ? { concurrency: numberOption(invocation, "concurrency")! }
+            : {}),
+          ...(numberOption(invocation, "timeout-ms") !== undefined
+            ? { timeoutMs: numberOption(invocation, "timeout-ms")! }
+            : {}),
+          ...(stringOption(invocation, "hardware") !== undefined
+            ? { hardwareAcceleration: stringOption(invocation, "hardware") as HardwareAccelerationPreference }
+            : {})
+        });
+        if (compositionResult !== null) {
+          io.stdout(format(compositionResult, invocation));
+          return 0;
+        }
+
         const options = exportOptions(invocation);
         options.onProgress = (progress) => {
           if (progress.percent !== null) io.stderr(`progress ${progress.percent.toFixed(1)}%`);
         };
         const result = await buildVideo(invocation, input).export(output, options);
+        io.stdout(format(result, invocation));
+        return 0;
+      }
+      case "still": {
+        const compositionId = requirePositional(invocation, 0, "composition-id");
+        const output = requirePositional(invocation, 1, "output");
+        const inputProps = jsonObjectOption(invocation, "props");
+        const manifestPath = stringOption(invocation, "manifest");
+        const result = await renderCompositionStill({
+          compositionId,
+          output,
+          hardwareFallback: boolOption(invocation, "hardware-fallback", true),
+          onProgress: (progress) => io.stderr(`progress ${progress.percent.toFixed(1)}%`),
+          ...(manifestPath !== undefined ? { manifestPath } : {}),
+          ...(inputProps !== undefined ? { inputProps } : {}),
+          ...(numberOption(invocation, "frame") !== undefined
+            ? { frame: numberOption(invocation, "frame")! }
+            : {}),
+          ...(numberOption(invocation, "concurrency") !== undefined
+            ? { concurrency: numberOption(invocation, "concurrency")! }
+            : {}),
+          ...(numberOption(invocation, "timeout-ms") !== undefined
+            ? { timeoutMs: numberOption(invocation, "timeout-ms")! }
+            : {}),
+          ...(stringOption(invocation, "hardware") !== undefined
+            ? { hardwareAcceleration: stringOption(invocation, "hardware") as HardwareAccelerationPreference }
+            : {})
+        });
         io.stdout(format(result, invocation));
         return 0;
       }

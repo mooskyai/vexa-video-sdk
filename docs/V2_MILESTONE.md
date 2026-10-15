@@ -815,6 +815,8 @@ Make composition discovery and rendering usable by humans, automation, and codin
 
 The first V2.14 slice extends the existing Node CLI with programmable composition discovery and bundle creation only. `vexa compositions` reuses `discoverBundleCompositions()` and defaults to `src/video.tsx`; `vexa bundle` reuses `bundleCompositions()` with explicit project-root, output-directory, build-mode, source-map, and JSON-output controls. Existing media-file `render` semantics stay intact until a renderer-backed composition command is introduced, so this slice does not create a second discovery/build path or silently reinterpret existing commands.
 
+The second slice connects the CLI directly to `VexaCompositionRenderer`. `vexa render` resolves a plain composition id through the default or explicit bundle manifest while existing paths, URLs, and filename-like media sources continue through `Video`. `--manifest` forces composition resolution when needed. `vexa still` always targets a composition and dispatches true stills to `renderStill()` or video snapshots to `renderFrame()`. JSON props and renderer-native progress, frame ranges, timeout, concurrency, hardware, and format validation are passed through rather than reimplemented.
+
 CLI targets:
 
 ```bash

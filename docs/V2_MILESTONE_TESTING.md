@@ -806,6 +806,36 @@ npm run cli -- bundle `
   --json
 ```
 
+The second slice adds real renderer-backed CLI acceptance. Automated tests bundle the checked-in executable renderer fixture, render a two-frame MP4 subrange, render a true still PNG, and render a selected video frame to WebP. They assert machine-readable results, real non-empty artifacts, and terminal progress while keeping media-file `render` as the fallback for existing paths, URLs, and filename-like sources.
+
+Repository-level PowerShell acceptance uses the executable fixture explicitly. The repository `npm run cli --` script passes through npm and `cmd.exe` on Windows, which can strip the inner quotes from inline JSON before Node receives `--props`. Commands without structured JSON may keep using the npm wrapper; `--props` acceptance invokes the already-built CLI entry point directly so the JSON reaches Vexa unchanged.
+
+```powershell
+npm run cli -- bundle `
+  .\packages\renderer\test\fixtures\acceptance\entry.tsx `
+  --out-dir .\.tmp\v2.14-cli-render-bundle `
+  --source-map none `
+  --json
+
+node .\packages\cli\dist\bin.js render product-demo .\.tmp\v2.14-product-demo.mp4 `
+  --manifest .\.tmp\v2.14-cli-render-bundle\vexa.bundle.json `
+  --start-frame 0 `
+  --end-frame 30 `
+  --props '{"background":"#223344"}' `
+  --json
+
+node .\packages\cli\dist\bin.js still product-demo .\.tmp\v2.14-product-demo-frame.png `
+  --manifest .\.tmp\v2.14-cli-render-bundle\vexa.bundle.json `
+  --frame 15 `
+  --props '{"background":"#334455"}' `
+  --json
+
+node .\packages\cli\dist\bin.js still social-square .\.tmp\v2.14-social-square.png `
+  --manifest .\.tmp\v2.14-cli-render-bundle\vexa.bundle.json `
+  --props '{"background":"#445566"}' `
+  --json
+```
+
 ### CLI acceptance
 
 PowerShell commands must cover:

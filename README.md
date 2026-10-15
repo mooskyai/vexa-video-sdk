@@ -42,7 +42,7 @@ Vexa keeps those concerns behind a typed SDK:
 | Angular | Browser-safe providers, uploads, render jobs, Signals, RxJS polling, preview helpers |
 | Plugins | Lifecycle-managed custom operations, storage adapters, job handlers, render backends, encoder providers |
 | AI extension | Provider-neutral transcription/captions, FFmpeg scene detection, silence removal, smart reframe, highlight hooks |
-| CLI | Probe, plan, render, hardware inspection, adaptive streaming, plus deterministic programmable-composition discovery and bundling |
+| CLI | Probe, plan, media rendering, hardware inspection, adaptive streaming, deterministic composition discovery/bundling, plus bundle-backed composition video and still/frame rendering with JSON props and machine-readable output |
 | Browser editor foundation | Framework-neutral timeline state, snapping, clip edits, viewport state, undo/redo |
 | Hosted rendering | Provider-neutral submit/get/cancel/wait plus typed composition requests, existing job-worker execution, deterministic artifact identity, retry-safe remote publication through the normal Storage upload boundary, and explicit provider publishing for directory artifacts |
 | Programmable authoring | Deterministic composition metadata, JSON-serializable input schemas with defaults/validation, deterministic reusable-template catalogs with validated 16:9/9:16/1:1 variants, reusable scene/storage asset descriptors, and JSON-safe service/agent invocation, frame/time math, scene graphs, serializable shape/effect/transition/typography contracts, reusable logical sound-effect catalogs, visual scene nodes, and React authoring primitives |
@@ -531,7 +531,7 @@ See [docs/visual-playground.md](./docs/visual-playground.md).
 | `@vexa-video/sound-effects` | Browser-safe reusable sound-effect catalogs that emit ordinary programmable audio assets and nodes without adding another execution path |
 | `@vexa-video/web-renderer` | Browser-safe WebCodecs capability detection and deterministic browser/backend render planning |
 | `@vexa-video/studio` | Browser-safe Studio session/runtime state for composition selection, preview/timeline coordination, props, metadata, and hot reload |
-| `@vexa-video/cli` | Node.js command-line interface for probing, planning, rendering, hardware, and streaming |
+| `@vexa-video/cli` | Node.js command-line interface for media workflows plus composition discovery, bundling, video rendering, and still/frame rendering through the existing renderer |
 
 Extended programmable media stays additive: specialized packages integrate through the shared surface or scene/project boundaries, while `@vexa-video/core` and the normal SDK remain free of optional renderer dependencies.
 
