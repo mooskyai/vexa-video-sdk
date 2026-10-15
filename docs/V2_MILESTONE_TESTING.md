@@ -691,7 +691,7 @@ If browser rendering is unsupported, the public API must provide a typed reason 
 
 ## V2.12 — Templates and parameterized compositions
 
-The first slice covers deterministic schema normalization, required/optional object properties, default-prop validation at definition time, runtime validation before custom validators, nested array/object paths, numeric/string bounds, enum values, unknown-property rejection, frozen schema metadata, and deterministic JSON serialization. The second slice adds deterministic template metadata normalization, JSON-safe catalog entries, stable id ordering, duplicate rejection, atomic bulk registration, and missing-template errors while preserving the wrapped composition identity. The third slice adds sorted/frozen variant normalization, JSON-safe variant props, duplicate-id rejection, normal composition/schema validation during variant resolution, and fail-closed aspect-ratio verification. The fourth slice adds deterministic JSON-safe invocation normalization plus catalog resolution that merges variant presets before caller prop overrides and preserves the normal schema/custom-validation/dynamic-metadata path.
+The first slice covers deterministic schema normalization, required/optional object properties, default-prop validation at definition time, runtime validation before custom validators, nested array/object paths, numeric/string bounds, enum values, unknown-property rejection, frozen schema metadata, and deterministic JSON serialization. The second slice adds deterministic template metadata normalization, JSON-safe catalog entries, stable id ordering, duplicate rejection, atomic bulk registration, and missing-template errors while preserving the wrapped composition identity. The third slice adds sorted/frozen variant normalization, JSON-safe variant props, duplicate-id rejection, normal composition/schema validation during variant resolution, and fail-closed aspect-ratio verification. The fourth slice adds deterministic JSON-safe invocation normalization plus catalog resolution that merges variant presets before caller prop overrides and preserves the normal schema/custom-validation/dynamic-metadata path. The fifth slice reuses `ProgrammableSceneAsset` normalization for deterministic reusable template asset descriptors and catalog discovery.
 
 ### Schema tests
 
@@ -728,6 +728,17 @@ Cover:
 - input-schema/custom validation after invocation merging;
 - dynamic metadata and aspect-ratio verification after the final props resolve;
 - rejection of non-JSON values and non-finite numbers.
+
+### Reusable asset tests
+
+Cover:
+
+- static and storage-backed image/video/audio descriptors through the existing scene asset contract;
+- deterministic asset id ordering and frozen JSON-safe catalog metadata;
+- existing preload defaults;
+- duplicate asset-id rejection;
+- static HTTP URLs rejected in favor of the storage/http source boundary;
+- no template-specific filesystem, fetch, or media-resolution path.
 
 ## V2.13 — Hosted/serverless composition rendering
 

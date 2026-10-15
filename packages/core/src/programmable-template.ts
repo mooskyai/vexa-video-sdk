@@ -10,6 +10,10 @@ import {
   type ResolvedProgrammableComposition
 } from "./programmable-composition.js";
 import type { ProgrammableInputObjectSchema } from "./programmable-input-schema.js";
+import {
+  normalizeProgrammableSceneAssets,
+  type ProgrammableSceneAsset
+} from "./programmable-scene.js";
 
 export const PROGRAMMABLE_TEMPLATE_SCHEMA_VERSION = 1 as const;
 export type ProgrammableTemplateSchemaVersion = typeof PROGRAMMABLE_TEMPLATE_SCHEMA_VERSION;
@@ -48,6 +52,7 @@ export interface ProgrammableTemplateMetadataInput {
   readonly category?: string;
   readonly tags?: readonly string[];
   readonly variants?: readonly ProgrammableTemplateVariantInput[];
+  readonly assets?: readonly ProgrammableSceneAsset[];
 }
 
 export interface ProgrammableTemplateMetadata {
@@ -57,6 +62,7 @@ export interface ProgrammableTemplateMetadata {
   readonly category?: string;
   readonly tags: readonly string[];
   readonly variants: readonly ProgrammableTemplateVariant[];
+  readonly assets: readonly ProgrammableSceneAsset[];
 }
 
 export interface ProgrammableTemplate<Props extends JsonObject = JsonObject> {
@@ -97,6 +103,7 @@ interface ProgrammableTemplateCatalogEntryBase {
   readonly category?: string;
   readonly tags: readonly string[];
   readonly variants: readonly ProgrammableTemplateVariant[];
+  readonly assets: readonly ProgrammableSceneAsset[];
   readonly width: number;
   readonly height: number;
   readonly defaultProps: JsonObject;
@@ -186,6 +193,17 @@ function normalizeInvocationProps(props: JsonObject | undefined): JsonObject {
   return normalized as JsonObject;
 }
 
+function normalizeTemplateAssets(
+  assets: readonly ProgrammableSceneAsset[] | undefined
+): readonly ProgrammableSceneAsset[] {
+  try {
+    return normalizeProgrammableSceneAssets(assets ?? []);
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    throw new ProgrammableTemplateError(`template.assets is invalid: ${message}`);
+  }
+}
+
 export function normalizeProgrammableTemplateInvocation(
   input: ProgrammableTemplateInvocationInput
 ): ProgrammableTemplateInvocation {
@@ -236,7 +254,8 @@ export function normalizeProgrammableTemplateMetadata(
     ...(description === undefined ? {} : { description }),
     ...(category === undefined ? {} : { category }),
     tags: normalizeTags(metadata.tags),
-    variants: normalizeVariants(metadata.variants)
+    variants: normalizeVariants(metadata.variants),
+    assets: normalizeTemplateAssets(metadata.assets)
   });
 }
 
@@ -267,6 +286,7 @@ export function getProgrammableTemplateCatalogEntry<Props extends JsonObject>(
     ...(template.metadata.category === undefined ? {} : { category: template.metadata.category }),
     tags: template.metadata.tags,
     variants: template.metadata.variants,
+    assets: template.metadata.assets,
     width: composition.width,
     height: composition.height,
     defaultProps: composition.defaultProps,

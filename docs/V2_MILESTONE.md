@@ -746,6 +746,8 @@ The third slice adds deterministic aspect-ratio variants to those descriptors. E
 
 The fourth slice adds a JSON-safe invocation envelope for services and agents. Invocation normalization validates and freezes `templateId`, optional `variantId`, and JSON-only props; catalog resolution merges variant presets before caller overrides, then delegates to the existing composition schema/custom validation and dynamic-metadata path. Variant aspect-ratio verification runs after those final props resolve, so remote callers cannot bypass responsive-template guarantees.
 
+The fifth slice adds reusable template assets by referencing the existing `ProgrammableSceneAsset` contract instead of introducing template-specific media URLs or files. Template asset sets normalize through the same static/storage source validation, preload defaults, deterministic id ordering, duplicate rejection, and storage-security boundary already used by programmable scenes. Catalog entries expose those frozen JSON-safe descriptors so Studio, services, and agents can discover required media without bypassing scene/storage resolution.
+
 ### Goal
 
 Make compositions reusable by applications, APIs, and agents.

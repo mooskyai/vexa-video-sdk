@@ -529,6 +529,27 @@ function normalizeAsset(
   return Object.freeze({ id, kind: asset.kind, source, preload });
 }
 
+export function normalizeProgrammableSceneAssets(
+  assets: readonly ProgrammableSceneAsset[],
+  assetPolicy?: ProgrammableSceneAssetPolicy
+): readonly ProgrammableSceneAsset[] {
+  const policy = normalizePolicy(assetPolicy);
+  const normalized = assets.map((asset) => normalizeAsset(asset, policy));
+  normalized.sort((left, right) => compareStableText(left.id, right.id));
+
+  const seen = new Set<string>();
+  for (const asset of normalized) {
+    if (seen.has(asset.id)) {
+      throw new InvalidProgrammableSceneError(`Duplicate scene asset id: ${asset.id}.`, {
+        assetId: asset.id
+      });
+    }
+    seen.add(asset.id);
+  }
+
+  return Object.freeze(normalized);
+}
+
 function normalizeCrop(crop: ProgrammableSceneCrop | undefined, nodeId: string): ProgrammableSceneCrop | undefined {
   if (!crop) return undefined;
   assertFiniteNonNegative(crop.x, `node ${nodeId}.crop.x`);
@@ -975,15 +996,10 @@ export function defineProgrammableScene(options: DefineProgrammableSceneOptions)
   }
 
   const policy = normalizePolicy(options.assetPolicy);
-  const assets = (options.assets ?? []).map((asset) => normalizeAsset(asset, policy));
-  assets.sort((left, right) => compareStableText(left.id, right.id));
-  const assetMap = new Map<string, ProgrammableSceneAsset>();
-  for (const asset of assets) {
-    if (assetMap.has(asset.id)) {
-      throw new InvalidProgrammableSceneError(`Duplicate scene asset id: ${asset.id}.`, { assetId: asset.id });
-    }
-    assetMap.set(asset.id, asset);
-  }
+  const assets = normalizeProgrammableSceneAssets(options.assets ?? [], policy);
+  const assetMap = new Map<string, ProgrammableSceneAsset>(
+    assets.map((asset) => [asset.id, asset] as const)
+  );
 
   const nodeIds = new Set<string>();
   const children = (options.children ?? []).map((node) => normalizeNode(node, {

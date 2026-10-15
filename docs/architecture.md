@@ -176,6 +176,8 @@ The third V2.12 slice keeps responsive variants inside that same boundary. Templ
 
 The fourth V2.12 slice adds a transport-friendly invocation envelope rather than a service-specific runtime. `templateId`, optional `variantId`, and caller props normalize into frozen deterministic JSON; catalog resolution finds the same template descriptor, applies any variant preset first, overlays caller props, and then invokes the ordinary composition resolver. Schema/custom validation, dynamic metadata, and post-resolution aspect-ratio checks therefore remain authoritative for browser, Node, hosted, and future agent callers.
 
+The fifth V2.12 slice keeps reusable media declarative. Template metadata accepts the existing `ProgrammableSceneAsset` descriptors and normalizes them through the same static/storage source rules, preload defaults, duplicate-id checks, and deterministic ordering used by programmable scenes. Catalog consumers can therefore discover a template's reusable media requirements without gaining a second fetch/filesystem API; actual storage resolution remains in the existing browser/SDK/renderer boundaries.
+
 The intended boundary is:
 
 ```text

@@ -45,7 +45,8 @@ test("template metadata normalizes deterministically around an existing composit
     description: "Reusable product launch video",
     category: "Marketing",
     tags: ["launch", "product"],
-    variants: []
+    variants: [],
+    assets: []
   });
   assert.equal(Object.isFrozen(template), true);
   assert.equal(Object.isFrozen(template.metadata), true);
@@ -78,6 +79,7 @@ test("catalog entries expose JSON-safe composition discovery metadata", () => {
     name: "Social Card",
     tags: ["social"],
     variants: [],
+    assets: [],
     width: 1080,
     height: 1080,
     defaultProps: { title: "Hello" },
@@ -336,5 +338,73 @@ test("template invocation rejects malformed JSON and preserves schema and ratio 
         props: { title: "" }
       }),
     /title/
+  );
+});
+
+test("template assets reuse scene asset normalization and remain JSON-safe", () => {
+  const template = defineProgrammableTemplate(
+    defineStill({ id: "asset-card", width: 1080, height: 1080 }),
+    {
+      name: "Asset Card",
+      assets: [
+        {
+          id: "voiceover",
+          kind: "audio",
+          source: {
+            kind: "storage",
+            source: { kind: "local", path: "./media/voiceover.wav" }
+          },
+          preload: "metadata"
+        },
+        {
+          id: "logo",
+          kind: "image",
+          source: { kind: "static", src: "/brand/logo.png" }
+        }
+      ]
+    }
+  );
+
+  assert.deepEqual(JSON.parse(JSON.stringify(template.metadata.assets)), [
+    {
+      id: "logo",
+      kind: "image",
+      source: { kind: "static", src: "/brand/logo.png" },
+      preload: "auto"
+    },
+    {
+      id: "voiceover",
+      kind: "audio",
+      source: {
+        kind: "storage",
+        source: { kind: "local", path: "./media/voiceover.wav" }
+      },
+      preload: "metadata"
+    }
+  ]);
+  assert.equal(Object.isFrozen(template.metadata.assets), true);
+  assert.equal(Object.isFrozen(template.metadata.assets[0]), true);
+  assert.deepEqual(getProgrammableTemplateCatalogEntry(template).assets, template.metadata.assets);
+
+  assert.throws(
+    () =>
+      normalizeProgrammableTemplateMetadata({
+        name: "Duplicate Assets",
+        assets: [
+          { id: "same", kind: "image", source: { kind: "static", src: "/a.png" } },
+          { id: "same", kind: "image", source: { kind: "static", src: "/b.png" } }
+        ]
+      }),
+    /Duplicate scene asset id/
+  );
+  assert.throws(
+    () =>
+      normalizeProgrammableTemplateMetadata({
+        name: "Unsafe Static URL",
+        assets: [
+          { id: "remote", kind: "image", source: { kind: "static", src: "https://example.com/a.png" } }
+        ]
+      }),
+    /use a storage\/http source/
   );
 });
