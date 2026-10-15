@@ -4,9 +4,12 @@ import test from "node:test";
 import {
   createWebVideoFile,
   detectWebRenderCapabilities,
+  muxWebMedia,
   muxWebVideo,
   planWebRender,
+  VexaWebMediaMuxError,
   VexaWebMuxError,
+  type VexaWebAudioEncodeResult,
   type VexaWebVideoEncodeResult
 } from "../src/index.js";
 
@@ -544,4 +547,74 @@ test("audio cancellation resets the encoder and closes rendered AudioData", asyn
   );
   assert.equal(reset, true);
   assert.equal(closed, true);
+});
+
+function encodedAacAudio(): VexaWebAudioEncodeResult {
+  return {
+    kind: "encoded-audio-chunks",
+    audioCodec: "aac",
+    codec: "mp4a.40.2",
+    sampleRate: 48_000,
+    numberOfChannels: 2,
+    durationSeconds: 3_072 / 48_000,
+    decoderConfig: {
+      codec: "mp4a.40.2",
+      sampleRate: 48_000,
+      numberOfChannels: 2,
+      description: new Uint8Array([0x11, 0x90])
+    },
+    chunks: [
+      { type: "key", timestampUs: 0, durationUs: 21_333, data: new Uint8Array([0x21, 0x10]) },
+      { type: "key", timestampUs: 21_333, durationUs: 21_333, data: new Uint8Array([0x22, 0x10]) },
+      { type: "key", timestampUs: 42_667, durationUs: 21_333, data: new Uint8Array([0x23, 0x10]) }
+    ]
+  };
+}
+
+function encodedOpusAudio(): VexaWebAudioEncodeResult {
+  return {
+    kind: "encoded-audio-chunks",
+    audioCodec: "opus",
+    codec: "opus",
+    sampleRate: 48_000,
+    numberOfChannels: 2,
+    durationSeconds: 0.1,
+    chunks: [0, 20_000, 40_000, 60_000, 80_000].map((timestampUs, index) => ({
+      type: "key" as const,
+      timestampUs,
+      durationUs: 20_000,
+      data: new Uint8Array([0xf8, index])
+    }))
+  };
+}
+
+test("muxes H.264 and AAC into one fragmented MP4", () => {
+  const muxed = muxWebMedia(encodedMp4(), encodedAacAudio());
+  assert.equal(muxed.container, "mp4");
+  assert.equal(muxed.audioCodec, "aac");
+  assert.equal(muxed.blob.type, "video/mp4");
+  for (const marker of ["avc1", "avcC", "mp4a", "esds", "vide", "soun", "moof", "mdat"]) {
+    assert.equal(containsAscii(muxed.data, marker), true, `missing MP4 A/V marker ${marker}`);
+  }
+});
+
+test("muxes VP9 and Opus into one WebM with codec-private audio metadata", () => {
+  const muxed = muxWebMedia(encodedWebm("vp9"), encodedOpusAudio());
+  assert.equal(muxed.container, "webm");
+  assert.equal(muxed.audioCodec, "opus");
+  assert.equal(muxed.blob.type, "video/webm");
+  assert.equal(containsAscii(muxed.data, "V_VP9"), true);
+  assert.equal(containsAscii(muxed.data, "A_OPUS"), true);
+  assert.equal(containsAscii(muxed.data, "OpusHead"), true);
+});
+
+test("A/V muxing rejects codec/container mismatches and excessive duration skew", () => {
+  assert.throws(
+    () => muxWebMedia(encodedMp4(), encodedOpusAudio()),
+    (error: unknown) => error instanceof VexaWebMediaMuxError && error.code === "CONTAINER_MUX_UNSUPPORTED"
+  );
+  assert.throws(
+    () => muxWebMedia(encodedWebm(), { ...encodedOpusAudio(), durationSeconds: 1 }),
+    (error: unknown) => error instanceof VexaWebMediaMuxError && error.code === "INVALID_MUX_INPUT"
+  );
 });

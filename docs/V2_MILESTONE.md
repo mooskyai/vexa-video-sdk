@@ -706,6 +706,8 @@ The fourth slice completes the video-only MP4 path by preserving `EncodedVideoCh
 
 The fifth slice adds an independent browser `AudioEncoder` execution path for AAC and Opus. It deterministically partitions composition duration into PCM windows, lets a caller supply matching browser `AudioData`, owns encoded chunk bytes plus decoder metadata, configures raw AAC/Opus output suitable for later MP4/WebM muxing, and mirrors the video path's bounded queues, progress, cancellation/reset, typed failures, and cleanup. Video encoding no longer rejects a browser plan merely because that plan also requests audio; audio muxing and concrete Canvas/DOM capture adapters remain follow-on V2.11 work.
 
+The sixth slice muxes those owned audio chunks with the existing browser video outputs. H.264/AAC uses browser-provided AVC and AudioSpecificConfig metadata to build dual-track fragmented MP4, while VP9-or-AV1/Opus writes a second WebM track with `A_OPUS` and `OpusHead` codec-private data. Both paths require zero-origin monotonic streams, validate audio/video duration skew, preserve Blob/File compatibility, and fail closed for mismatched container/codec pairs. Concrete Canvas/DOM capture adapters remain the outstanding V2.11 execution surface.
+
 ### Goal
 
 Render suitable compositions entirely in the browser.

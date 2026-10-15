@@ -1,6 +1,7 @@
 import { Mp4MuxInputError, muxH264Mp4 } from "./mp4.js";
 
 export * from "./audio.js";
+export * from "./media-mux.js";
 
 export type VexaWebVideoCodec = "h264" | "vp9" | "av1";
 export type VexaWebAudioCodec = "aac" | "opus";

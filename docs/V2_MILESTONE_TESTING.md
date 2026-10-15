@@ -658,6 +658,8 @@ The fourth slice adds H.264/MP4 coverage for WebCodecs decoder-config preservati
 
 The fifth slice adds injectable `AudioEncoder` coverage for deterministic sample-window timing, AAC/Opus encoder configuration, encoded-chunk ownership, decoder-config copying, AudioData cleanup, progress completion, cancellation/reset, and typed render/encode failures. Container tests remain video-only until the following audio-muxing slice.
 
+The sixth slice adds A/V container coverage for AAC `mp4a`/`esds` tracks in fragmented MP4, Opus `A_OPUS`/`OpusHead` tracks in WebM, zero-origin and monotonic stream validation, duration-skew rejection, codec/container mismatch rejection, and Blob metadata for combined audio/video output.
+
 Cover:
 
 - WebCodecs unavailable;
