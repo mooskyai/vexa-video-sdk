@@ -762,6 +762,8 @@ The second slice tests the real worker boundary without requiring a cloud vendor
 
 The third slice covers remote-output publication through provider-neutral seams: single-file renders upload through the existing `Storage` adapter boundary, the caller destination/artifact id remain stable, publication uses overwrite-safe retry behavior and job cancellation, frame-range directories use an explicit publisher callback, returned artifact metadata is normalized, and a request with `output.destination` fails closed when no publisher is configured.
 
+The closure slice adds a forced transient publication failure with `maxAttempts: 2`. Acceptance requires the second attempt to reuse the same provider-resolved local output, caller artifact id, remote destination, and overwrite-enabled render/upload behavior before succeeding. This is the concrete retry/idempotency proof for external artifact writes.
+
 ### Contract tests
 
 Use a fake/in-memory provider to cover:
@@ -783,7 +785,11 @@ Run at least one composition through the existing Vexa job/worker path.
 
 ### Retry safety
 
-A retried job must use deterministic output identity or an explicitly documented idempotent external write strategy.
+A retried job must use deterministic output identity or an explicitly documented idempotent external write strategy. V2.13 closure verifies this directly by failing the first artifact upload and asserting attempt 2 uses the same artifact id, local output, remote destination, and overwrite-safe publication.
+
+### V2.13 closure acceptance
+
+Before committing the closure, run the focused hosted worker, SDK hosted, and core hosted suites; repository typecheck/test/build/verify; the root README guard; the repository prohibited-runtime guard; and `git diff --check`. The hosted worker suite must include request-to-render mapping, cancellation, resolver validation, missing-bundle resolution failure, single-file publication, frame-range publication, fail-closed missing publication, and retry-safe publication.
 
 ## V2.14 — Agent/MCP/CLI workflows
 

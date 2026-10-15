@@ -371,3 +371,142 @@ test("hosted composition worker fails closed when a destination has no publisher
   assert.equal(terminal.error?.code, "RENDER_ARTIFACT_PUBLISH_FAILED");
   assert.match(terminal.error?.message ?? "", /artifactStorage or publishArtifact/);
 });
+
+test("hosted composition worker surfaces missing bundle resolution failures", async () => {
+  const queue = new JobQueue({ workerId: "hosted-missing-bundle-test" });
+  let rendererCreated = false;
+
+  registerHostedCompositionRenderWorker(queue, {
+    resolveManifest() {
+      throw new Error("bundle manifest is unavailable");
+    },
+    resolveOutput: () => "C:\\renders\\missing-bundle.mp4",
+    createRenderer: async () => {
+      rendererCreated = true;
+      return {
+        renderStill: async () => ({} as never),
+        renderFrame: async () => ({} as never),
+        renderFrameRange: async () => ({} as never),
+        renderVideo: async () => ({} as never)
+      };
+    }
+  });
+
+  const hosted = request({ kind: "video", container: "mp4" });
+  const terminal = await queue
+    .submit<typeof hosted.payload, HostedCompositionWorkerResult>(
+      hosted.type,
+      hosted.payload
+    )
+    .wait();
+
+  assert.equal(terminal.state, "failed");
+  assert.equal(rendererCreated, false);
+  assert.match(terminal.error?.message ?? "", /bundle manifest is unavailable/);
+});
+
+test("hosted composition worker retries publication with stable artifact identity", async () => {
+  const root = await mkdtemp(join(tmpdir(), "vexa-hosted-retry-"));
+  try {
+    const localOutput = join(root, "retry.mp4");
+    const resolverAttempts: number[] = [];
+    const renderedOutputs: Array<{ output: string; overwrite: boolean | undefined }> = [];
+    const uploads: Array<{
+      sourcePath: string;
+      destination: string;
+      overwrite: boolean | undefined;
+    }> = [];
+    const storage = new Storage({
+      adapters: [
+        Storage.s3({
+          async download() {
+            throw new Error("unused");
+          },
+          async upload(sourcePath, reference, options) {
+            const destination = `s3://${reference.bucket}/${reference.key}`;
+            uploads.push({ sourcePath, destination, overwrite: options.overwrite });
+            if (uploads.length === 1) throw new Error("temporary upload failure");
+            return {
+              provider: "s3",
+              source: sourcePath,
+              destination,
+              destinationReference: reference,
+              bytesTransferred: (await readFile(sourcePath)).byteLength,
+              contentType: "video/mp4"
+            };
+          }
+        })
+      ]
+    });
+    const queue = new JobQueue({ workerId: "hosted-retry-test" });
+
+    registerHostedCompositionRenderWorker(queue, {
+      resolveManifest(_bundle, context) {
+        resolverAttempts.push(context.attempt);
+        return "C:\\resolved\\vexa.bundle.json";
+      },
+      resolveOutput: () => localOutput,
+      artifactStorage: storage,
+      createRenderer: async () => ({
+        renderStill: async () => ({} as never),
+        renderFrame: async () => ({} as never),
+        renderFrameRange: async () => ({} as never),
+        async renderVideo(options) {
+          renderedOutputs.push({
+            output: options.output,
+            overwrite: options.overwrite
+          });
+          await writeFile(options.output, "video");
+          return {} as never;
+        }
+      })
+    });
+
+    const hosted = request(
+      { kind: "video", container: "mp4" },
+      { destination: "s3://renders/customer/render-1.mp4" }
+    );
+    const handle = queue.submit<typeof hosted.payload, HostedCompositionWorkerResult>(
+      hosted.type,
+      hosted.payload,
+      {
+        idempotencyKey: hosted.idempotencyKey,
+        retry: {
+          maxAttempts: 2,
+          backoffMs: 0,
+          backoffMultiplier: 1,
+          maxBackoffMs: 0
+        }
+      }
+    );
+    const terminal = await handle.wait();
+
+    assert.equal(terminal.state, "succeeded");
+    assert.equal(terminal.attempt, 2);
+    assert.deepEqual(resolverAttempts, [1, 2]);
+    assert.deepEqual(renderedOutputs, [
+      { output: localOutput, overwrite: true },
+      { output: localOutput, overwrite: true }
+    ]);
+    assert.deepEqual(uploads, [
+      {
+        sourcePath: localOutput,
+        destination: "s3://renders/customer/render-1.mp4",
+        overwrite: true
+      },
+      {
+        sourcePath: localOutput,
+        destination: "s3://renders/customer/render-1.mp4",
+        overwrite: true
+      }
+    ]);
+    assert.equal(terminal.result?.artifactId, "customer/render-1");
+    assert.equal(
+      terminal.result?.artifact?.url,
+      "s3://renders/customer/render-1.mp4"
+    );
+    assert.equal(terminal.result?.artifact?.name, "customer/render-1");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

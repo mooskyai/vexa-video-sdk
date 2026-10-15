@@ -88,6 +88,8 @@ registerHostedCompositionRenderWorker(worker, {
 
 A request that specifies `output.destination` fails closed when neither `artifactStorage` nor `publishArtifact()` can fulfill it. Publication returns a normalized artifact URL/name/content type/size record in the worker result; application-owned storage/provider code continues to own credentials and vendor SDKs.
 
+Retries use the existing job retry policy. The worker reruns against the same caller `artifactId`, provider-resolved local output, and `output.destination`; render execution and `Storage.upload()` are overwrite-enabled by default. V2.13 closure tests this by forcing the first upload to fail and requiring attempt 2 to publish the same artifact identity successfully.
+
 The adapter decides how jobs map to a cloud vendor, hosted Vexa service, Kubernetes job, serverless queue, or another execution plane. Vexa does not embed provider credentials or vendor SDKs in the core contract.
 
 Artifacts are represented by portable URLs plus optional content type, byte size, and metadata. Cancellation is best-effort and should map to the provider's native cancellation semantics.

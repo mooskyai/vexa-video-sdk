@@ -186,6 +186,8 @@ The second V2.13 slice places the execution bridge in `@vexa-video/renderer`, pr
 
 The third V2.13 slice keeps artifact publication on those same boundaries. A hosted request that names `output.destination` publishes only after the normal renderer succeeds. File outputs reuse `@vexa-video/sdk` `Storage.upload()` so local/object destinations, adapter-owned credentials, cancellation, byte counts, and overwrite behavior remain centralized; no cloud SDK enters core or renderer. Frame-range output remains a directory and therefore uses an explicit host publisher for packaging or multi-object upload. Publication returns a normalized hosted artifact reference while retaining the deterministic local output path for worker diagnostics.
 
+V2.13 closes by proving retry behavior on the same architecture: the job layer owns attempts, the hosted worker resolves the same deterministic output identity on each attempt, renderer execution is overwrite-safe, and `Storage.upload()` defaults to overwrite the same requested destination. A transient publication failure therefore retries through existing job semantics instead of creating a second delivery workflow.
+
 The intended boundary is:
 
 ```text
