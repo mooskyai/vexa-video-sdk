@@ -193,7 +193,7 @@ test("cancellation resets the browser encoder and returns a typed error", async 
   assert.equal(closed, true);
 });
 
-test("video execution fails closed for audio plans and frame-render failures", async () => {
+test("video execution can encode the video portion of audio plans while frame failures stay typed", async () => {
   const { encodeWebVideoFrames, VexaWebVideoEncodeError } = await import("../src/index.js");
   const runtime = {
     createVideoFrame() { return { close() {} }; },
@@ -208,18 +208,17 @@ test("video execution fails closed for audio plans and frame-render failures", a
       };
     }
   };
-  await assert.rejects(
-    encodeWebVideoFrames({
-      plan: { kind: "browser", container: "mp4", videoCodec: "h264", audioCodec: "aac" },
-      width: 16,
-      height: 16,
-      fps: 30,
-      frameCount: 1,
-      runtime,
-      renderFrame() { return {}; }
-    }),
-    (error: unknown) => error instanceof VexaWebVideoEncodeError && error.code === "AUDIO_EXECUTION_UNAVAILABLE"
-  );
+  const withAudio = await encodeWebVideoFrames({
+    plan: { kind: "browser", container: "mp4", videoCodec: "h264", audioCodec: "aac" },
+    width: 16,
+    height: 16,
+    fps: 30,
+    frameCount: 1,
+    runtime,
+    renderFrame() { return {}; }
+  });
+  assert.equal(withAudio.targetContainer, "mp4");
+  assert.equal(withAudio.chunks.length, 0);
   await assert.rejects(
     encodeWebVideoFrames({
       plan: { kind: "browser", container: "mp4", videoCodec: "h264" },
@@ -413,4 +412,136 @@ test("H.264 encoding preserves decoder metadata and requests AVC output", async 
   });
   assert.equal(encoded.decoderConfig?.description?.[1], 0x42);
   assert.equal(muxWebVideo(encoded).mimeType, "video/mp4");
+});
+
+
+test("encodes deterministic AAC chunks with owned decoder metadata and progress", async () => {
+  const { encodeWebAudioData } = await import("../src/index.js");
+  const description = new Uint8Array([0x11, 0x90]);
+  const contexts: Array<{ readonly sampleOffset: number; readonly numberOfFrames: number; readonly timestampUs: number }> = [];
+  const closed: number[] = [];
+  const progress: Array<{ readonly phase: string; readonly completedChunks: number }> = [];
+  let configured: unknown;
+  const runtime = {
+    createAudioEncoder(callbacks: {
+      readonly output: (chunk: {
+        readonly type: "key" | "delta";
+        readonly timestamp: number;
+        readonly duration: number;
+        readonly byteLength: number;
+        copyTo(destination: AllowSharedBufferSource): void;
+      }, metadata?: { readonly decoderConfig?: { readonly codec: string; readonly sampleRate: number; readonly numberOfChannels: number; readonly description?: AllowSharedBufferSource } }) => void;
+      readonly error: (error: Error) => void;
+    }) {
+      let emitted = 0;
+      return {
+        encodeQueueSize: 0,
+        configure(config: unknown) { configured = config; },
+        encode(data: { readonly timestamp: number }) {
+          emitted += 1;
+          const bytes = new Uint8Array([emitted, 0xaa]);
+          callbacks.output({
+            type: "key",
+            timestamp: data.timestamp,
+            duration: 21_333,
+            byteLength: bytes.length,
+            copyTo(destination) {
+              const view = ArrayBuffer.isView(destination)
+                ? new Uint8Array(destination.buffer, destination.byteOffset, destination.byteLength)
+                : new Uint8Array(destination);
+              view.set(bytes);
+            }
+          }, emitted === 1 ? { decoderConfig: { codec: "mp4a.40.2", sampleRate: 48_000, numberOfChannels: 2, description } } : undefined);
+        },
+        async flush() {},
+        reset() {},
+        close() {}
+      };
+    }
+  };
+
+  const encoded = await encodeWebAudioData({
+    audioCodec: "aac",
+    durationSeconds: 2048 / 48_000,
+    sampleRate: 48_000,
+    numberOfChannels: 2,
+    framesPerChunk: 1_024,
+    runtime,
+    renderAudio(context) {
+      contexts.push({ sampleOffset: context.sampleOffset, numberOfFrames: context.numberOfFrames, timestampUs: context.timestampUs });
+      return { timestamp: context.timestampUs, close() { closed.push(context.chunk); } };
+    },
+    onProgress(value) { progress.push({ phase: value.phase, completedChunks: value.completedChunks }); }
+  });
+  description[0] = 0;
+  assert.deepEqual(configured, {
+    codec: "mp4a.40.2", sampleRate: 48_000, numberOfChannels: 2, bitrate: 192_000, aac: { format: "aac" }
+  });
+  assert.deepEqual(contexts, [
+    { sampleOffset: 0, numberOfFrames: 1_024, timestampUs: 0 },
+    { sampleOffset: 1_024, numberOfFrames: 1_024, timestampUs: 21_333 }
+  ]);
+  assert.deepEqual(closed, [0, 1]);
+  assert.equal(encoded.decoderConfig?.description?.[0], 0x11);
+  assert.deepEqual(encoded.chunks.map((chunk) => [chunk.timestampUs, [...chunk.data]]), [
+    [0, [1, 0xaa]],
+    [21_333, [2, 0xaa]]
+  ]);
+  assert.deepEqual(progress, [
+    { phase: "encoding", completedChunks: 1 },
+    { phase: "encoding", completedChunks: 2 },
+    { phase: "complete", completedChunks: 2 }
+  ]);
+});
+
+test("configures raw Opus chunks with deterministic 20ms audio windows", async () => {
+  const { encodeWebAudioData } = await import("../src/index.js");
+  let configured: unknown;
+  const rendered: number[] = [];
+  const runtime = {
+    createAudioEncoder() {
+      return {
+        encodeQueueSize: 0,
+        configure(config: unknown) { configured = config; },
+        encode() {},
+        async flush() {},
+        reset() {},
+        close() {}
+      };
+    }
+  };
+  const encoded = await encodeWebAudioData({
+    audioCodec: "opus", durationSeconds: 0.04, runtime,
+    renderAudio(context) { rendered.push(context.numberOfFrames); return { close() {} }; }
+  });
+  assert.deepEqual(configured, {
+    codec: "opus", sampleRate: 48_000, numberOfChannels: 2, bitrate: 128_000,
+    opus: { format: "opus", frameDuration: 20_000 }
+  });
+  assert.deepEqual(rendered, [960, 960]);
+  assert.equal(encoded.audioCodec, "opus");
+});
+
+test("audio cancellation resets the encoder and closes rendered AudioData", async () => {
+  const { encodeWebAudioData, VexaWebAudioEncodeError } = await import("../src/index.js");
+  const controller = new AbortController();
+  let reset = false;
+  let closed = false;
+  const runtime = {
+    createAudioEncoder() {
+      return {
+        encodeQueueSize: 0, configure() {}, encode() {}, async flush() {},
+        reset() { reset = true; }, close() {}
+      };
+    }
+  };
+  await assert.rejects(
+    encodeWebAudioData({
+      audioCodec: "opus", durationSeconds: 0.02, signal: controller.signal, runtime,
+      renderAudio() { controller.abort(); return { close() { closed = true; } }; }
+    }),
+    (error: unknown) => error instanceof VexaWebAudioEncodeError && error.code === "CANCELLED"
+  );
+  assert.equal(reset, true);
+  assert.equal(closed, true);
 });

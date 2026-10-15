@@ -90,7 +90,7 @@ The planned sequence is:
 | V2.8 | **Complete** | Local Vexa Studio development environment |
 | V2.9 | **Complete** | Shapes, effects, transitions, fonts, and composition captions; deterministic typography, local/remote font readiness, caption cue rendering, active-word timing, and speaker-aware style overrides execute through the shared project/FFmpeg graph |
 | V2.10 | **Complete** | Extended programmable-media boundary plus concrete GIF, waveform, and reusable sound-effect integrations, all preserving dependency separation from core/normal SDK execution |
-| V2.11 | **In progress** | Browser/WebCodecs rendering; capability/fallback planning, cancellable video encoding, VP9/AV1 WebM output, and metadata-correct H.264 fragmented-MP4 output are established; capture adapters and browser audio remain ahead |
+| V2.11 | **In progress** | Browser/WebCodecs rendering; capability/fallback planning, cancellable video plus AAC/Opus audio encoding, VP9/AV1 WebM output, and metadata-correct H.264 fragmented-MP4 output are established; audio muxing and capture adapters remain ahead |
 | V2.12 | **Planned** | Parameterized templates and validated input schemas |
 | V2.13 | **Planned** | Hosted/serverless composition rendering through existing job contracts |
 | V2.14 | **Planned** | Agent/MCP/CLI composition workflows |

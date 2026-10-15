@@ -158,6 +158,8 @@ The third slice keeps muxing in the same browser package but below the encoder c
 
 The fourth slice extends that boundary to H.264 MP4 without guessing codec-private state. `EncodedVideoChunkMetadata.decoderConfig.description` is copied into Vexa-owned bytes when WebCodecs reports a new output configuration; AVC encoding is explicitly requested in `avc` format, where the description is the `AVCDecoderConfigurationRecord`. The MP4 backend consumes that record in an `avcC` sample entry and emits a fragmented `ftyp`/`moov` + `moof`/`mdat` file. This keeps MP4 validity tied to browser-provided decoder metadata and preserves typed failure when required metadata or monotonic sample timing is absent.
 
+The fifth slice adds audio execution beside, rather than inside, the video encoder. A deterministic sample-window context tells the caller exactly which PCM frames to materialize as browser `AudioData`; Vexa feeds those values to `AudioEncoder`, closes them immediately after enqueue, copies encoded bytes and decoder metadata into owned values, and applies the same queue, progress, cancellation, and cleanup discipline as video. AAC is requested in raw `aac` format so `AudioDecoderConfig.description` carries `AudioSpecificConfig`; Opus is requested as raw `opus` packets. This encoded-audio result is the stable input for the next MP4/WebM audio-muxing slice and does not introduce a second composition/audio model.
+
 `@vexa-video/web-renderer` does not import the SDK, Node renderer, FFmpeg, filesystem, or process execution. Browser execution extends the backend boundary without changing composition semantics.
 
 The intended boundary is:

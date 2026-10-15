@@ -1,5 +1,7 @@
 import { Mp4MuxInputError, muxH264Mp4 } from "./mp4.js";
 
+export * from "./audio.js";
+
 export type VexaWebVideoCodec = "h264" | "vp9" | "av1";
 export type VexaWebAudioCodec = "aac" | "opus";
 export type VexaWebContainer = "mp4" | "webm";
@@ -392,12 +394,6 @@ export async function encodeWebVideoFrames(
   const keyFrameInterval = positiveInteger(options.keyFrameInterval ?? Math.max(1, Math.round(fps * 2)), "keyFrameInterval");
   const maxQueueSize = positiveInteger(options.maxQueueSize ?? 8, "maxQueueSize");
 
-  if (options.plan.audioCodec !== undefined) {
-    throw new VexaWebVideoEncodeError(
-      "AUDIO_EXECUTION_UNAVAILABLE",
-      "V2.11 browser video execution does not encode or mux audio yet."
-    );
-  }
   if (options.signal?.aborted) throw cancellationError();
 
   const runtime = options.runtime ?? defaultEncodingRuntime();
