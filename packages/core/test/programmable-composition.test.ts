@@ -9,6 +9,8 @@ import {
   ProgrammableCompositionRegistry,
   defineComposition,
   defineStill,
+  normalizeProgrammableInputSchema,
+  validateProgrammableInput,
   resolveProgrammableComposition,
   serializeProgrammableCompositionMetadata
 } from "../src/index.js";
@@ -208,4 +210,85 @@ test("static metadata serialization is deterministic across object key insertion
     serializeProgrammableCompositionMetadata(first),
     serializeProgrammableCompositionMetadata(second)
   );
+});
+
+test("input schemas normalize deterministically and validate resolved props before custom validation", async () => {
+  let customValidated = 0;
+  const composition = defineComposition({
+    id: "schema-demo",
+    width: 1920,
+    height: 1080,
+    fps: 30,
+    durationInFrames: 60,
+    defaultProps: { title: "Vexa", seconds: 2, layout: "wide" },
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", minLength: 1, maxLength: 40 },
+        seconds: { type: "number", integer: true, minimum: 1, maximum: 10 },
+        layout: { type: "enum", values: ["square", "wide"] }
+      },
+      required: ["title", "seconds"],
+      additionalProperties: false
+    },
+    validateProps() { customValidated += 1; },
+    calculateMetadata({ props, staticMetadata }) {
+      return { durationInFrames: props.seconds * staticMetadata.fps };
+    }
+  });
+
+  assert.equal(Object.isFrozen(composition.inputSchema), true);
+  assert.deepEqual(composition.inputSchema?.required, ["seconds", "title"]);
+  const serialized = JSON.parse(serializeProgrammableCompositionMetadata(composition));
+  assert.deepEqual(Object.keys(serialized.inputSchema.properties), ["layout", "seconds", "title"]);
+
+  const resolved = await resolveProgrammableComposition(composition, { seconds: 3, layout: "square" });
+  assert.equal(resolved.metadata.kind, "video");
+  if (resolved.metadata.kind === "video") assert.equal(resolved.metadata.durationInFrames, 90);
+  assert.equal(customValidated, 1);
+
+  await assert.rejects(
+    () => resolveProgrammableComposition(composition, { title: "" }),
+    (error: unknown) => error instanceof InvalidProgrammableCompositionPropsError && /props.title/.test(error.message)
+  );
+  assert.equal(customValidated, 1);
+  await assert.rejects(
+    () => resolveProgrammableComposition(composition, { extra: true } as never),
+    (error: unknown) => error instanceof InvalidProgrammableCompositionPropsError && /UNKNOWN|not declared|props.extra/.test(error.message)
+  );
+});
+
+test("invalid schemas and defaults fail while standalone validation reports stable paths", () => {
+  assert.throws(
+    () => normalizeProgrammableInputSchema({
+      type: "object",
+      properties: { title: { type: "string" } },
+      required: ["missing"]
+    }),
+    /references unknown property/
+  );
+
+  assert.throws(
+    () => defineStill({
+      id: "bad-schema-default",
+      width: 100,
+      height: 100,
+      defaultProps: { count: 0 },
+      inputSchema: {
+        type: "object",
+        properties: { count: { type: "number", minimum: 1 } },
+        required: ["count"]
+      }
+    }),
+    /defaultProps do not satisfy inputSchema/
+  );
+
+  const schema = normalizeProgrammableInputSchema({
+    type: "object",
+    properties: { tags: { type: "array", items: { type: "string", minLength: 2 }, minItems: 1 } },
+    required: ["tags"]
+  });
+  assert.deepEqual(validateProgrammableInput(schema, { tags: ["ok", "x"] }), [
+    { path: "props.tags[1]", code: "MIN_LENGTH", message: "must contain at least 2 characters." }
+  ]);
 });

@@ -168,6 +168,8 @@ V2.11 closes by testing that these layers remain composable rather than merging 
 
 `@vexa-video/web-renderer` does not import the SDK, Node renderer, FFmpeg, filesystem, or process execution. Browser execution extends the backend boundary without changing composition semantics.
 
+V2.12 begins inside the existing programmable-composition boundary rather than introducing a template runtime. Definitions may attach a normalized browser-safe object `inputSchema`; `defaultProps` remain the authoritative defaults and must satisfy that schema immediately, while merged invocation props are schema-validated before the existing custom `validateProps` hook. Static metadata carries the frozen schema so Studio, services, and future agent surfaces can inspect the same contract used at execution time. The schema vocabulary is deliberately dependency-free and JSON-serializable, keeping validation available from `@vexa-video/core/browser` without pulling a third-party validator into browser bundles.
+
 The intended boundary is:
 
 ```text

@@ -1,3 +1,9 @@
+import {
+  normalizeProgrammableInputSchema,
+  validateProgrammableInput,
+  type ProgrammableInputObjectSchema
+} from "./programmable-input-schema.js";
+
 export const PROGRAMMABLE_COMPOSITION_SCHEMA_VERSION = 1 as const;
 
 export type ProgrammableCompositionSchemaVersion = typeof PROGRAMMABLE_COMPOSITION_SCHEMA_VERSION;
@@ -102,6 +108,7 @@ export interface VideoProgrammableCompositionMetadata
   readonly kind: "video";
   readonly id: string;
   readonly defaultProps: JsonObject;
+  readonly inputSchema?: ProgrammableInputObjectSchema;
 }
 
 export interface StillProgrammableCompositionMetadata extends ProgrammableCompositionDimensions {
@@ -109,6 +116,7 @@ export interface StillProgrammableCompositionMetadata extends ProgrammableCompos
   readonly kind: "still";
   readonly id: string;
   readonly defaultProps: JsonObject;
+  readonly inputSchema?: ProgrammableInputObjectSchema;
 }
 
 export type ProgrammableCompositionStaticMetadata =
@@ -147,6 +155,7 @@ interface ProgrammableCompositionDefinitionBase<Props extends JsonObject> {
   readonly width: number;
   readonly height: number;
   readonly defaultProps: Readonly<Props>;
+  readonly inputSchema?: ProgrammableInputObjectSchema;
   readonly validateProps?: ProgrammableCompositionPropsValidator<Props>;
 }
 
@@ -184,6 +193,7 @@ export interface DefineProgrammableCompositionOptions<Props extends JsonObject =
   readonly fps: number;
   readonly durationInFrames: number;
   readonly defaultProps?: Props;
+  readonly inputSchema?: ProgrammableInputObjectSchema;
   readonly validateProps?: ProgrammableCompositionPropsValidator<Props>;
   readonly calculateMetadata?: ProgrammableCompositionMetadataCalculator<
     Props,
@@ -198,6 +208,7 @@ export interface DefineProgrammableStillOptions<Props extends JsonObject = JsonO
   readonly width: number;
   readonly height: number;
   readonly defaultProps?: Props;
+  readonly inputSchema?: ProgrammableInputObjectSchema;
   readonly validateProps?: ProgrammableCompositionPropsValidator<Props>;
   readonly calculateMetadata?: ProgrammableCompositionMetadataCalculator<
     Props,
@@ -207,8 +218,8 @@ export interface DefineProgrammableStillOptions<Props extends JsonObject = JsonO
 }
 
 export type ResolvedProgrammableCompositionMetadata =
-  | Omit<VideoProgrammableCompositionMetadata, "defaultProps">
-  | Omit<StillProgrammableCompositionMetadata, "defaultProps">;
+  | Omit<VideoProgrammableCompositionMetadata, "defaultProps" | "inputSchema">
+  | Omit<StillProgrammableCompositionMetadata, "defaultProps" | "inputSchema">;
 
 export interface ResolvedProgrammableComposition<Props extends JsonObject = JsonObject> {
   readonly metadata: ResolvedProgrammableCompositionMetadata;
@@ -326,6 +337,36 @@ function normalizeDefaultProps<Props extends JsonObject>(
   return freezeJsonValue(normalized) as Props;
 }
 
+
+function inputIssueMessage(issue: { readonly path: string; readonly message: string }): string {
+  return `${issue.path} ${issue.message}`;
+}
+
+function normalizeCompositionInputSchema<Props extends JsonObject>(
+  compositionId: string,
+  schema: ProgrammableInputObjectSchema | undefined,
+  defaultProps: Readonly<Props>
+): ProgrammableInputObjectSchema | undefined {
+  if (schema === undefined) return undefined;
+  try {
+    const normalized = normalizeProgrammableInputSchema(schema);
+    const issues = validateProgrammableInput(normalized, defaultProps, "defaultProps");
+    if (issues.length > 0) {
+      throw new InvalidProgrammableCompositionError(
+        `composition ${compositionId}.defaultProps do not satisfy inputSchema: ${inputIssueMessage(issues[0]!)}`
+      );
+    }
+    return normalized;
+  } catch (cause) {
+    if (cause instanceof InvalidProgrammableCompositionError) throw cause;
+    const message = cause instanceof Error ? cause.message : String(cause);
+    throw new InvalidProgrammableCompositionError(
+      `Invalid inputSchema for composition "${compositionId}": ${message}`,
+      { cause }
+    );
+  }
+}
+
 function normalizeResolvedProps<Props extends JsonObject>(
   compositionId: string,
   defaultProps: Readonly<Props>,
@@ -355,6 +396,15 @@ function validateResolvedProps<Props extends JsonObject>(
   definition: ProgrammableCompositionDefinition<Props>,
   props: Readonly<Props>
 ): void {
+  if (definition.inputSchema !== undefined) {
+    const issues = validateProgrammableInput(definition.inputSchema, props);
+    if (issues.length > 0) {
+      throw new InvalidProgrammableCompositionPropsError(
+        definition.id,
+        inputIssueMessage(issues[0]!)
+      );
+    }
+  }
   if (!definition.validateProps) return;
   try {
     definition.validateProps(props);
@@ -376,7 +426,8 @@ function videoStaticMetadata<Props extends JsonObject>(
     height: definition.height,
     fps: definition.fps,
     durationInFrames: definition.durationInFrames,
-    defaultProps: definition.defaultProps
+    defaultProps: definition.defaultProps,
+    ...(definition.inputSchema === undefined ? {} : { inputSchema: definition.inputSchema })
   });
 }
 
@@ -389,7 +440,8 @@ function stillStaticMetadata<Props extends JsonObject>(
     id: definition.id,
     width: definition.width,
     height: definition.height,
-    defaultProps: definition.defaultProps
+    defaultProps: definition.defaultProps,
+    ...(definition.inputSchema === undefined ? {} : { inputSchema: definition.inputSchema })
   });
 }
 
@@ -402,6 +454,8 @@ export function defineComposition<Props extends JsonObject = JsonObject>(
   assertPositiveInteger(options.height, `composition ${options.id}.height`);
   assertPositiveFinite(options.fps, `composition ${options.id}.fps`);
   assertPositiveInteger(options.durationInFrames, `composition ${options.id}.durationInFrames`);
+  const defaultProps = normalizeDefaultProps(options.id, options.defaultProps);
+  const inputSchema = normalizeCompositionInputSchema(options.id, options.inputSchema, defaultProps);
 
   return Object.freeze({
     schemaVersion: PROGRAMMABLE_COMPOSITION_SCHEMA_VERSION,
@@ -411,7 +465,8 @@ export function defineComposition<Props extends JsonObject = JsonObject>(
     height: options.height,
     fps: options.fps,
     durationInFrames: options.durationInFrames,
-    defaultProps: normalizeDefaultProps(options.id, options.defaultProps),
+    defaultProps,
+    ...(inputSchema === undefined ? {} : { inputSchema }),
     ...(options.validateProps ? { validateProps: options.validateProps } : {}),
     ...(options.calculateMetadata ? { calculateMetadata: options.calculateMetadata } : {})
   });
@@ -424,6 +479,8 @@ export function defineStill<Props extends JsonObject = JsonObject>(
   assertCompositionId(options.id);
   assertPositiveInteger(options.width, `composition ${options.id}.width`);
   assertPositiveInteger(options.height, `composition ${options.id}.height`);
+  const defaultProps = normalizeDefaultProps(options.id, options.defaultProps);
+  const inputSchema = normalizeCompositionInputSchema(options.id, options.inputSchema, defaultProps);
 
   return Object.freeze({
     schemaVersion: PROGRAMMABLE_COMPOSITION_SCHEMA_VERSION,
@@ -431,7 +488,8 @@ export function defineStill<Props extends JsonObject = JsonObject>(
     id: options.id,
     width: options.width,
     height: options.height,
-    defaultProps: normalizeDefaultProps(options.id, options.defaultProps),
+    defaultProps,
+    ...(inputSchema === undefined ? {} : { inputSchema }),
     ...(options.validateProps ? { validateProps: options.validateProps } : {}),
     ...(options.calculateMetadata ? { calculateMetadata: options.calculateMetadata } : {})
   });

@@ -738,6 +738,8 @@ Browser rendering is an alternate backend, not a reason to weaken Node/browser p
 
 ## V2.12 — Templates and parameterized compositions
 
+The first slice adds a browser-safe serializable input-schema contract directly to existing programmable composition definitions. Object schemas cover strings, finite numbers/integers, booleans, enums, arrays, nested objects, required keys, bounded lengths/ranges/item counts, and explicit unknown-property policy. `defaultProps` remain the single source of defaults: definitions validate them against the normalized schema at authoring time, resolved props validate before any custom `validateProps`, and static composition metadata exposes the same frozen schema for Studio/API/agent discovery. No external schema library or second composition/template model is introduced.
+
 ### Goal
 
 Make compositions reusable by applications, APIs, and agents.

@@ -691,6 +691,8 @@ If browser rendering is unsupported, the public API must provide a typed reason 
 
 ## V2.12 — Templates and parameterized compositions
 
+The first slice covers deterministic schema normalization, required/optional object properties, default-prop validation at definition time, runtime validation before custom validators, nested array/object paths, numeric/string bounds, enum values, unknown-property rejection, frozen schema metadata, and deterministic JSON serialization.
+
 ### Schema tests
 
 Cover:

@@ -103,6 +103,24 @@ export type {
 } from "./hosted.js";
 
 export {
+  normalizeProgrammableInputSchema,
+  validateProgrammableInput
+} from "./programmable-input-schema.js";
+export type {
+  ProgrammableInputArraySchema,
+  ProgrammableInputBooleanSchema,
+  ProgrammableInputEnumSchema,
+  ProgrammableInputNumberSchema,
+  ProgrammableInputObjectSchema,
+  ProgrammableInputPrimitive,
+  ProgrammableInputSchema,
+  ProgrammableInputSchemaVersion,
+  ProgrammableInputStringSchema,
+  ProgrammableInputValidationCode,
+  ProgrammableInputValidationIssue
+} from "./programmable-input-schema.js";
+
+export {
   defineComposition,
   defineStill,
   getProgrammableCompositionStaticMetadata,
