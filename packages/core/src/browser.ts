@@ -123,7 +123,9 @@ export type {
 export {
   defineProgrammableTemplate,
   getProgrammableTemplateCatalogEntry,
+  normalizeProgrammableTemplateInvocation,
   normalizeProgrammableTemplateMetadata,
+  resolveProgrammableTemplateInvocation,
   resolveProgrammableTemplateVariant,
   ProgrammableTemplateCatalog,
   ProgrammableTemplateError
@@ -133,11 +135,14 @@ export type {
   ProgrammableTemplateAspectRatio,
   ProgrammableTemplateCatalogEntry,
   ProgrammableTemplateErrorCode,
+  ProgrammableTemplateInvocation,
+  ProgrammableTemplateInvocationInput,
   ProgrammableTemplateMetadata,
   ProgrammableTemplateMetadataInput,
   ProgrammableTemplateSchemaVersion,
   ProgrammableTemplateVariant,
   ProgrammableTemplateVariantInput,
+  ResolvedProgrammableTemplateInvocation,
   ResolvedProgrammableTemplateVariant,
   StillProgrammableTemplateCatalogEntry,
   VideoProgrammableTemplateCatalogEntry

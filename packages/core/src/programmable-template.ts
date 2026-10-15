@@ -66,6 +66,28 @@ export interface ProgrammableTemplate<Props extends JsonObject = JsonObject> {
   readonly metadata: ProgrammableTemplateMetadata;
 }
 
+export interface ProgrammableTemplateInvocationInput {
+  readonly templateId: string;
+  readonly variantId?: string;
+  readonly props?: JsonObject;
+}
+
+export interface ProgrammableTemplateInvocation {
+  readonly schemaVersion: ProgrammableTemplateSchemaVersion;
+  readonly templateId: string;
+  readonly variantId?: string;
+  readonly props: JsonObject;
+}
+
+export interface ResolvedProgrammableTemplateInvocation<
+  Props extends JsonObject = JsonObject
+> {
+  readonly invocation: ProgrammableTemplateInvocation;
+  readonly template: ProgrammableTemplate<Props>;
+  readonly variant?: ProgrammableTemplateVariant;
+  readonly composition: ResolvedProgrammableComposition<Props>;
+}
+
 interface ProgrammableTemplateCatalogEntryBase {
   readonly schemaVersion: ProgrammableTemplateSchemaVersion;
   readonly id: string;
@@ -154,6 +176,26 @@ function normalizeVariantProps(props: JsonObject | undefined, index: number): Js
     throw new ProgrammableTemplateError(`template.variants[${index}].props must be a JSON object.`);
   }
   return normalized as JsonObject;
+}
+
+function normalizeInvocationProps(props: JsonObject | undefined): JsonObject {
+  const normalized = normalizeVariantJson(props ?? {}, "invocation.props");
+  if (!isPlainObject(normalized)) {
+    throw new ProgrammableTemplateError("invocation.props must be a JSON object.");
+  }
+  return normalized as JsonObject;
+}
+
+export function normalizeProgrammableTemplateInvocation(
+  input: ProgrammableTemplateInvocationInput
+): ProgrammableTemplateInvocation {
+  const variantId = optionalText(input.variantId, "invocation.variantId");
+  return Object.freeze({
+    schemaVersion: PROGRAMMABLE_TEMPLATE_SCHEMA_VERSION,
+    templateId: requiredText(input.templateId, "invocation.templateId"),
+    ...(variantId === undefined ? {} : { variantId }),
+    props: normalizeInvocationProps(input.props)
+  });
 }
 
 function normalizeVariants(
@@ -253,26 +295,42 @@ function aspectRatioDimensions(aspectRatio: ProgrammableTemplateAspectRatio): re
   return [1, 1];
 }
 
-export async function resolveProgrammableTemplateVariant<Props extends JsonObject>(
+function requireTemplateVariant<Props extends JsonObject>(
   template: ProgrammableTemplate<Props>,
   variantId: string
-): Promise<ResolvedProgrammableTemplateVariant<Props>> {
+): ProgrammableTemplateVariant {
   const variant = template.metadata.variants.find((candidate) => candidate.id === variantId);
   if (!variant) {
     throw new ProgrammableTemplateError(
       `Template "${template.id}" does not define variant "${variantId}".`
     );
   }
-  const composition = await resolveProgrammableComposition(
-    template.composition,
-    variant.props as Partial<Props>
-  );
+  return variant;
+}
+
+function assertVariantAspectRatio(
+  variant: ProgrammableTemplateVariant,
+  composition: ResolvedProgrammableComposition
+): void {
   const [ratioWidth, ratioHeight] = aspectRatioDimensions(variant.aspectRatio);
   if (composition.metadata.width * ratioHeight !== composition.metadata.height * ratioWidth) {
     throw new ProgrammableTemplateError(
       `Template variant "${variant.id}" declares ${variant.aspectRatio} but resolved ${composition.metadata.width}:${composition.metadata.height}.`
     );
   }
+}
+
+export async function resolveProgrammableTemplateVariant<Props extends JsonObject>(
+  template: ProgrammableTemplate<Props>,
+  variantId: string,
+  inputProps?: Partial<Props>
+): Promise<ResolvedProgrammableTemplateVariant<Props>> {
+  const variant = requireTemplateVariant(template, variantId);
+  const composition = await resolveProgrammableComposition(template.composition, {
+    ...variant.props,
+    ...(inputProps ?? {})
+  } as Partial<Props>);
+  assertVariantAspectRatio(variant, composition);
   return Object.freeze({ templateId: template.id, variant, composition });
 }
 
@@ -328,4 +386,32 @@ export class ProgrammableTemplateCatalog {
   get size(): number {
     return this.#entries.size;
   }
+}
+
+export async function resolveProgrammableTemplateInvocation<Props extends JsonObject = JsonObject>(
+  catalog: ProgrammableTemplateCatalog,
+  input: ProgrammableTemplateInvocationInput
+): Promise<ResolvedProgrammableTemplateInvocation<Props>> {
+  const invocation = normalizeProgrammableTemplateInvocation(input);
+  const template = catalog.require<Props>(invocation.templateId);
+
+  if (invocation.variantId !== undefined) {
+    const resolved = await resolveProgrammableTemplateVariant(
+      template,
+      invocation.variantId,
+      invocation.props as Partial<Props>
+    );
+    return Object.freeze({
+      invocation,
+      template,
+      variant: resolved.variant,
+      composition: resolved.composition
+    });
+  }
+
+  const composition = await resolveProgrammableComposition(
+    template.composition,
+    invocation.props as Partial<Props>
+  );
+  return Object.freeze({ invocation, template, composition });
 }

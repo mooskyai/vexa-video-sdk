@@ -174,6 +174,8 @@ The second V2.12 slice keeps templates as discovery descriptors, not executable 
 
 The third V2.12 slice keeps responsive variants inside that same boundary. Template variants are normalized JSON-safe prop presets with a declared aspect ratio. Resolving one calls the wrapped composition's existing prop/schema validation and dynamic metadata calculator, then verifies the resulting width/height against the declared ratio. This lets one authored composition cover 16:9, 9:16, and 1:1 while preserving the exact player/render execution contract.
 
+The fourth V2.12 slice adds a transport-friendly invocation envelope rather than a service-specific runtime. `templateId`, optional `variantId`, and caller props normalize into frozen deterministic JSON; catalog resolution finds the same template descriptor, applies any variant preset first, overlays caller props, and then invokes the ordinary composition resolver. Schema/custom validation, dynamic metadata, and post-resolution aspect-ratio checks therefore remain authoritative for browser, Node, hosted, and future agent callers.
+
 The intended boundary is:
 
 ```text

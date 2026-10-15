@@ -45,7 +45,7 @@ Vexa keeps those concerns behind a typed SDK:
 | CLI | Probe, plan, render, hardware inspection, and adaptive streaming from the terminal |
 | Browser editor foundation | Framework-neutral timeline state, snapping, clip edits, viewport state, undo/redo |
 | Hosted rendering | Provider-neutral submit/get/cancel contract for cloud or hosted render services |
-| Programmable authoring | Deterministic composition metadata, JSON-serializable input schemas with defaults/validation, deterministic reusable-template catalogs with validated 16:9/9:16/1:1 variants, frame/time math, scene graphs, serializable shape/effect/transition/typography contracts, reusable logical sound-effect catalogs, visual scene nodes, and React authoring primitives |
+| Programmable authoring | Deterministic composition metadata, JSON-serializable input schemas with defaults/validation, deterministic reusable-template catalogs with validated 16:9/9:16/1:1 variants and JSON-safe service/agent invocation, frame/time math, scene graphs, serializable shape/effect/transition/typography contracts, reusable logical sound-effect catalogs, visual scene nodes, and React authoring primitives |
 | Browser player | Framework-neutral playback state, seek/step/loop/rate/buffering, responsive host, events, and fullscreen |
 | Browser rendering | Browser-safe WebCodecs capability probing, typed fallback planning, cancellable video plus AAC/Opus audio encoding, H.264/AAC MP4 and VP9-or-AV1/Opus WebM A/V muxing with Blob/File output, concrete Canvas and serializable-DOM frame capture adapters, and deterministic capture-to-container acceptance coverage |
 | Composition bundling | TypeScript/TSX browser bundles, CSS/assets, deterministic manifests/discovery, source maps, and environment allowlists |

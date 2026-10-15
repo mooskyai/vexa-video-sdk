@@ -9,7 +9,9 @@ import {
   defineProgrammableTemplate,
   defineStill,
   getProgrammableTemplateCatalogEntry,
+  normalizeProgrammableTemplateInvocation,
   normalizeProgrammableTemplateMetadata,
+  resolveProgrammableTemplateInvocation,
   resolveProgrammableTemplateVariant
 } from "../src/index.js";
 
@@ -214,5 +216,125 @@ test("variant definitions stay deterministic and fail closed on bad ids or ratio
   await assert.rejects(
     () => resolveProgrammableTemplateVariant(template, "wide"),
     /declares 16:9 but resolved 100:100/
+  );
+});
+
+test("JSON-safe template invocation resolves catalog variants with caller prop overrides", async () => {
+  const template = defineProgrammableTemplate(
+    defineComposition({
+      id: "agent-promo",
+      width: 1920,
+      height: 1080,
+      fps: 30,
+      durationInFrames: 90,
+      defaultProps: { format: "wide", title: "Default" },
+      inputSchema: {
+        type: "object",
+        properties: {
+          format: { type: "enum", values: ["wide", "vertical"] },
+          title: { type: "string", minLength: 1 }
+        },
+        required: ["format", "title"],
+        additionalProperties: false
+      },
+      calculateMetadata: ({ props }) =>
+        props.format === "vertical"
+          ? { width: 1080, height: 1920 }
+          : { width: 1920, height: 1080 }
+    }),
+    {
+      name: "Agent Promo",
+      variants: [{ id: "vertical", aspectRatio: "9:16", props: { format: "vertical" } }]
+    }
+  );
+  const catalog = new ProgrammableTemplateCatalog().register(template);
+
+  const invocation = normalizeProgrammableTemplateInvocation({
+    templateId: " agent-promo ",
+    variantId: " vertical ",
+    props: { title: "Launch", format: "vertical" }
+  });
+
+  assert.deepEqual(JSON.parse(JSON.stringify(invocation)), {
+    schemaVersion: 1,
+    templateId: "agent-promo",
+    variantId: "vertical",
+    props: { format: "vertical", title: "Launch" }
+  });
+
+  const resolved = await resolveProgrammableTemplateInvocation(catalog, invocation);
+  assert.equal(resolved.template, template);
+  assert.equal(resolved.variant?.id, "vertical");
+  assert.equal(resolved.composition.props.title, "Launch");
+  assert.equal(resolved.composition.metadata.width, 1080);
+  assert.equal(resolved.composition.metadata.height, 1920);
+});
+
+test("template invocation rejects malformed JSON and preserves schema and ratio validation", async () => {
+  const template = defineProgrammableTemplate(
+    defineComposition({
+      id: "strict-promo",
+      width: 1920,
+      height: 1080,
+      fps: 30,
+      durationInFrames: 60,
+      defaultProps: { format: "wide", title: "Valid" },
+      inputSchema: {
+        type: "object",
+        properties: {
+          format: { type: "enum", values: ["wide", "vertical"] },
+          title: { type: "string", minLength: 1 }
+        },
+        required: ["format", "title"],
+        additionalProperties: false
+      },
+      calculateMetadata: ({ props }) =>
+        props.format === "vertical"
+          ? { width: 1080, height: 1920 }
+          : { width: 1920, height: 1080 }
+    }),
+    {
+      name: "Strict Promo",
+      variants: [{ id: "vertical", aspectRatio: "9:16", props: { format: "vertical" } }]
+    }
+  );
+  const catalog = new ProgrammableTemplateCatalog().register(template);
+
+  assert.throws(
+    () => normalizeProgrammableTemplateInvocation({ templateId: "   " }),
+    /invocation.templateId cannot be empty/
+  );
+  assert.throws(
+    () =>
+      normalizeProgrammableTemplateInvocation({
+        templateId: "strict-promo",
+        props: { value: Number.POSITIVE_INFINITY }
+      }),
+    /invocation.props.value must contain only finite numbers/
+  );
+  await assert.rejects(
+    () =>
+      resolveProgrammableTemplateInvocation(catalog, {
+        templateId: "strict-promo",
+        variantId: "missing"
+      }),
+    /does not define variant/
+  );
+  await assert.rejects(
+    () =>
+      resolveProgrammableTemplateInvocation(catalog, {
+        templateId: "strict-promo",
+        variantId: "vertical",
+        props: { format: "wide" }
+      }),
+    /declares 9:16 but resolved 1920:1080/
+  );
+  await assert.rejects(
+    () =>
+      resolveProgrammableTemplateInvocation(catalog, {
+        templateId: "strict-promo",
+        props: { title: "" }
+      }),
+    /title/
   );
 });

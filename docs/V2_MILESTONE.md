@@ -744,6 +744,8 @@ The second slice adds reusable template descriptors around those same compositio
 
 The third slice adds deterministic aspect-ratio variants to those descriptors. Each variant contains JSON-safe prop overrides and a declared `16:9`, `9:16`, or `1:1` ratio; resolution delegates to the existing composition prop validation and `calculateMetadata` path, then verifies the resolved dimensions match the declared ratio. One composition therefore supports landscape, vertical, and square output without cloned template code or an alternate render contract.
 
+The fourth slice adds a JSON-safe invocation envelope for services and agents. Invocation normalization validates and freezes `templateId`, optional `variantId`, and JSON-only props; catalog resolution merges variant presets before caller overrides, then delegates to the existing composition schema/custom validation and dynamic-metadata path. Variant aspect-ratio verification runs after those final props resolve, so remote callers cannot bypass responsive-template guarantees.
+
 ### Goal
 
 Make compositions reusable by applications, APIs, and agents.
