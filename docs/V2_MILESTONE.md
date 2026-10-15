@@ -819,7 +819,9 @@ The second slice connects the CLI directly to `VexaCompositionRenderer`. `vexa r
 
 The third slice exposes executable composition inspection and props resolution on `VexaCompositionRenderer` before adding any agent-specific adapter. `inspectComposition()` returns the authoritative static definition metadata, including default props and any declared input schema, after the existing manifest/executable consistency check. `resolveComposition()` merges defaults, runs the existing schema and custom validators, and calculates dynamic metadata without constructing a scene. `vexa inspect` and `vexa validate` delegate to those methods and emit JSON-safe results; JSON-mode failures include stable renderer error codes. MCP remains a later adapter over these same typed operations.
 
-The fourth slice adds that adapter as the transport-neutral `@vexa-video/mcp` package. It exposes a stable typed tool catalog for composition listing, executable inspection, authoritative prop resolution, hosted render submission, render-state inspection, and cancellation. The package delegates to `VexaCompositionRenderer` and a `HostedRenderer`-compatible runtime, preserves their error codes, and validates only the operation envelope needed to reject unknown fields and raw command surfaces. It does not introduce a second props schema, renderer, queue, hosted request format, or MCP protocol server; protocol transport is a later layer over the same tools.
+The fourth slice adds that adapter as the transport-neutral `@vexa-video/mcp` package. It exposes a stable typed tool catalog for composition listing, executable inspection, authoritative prop resolution, hosted render submission, render-state inspection, and cancellation. The package delegates to `VexaCompositionRenderer` and a `HostedRenderer`-compatible runtime, preserves their error codes, and validates only the operation envelope needed to reject unknown fields and raw command surfaces.
+
+The fifth slice closes V2.14 with an actual MCP protocol boundary over the unchanged adapter. `@vexa-video/mcp/server` uses the official MCP SDK low-level server so `tools/list` can publish Vexa's existing JSON schemas verbatim and `tools/call` can delegate to `callTool()` for the already-enforced operation checks. `@vexa-video/mcp/stdio` adds the official stdio transport for local agent hosts. The MCP SDK remains a peer dependency of this integration package, while renderer, hosted-job, provider, credential, and shell concerns stay in their existing owners.
 
 CLI targets:
 
@@ -843,7 +845,7 @@ Agent-safe operations should include:
 - inspect render state;
 - cancel render.
 
-A future `@vexa-video/mcp` package is allowed only if it exposes the same typed composition/render contracts instead of bypassing them.
+The `@vexa-video/mcp` package must continue to expose the same typed composition/render contracts rather than bypassing them when additional MCP transports or host integrations are added.
 
 ## V2.15 — Visual regression and parity testing
 

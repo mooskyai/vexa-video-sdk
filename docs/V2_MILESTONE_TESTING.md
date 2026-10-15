@@ -843,11 +843,17 @@ npm run cli -- inspect product-demo --manifest .\.tmp\v2.14-cli-render-bundle\ve
 node .\packages\cli\dist\bin.js validate product-demo --manifest .\.tmp\v2.14-cli-render-bundle\vexa.bundle.json --props '{"background":"#223344","fps":24}' --json
 ```
 
-The fourth slice introduces the transport-neutral `@vexa-video/mcp` tool adapter. Focused tests must prove a stable six-tool catalog with strict JSON-object input schemas, renderer-backed list/inspect/validate delegation, preservation of renderer validation error codes, `HostedRenderer`-compatible start/get/cancel delegation, rejection of unsupported command/shell fields before hosted submission, and typed failures for malformed or unknown tool calls. Protocol transport is intentionally outside this slice.
+The fourth slice introduces the transport-neutral `@vexa-video/mcp` tool adapter. Focused tests must prove a stable six-tool catalog with strict JSON-object input schemas, renderer-backed list/inspect/validate delegation, preservation of renderer validation error codes, `HostedRenderer`-compatible start/get/cancel delegation, rejection of unsupported command/shell fields before hosted submission, and typed failures for malformed or unknown tool calls.
+
+The fifth/closure slice adds official MCP protocol and stdio acceptance without changing that adapter. An in-memory MCP client/server pair must verify `tools/list`, successful `tools/call`, and typed Vexa validation failures returned with `isError: true`. A second test must spawn the Vexa stdio fixture through `StdioClientTransport`, list the same six tools, and execute a render-state call across real stdin/stdout. Both paths must prove the protocol layer delegates to `VexaMcpCompositionTools` rather than adding another schema/validator or arbitrary command surface.
 
 ```powershell
 node --import tsx --test "packages/mcp/**/*.test.ts"
 ```
+
+### V2.14 closure acceptance
+
+Before committing the closure, require the focused MCP suite, repository typecheck/test/build/verify, release check/pack, the root README guard, the prohibited-runtime guard, and `git diff --check`. The focused MCP suite should contain the six transport-neutral operation tests plus protocol and spawned-stdio acceptance.
 
 ### CLI acceptance
 

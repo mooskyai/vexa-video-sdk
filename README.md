@@ -43,7 +43,7 @@ Vexa keeps those concerns behind a typed SDK:
 | Plugins | Lifecycle-managed custom operations, storage adapters, job handlers, render backends, encoder providers |
 | AI extension | Provider-neutral transcription/captions, FFmpeg scene detection, silence removal, smart reframe, highlight hooks |
 | CLI | Probe, plan, media rendering, hardware inspection, adaptive streaming, deterministic composition discovery/bundling, bundle-backed composition video/still rendering, executable composition inspection, props validation, and machine-readable output/errors |
-| Agent/MCP | Transport-neutral typed composition tools for list, inspect, validate, hosted render start/state/cancel, and stable machine-readable failures without raw shell execution |
+| Agent/MCP | Typed composition tools plus an official MCP protocol server and stdio transport for list/inspect/validate and hosted render start/state/cancel, with stable machine-readable failures and no raw shell execution |
 | Browser editor foundation | Framework-neutral timeline state, snapping, clip edits, viewport state, undo/redo |
 | Hosted rendering | Provider-neutral submit/get/cancel/wait plus typed composition requests, existing job-worker execution, deterministic artifact identity, retry-safe remote publication through the normal Storage upload boundary, and explicit provider publishing for directory artifacts |
 | Programmable authoring | Deterministic composition metadata, JSON-serializable input schemas with defaults/validation, deterministic reusable-template catalogs with validated 16:9/9:16/1:1 variants, reusable scene/storage asset descriptors, and JSON-safe service/agent invocation, frame/time math, scene graphs, serializable shape/effect/transition/typography contracts, reusable logical sound-effect catalogs, visual scene nodes, and React authoring primitives |
@@ -439,6 +439,16 @@ npm run cli -- stream input.mp4 ./hls --protocol hls --preset balanced
 
 Programmable discovery and bundling reuse `@vexa-video/bundler` directly. Composition video/still execution, inspection, and props validation all reuse `VexaCompositionRenderer`; existing media-file `render` detection is preserved. Structured `--props` acceptance on Windows invokes the built CLI entry point directly because the PowerShell → npm → `cmd.exe` path can strip JSON quotes before Node receives them.
 
+### MCP and agent workflows
+
+`@vexa-video/mcp` publishes the same six typed composition/render-control operations through the official MCP protocol. Hosts can create a protocol server with `@vexa-video/mcp/server` or connect it directly to stdin/stdout with `@vexa-video/mcp/stdio`. The protocol layer publishes the existing Vexa tool schemas and routes calls into the existing dispatcher; it does not accept shell commands or redefine composition validation, rendering, jobs, or hosted requests.
+
+```ts
+import { serveVexaMcpStdio } from "@vexa-video/mcp/stdio";
+
+await serveVexaMcpStdio(tools, { name: "my-vexa-server", version: "1.0.0" });
+```
+
 A generic REST render-service template is available with:
 
 ```bash
@@ -537,7 +547,7 @@ See [docs/visual-playground.md](./docs/visual-playground.md).
 | `@vexa-video/web-renderer` | Browser-safe WebCodecs capability detection and deterministic browser/backend render planning |
 | `@vexa-video/studio` | Browser-safe Studio session/runtime state for composition selection, preview/timeline coordination, props, metadata, and hot reload |
 | `@vexa-video/cli` | Node.js command-line interface for media workflows plus composition discovery, bundling, inspection, validation, video rendering, and still/frame rendering through the existing renderer |
-| `@vexa-video/mcp` | Transport-neutral agent/MCP composition tools that delegate discovery and validation to the renderer and render control to HostedRenderer-compatible contracts |
+| `@vexa-video/mcp` | Agent-safe composition tools plus official MCP server/stdio adapters that route protocol calls into the existing renderer and HostedRenderer-compatible contracts |
 
 Extended programmable media stays additive: specialized packages integrate through the shared surface or scene/project boundaries, while `@vexa-video/core` and the normal SDK remain free of optional renderer dependencies.
 
