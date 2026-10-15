@@ -8,10 +8,13 @@ import type {
   VexaBundledCompositionDescriptor
 } from "@vexa-video/bundler";
 import {
+  HOSTED_COMPOSITION_RENDER_TYPE,
   HardwareAccelerationUnavailableError,
+  JobCancelledError,
   ProcessAbortedError,
   ProcessTimeoutError,
   collectProgrammableSceneAssets,
+  createHostedCompositionRenderRequest,
   createProgrammableSceneRenderGraph,
   defineProgrammableScene,
   evaluateExecutableComposition,
@@ -20,6 +23,10 @@ import {
   programmableShapeToSvgPath,
   type ExecutableProgrammableComposition,
   type HardwareAccelerationPreference,
+  type HostedCompositionBundleReference,
+  type HostedCompositionOutputReference,
+  type HostedCompositionRenderPayload,
+  type HostedCompositionRenderTarget,
   type JsonObject,
   type MediaProgress,
   type MediaStorageSource,
@@ -52,7 +59,7 @@ import {
   type ProjectFrameExecutionPlan,
   type ProjectRangeExecutionPlan
 } from "@vexa-video/ffmpeg";
-import { Storage } from "@vexa-video/sdk";
+import { Storage, type JobHandler, type JobHandlerContext, type JobHandlerOptions } from "@vexa-video/sdk";
 
 export const VEXA_RENDER_PLAN_SCHEMA_VERSION = 1 as const;
 export const VEXA_EXECUTABLE_COMPOSITIONS_EXPORT = "vexaExecutableCompositions" as const;
@@ -2297,4 +2304,237 @@ export function createCompositionRenderer(
   options: VexaRendererOptions = {}
 ): VexaCompositionRenderer {
   return new VexaCompositionRenderer(manifest, options);
+}
+
+export interface HostedCompositionWorkerContext {
+  readonly jobId: string;
+  readonly attempt: number;
+  readonly signal: AbortSignal;
+}
+
+export type HostedCompositionManifestResolver = (
+  bundle: HostedCompositionBundleReference,
+  context: HostedCompositionWorkerContext
+) => string | Promise<string>;
+
+export type HostedCompositionOutputResolver = (
+  output: HostedCompositionOutputReference,
+  payload: HostedCompositionRenderPayload,
+  context: HostedCompositionWorkerContext
+) => string | Promise<string>;
+
+export type HostedCompositionWorkerRenderer = Pick<
+  VexaCompositionRenderer,
+  "renderStill" | "renderFrame" | "renderFrameRange" | "renderVideo"
+>;
+
+export interface HostedCompositionWorkerRegistry {
+  register<TPayload, TResult>(
+    type: string,
+    handler: JobHandler<TPayload, TResult>,
+    options?: JobHandlerOptions<TPayload, TResult>
+  ): unknown;
+}
+
+export interface HostedCompositionWorkerOptions {
+  readonly resolveManifest: HostedCompositionManifestResolver;
+  readonly resolveOutput: HostedCompositionOutputResolver;
+  readonly rendererOptions?: VexaRendererOptions;
+  readonly executionOptions?: Omit<
+    VexaRenderExecutionOptions,
+    "inputProps" | "signal" | "onProgress"
+  >;
+  /** Test/provider seam; normal execution uses VexaCompositionRenderer.fromManifest(). */
+  readonly createRenderer?: (
+    manifestPath: string,
+    options: VexaRendererOptions
+  ) => HostedCompositionWorkerRenderer | Promise<HostedCompositionWorkerRenderer>;
+}
+
+export interface HostedCompositionWorkerResult {
+  readonly schemaVersion: 1;
+  readonly artifactId: string;
+  readonly bundleId: string;
+  readonly compositionId: string;
+  readonly target: HostedCompositionRenderTarget["kind"];
+  readonly output: string;
+  readonly contentType: string;
+}
+
+function hostedWorkerText(value: unknown, label: string): string {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new VexaRendererError(
+      `${label} must resolve to a non-empty string.`,
+      "INVALID_RENDERER_OPTIONS"
+    );
+  }
+  return value.trim();
+}
+
+function hostedWorkerContentType(payload: HostedCompositionRenderPayload): string {
+  if (payload.output.contentType) return payload.output.contentType;
+  switch (payload.target.kind) {
+    case "still":
+    case "frame": {
+      const format = payload.target.format ?? "png";
+      return format === "jpeg" ? "image/jpeg" : `image/${format}`;
+    }
+    case "frame-range":
+      return "application/vnd.vexa.frame-sequence";
+    case "video":
+      return payload.target.container === "webm" ? "video/webm" : "video/mp4";
+  }
+}
+
+function hostedWorkerContext(
+  context: JobHandlerContext<HostedCompositionRenderPayload, HostedCompositionWorkerResult>
+): HostedCompositionWorkerContext {
+  return Object.freeze({
+    jobId: context.job.descriptor.id,
+    attempt: context.job.attempt,
+    signal: context.signal
+  });
+}
+
+export function registerHostedCompositionRenderWorker<
+  TRegistry extends HostedCompositionWorkerRegistry
+>(
+  registry: TRegistry,
+  options: HostedCompositionWorkerOptions
+): TRegistry {
+  if (!registry || typeof registry.register !== "function") {
+    throw new TypeError(
+      "registerHostedCompositionRenderWorker requires an existing Vexa job registry."
+    );
+  }
+  if (!options || typeof options.resolveManifest !== "function") {
+    throw new TypeError("Hosted composition workers require resolveManifest().");
+  }
+  if (typeof options.resolveOutput !== "function") {
+    throw new TypeError("Hosted composition workers require resolveOutput().");
+  }
+
+  registry.register<HostedCompositionRenderPayload, HostedCompositionWorkerResult>(
+    HOSTED_COMPOSITION_RENDER_TYPE,
+    async (rawPayload, jobContext) => {
+      const payload = createHostedCompositionRenderRequest(rawPayload).payload;
+      const context = hostedWorkerContext(jobContext);
+      if (context.signal.aborted) throw new JobCancelledError(context.jobId);
+
+      await jobContext.reportProgress({
+        percent: 0,
+        phase: "preparing",
+        message: "Resolving hosted composition inputs."
+      });
+
+      const [manifestValue, outputValue] = await Promise.all([
+        options.resolveManifest(payload.bundle, context),
+        options.resolveOutput(payload.output, payload, context)
+      ]);
+      if (context.signal.aborted) throw new JobCancelledError(context.jobId);
+
+      const manifestPath = hostedWorkerText(
+        manifestValue,
+        "Hosted composition manifest resolver"
+      );
+      const output = hostedWorkerText(
+        outputValue,
+        "Hosted composition output resolver"
+      );
+      const renderer = await (
+        options.createRenderer?.(manifestPath, options.rendererOptions ?? {}) ??
+        VexaCompositionRenderer.fromManifest(manifestPath, options.rendererOptions)
+      );
+
+      let progressChain = Promise.resolve();
+      const onProgress = (progress: VexaRenderProgress): void => {
+        progressChain = progressChain.then(() =>
+          jobContext.reportProgress({
+            percent: progress.percent,
+            phase: progress.phase,
+            message: `Rendering ${progress.target}.`,
+            data: {
+              target: progress.target,
+              completedFrames: progress.completedFrames,
+              totalFrames: progress.totalFrames
+            }
+          })
+        );
+      };
+
+      const execution = {
+        ...(options.executionOptions ?? {}),
+        overwrite: options.executionOptions?.overwrite ?? true,
+        ...(payload.inputProps ? { inputProps: payload.inputProps } : {}),
+        signal: context.signal,
+        onProgress
+      } satisfies VexaRenderExecutionOptions;
+
+      try {
+        switch (payload.target.kind) {
+          case "still":
+            await renderer.renderStill({
+              ...execution,
+              compositionId: payload.compositionId,
+              output,
+              ...(payload.target.format ? { format: payload.target.format } : {})
+            });
+            break;
+          case "frame":
+            await renderer.renderFrame({
+              ...execution,
+              compositionId: payload.compositionId,
+              output,
+              frame: payload.target.frame,
+              ...(payload.target.format ? { format: payload.target.format } : {})
+            });
+            break;
+          case "frame-range":
+            await renderer.renderFrameRange({
+              ...execution,
+              compositionId: payload.compositionId,
+              output,
+              startFrame: payload.target.startFrame,
+              endFrameExclusive: payload.target.endFrameExclusive,
+              ...(payload.target.format ? { format: payload.target.format } : {})
+            });
+            break;
+          case "video":
+            await renderer.renderVideo({
+              ...execution,
+              compositionId: payload.compositionId,
+              output,
+              ...(payload.target.startFrame === undefined
+                ? {}
+                : {
+                    startFrame: payload.target.startFrame,
+                    endFrameExclusive: payload.target.endFrameExclusive!
+                  }),
+              ...(payload.target.container ? { format: payload.target.container } : {})
+            });
+            break;
+        }
+        await progressChain;
+      } catch (cause) {
+        await progressChain.catch(() => undefined);
+        const code = (cause as { readonly code?: unknown } | null)?.code;
+        if (context.signal.aborted || code === "RENDER_ABORTED") {
+          throw new JobCancelledError(context.jobId);
+        }
+        throw cause;
+      }
+
+      return Object.freeze({
+        schemaVersion: 1 as const,
+        artifactId: payload.output.artifactId,
+        bundleId: payload.bundle.id,
+        compositionId: payload.compositionId,
+        target: payload.target.kind,
+        output,
+        contentType: hostedWorkerContentType(payload)
+      });
+    }
+  );
+
+  return registry;
 }

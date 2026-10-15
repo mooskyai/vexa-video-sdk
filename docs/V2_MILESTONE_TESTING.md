@@ -758,6 +758,8 @@ Windows 11 acceptance for the completed template/parameterization stage:
 
 The first slice tests request normalization independently of worker execution: bundle/composition/output identities are required, input props remain deterministic JSON, frame/range bounds fail closed, video ranges require both endpoints, idempotency is preserved, and `HostedRenderer.submitComposition()` delegates the normalized request through the existing adapter.
 
+The second slice tests the real worker boundary without requiring a cloud vendor: an in-memory `JobQueue` receives `composition.render`, injected resolvers map provider bundle/output identities into local worker paths, the existing renderer surface receives still/frame/range/video options, renderer progress becomes job progress, and renderer cancellation maps back to the job's cancelled state. The registration contract is shared with distributed workers, provider callbacks are validated eagerly, and no second queue implementation is introduced.
+
 ### Contract tests
 
 Use a fake/in-memory provider to cover:

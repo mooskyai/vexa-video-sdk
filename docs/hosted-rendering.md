@@ -48,7 +48,25 @@ const terminal = await renderer.wait(compositionJob.id, {
 });
 ```
 
-`submitComposition()` is only a typed transport boundary. Bundle acquisition, prop validation against the executable composition, worker execution, and remote artifact writes belong to the provider/worker side and later V2.13 integration.
+`submitComposition()` is only a typed transport boundary. Worker execution reuses the existing Node renderer and job registration contract rather than adding a hosted-only scheduler. `@vexa-video/renderer` exposes `registerHostedCompositionRenderWorker()`: the host resolves the provider-owned bundle reference and output identity into worker-local paths, while Vexa maps the request into the normal still/frame/range/video renderer, forwards renderer progress into job progress, and preserves cancellation through the existing `AbortSignal` contract.
+
+```ts
+import { JobQueue } from "@vexa-video/sdk";
+import { registerHostedCompositionRenderWorker } from "@vexa-video/renderer";
+
+const queue = new JobQueue({ concurrency: 2 });
+
+registerHostedCompositionRenderWorker(queue, {
+  async resolveManifest(bundle) {
+    return await bundleCache.materialize(bundle);
+  },
+  async resolveOutput(output) {
+    return renderWorkspace.pathFor(output.artifactId);
+  }
+});
+```
+
+The same registration shape is implemented by Vexa's distributed worker. The bridge deliberately stops at the local render artifact. Uploading that artifact to `output.destination` and returning a portable hosted artifact URL remains provider-owned until the remote-output slice lands.
 
 The adapter decides how jobs map to a cloud vendor, hosted Vexa service, Kubernetes job, serverless queue, or another execution plane. Vexa does not embed provider credentials or vendor SDKs in the core contract.
 

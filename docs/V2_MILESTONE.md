@@ -783,6 +783,8 @@ player / still / local render / hosted render
 
 The first slice extends the existing provider-neutral hosted contract rather than creating a second render service model. `composition.render` requests carry a provider-resolved bundle manifest reference, composition id, JSON-safe input props, a still/frame/range/video target, and explicit output artifact identity. `HostedRenderer.submitComposition()` normalizes that envelope and delegates to the same application-supplied submit/get/cancel adapter used by existing hosted work. Cloud SDKs, bundle acquisition, synchronous renderer execution, durable workers, and remote writes remain outside core and are later V2.13 slices.
 
+The second slice adds the worker bridge inside `@vexa-video/renderer`, where the dependency direction already points toward `@vexa-video/sdk`. `registerHostedCompositionRenderWorker()` registers `composition.render` on the existing local `JobQueue` or distributed-worker registration contract, resolves the provider-owned manifest and local output through injected callbacks, and dispatches still/frame/range/video work to `VexaCompositionRenderer`. Renderer progress is forwarded into the existing job progress snapshot, `AbortSignal` cancellation remains a cancelled job rather than a failed render, and retries reuse the caller's stable artifact id plus a deterministic provider-resolved output path. Remote artifact publication remains a later slice.
+
 ### Goal
 
 Connect composition rendering to the existing hosted-render and job abstractions.

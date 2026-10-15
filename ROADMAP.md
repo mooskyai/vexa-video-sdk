@@ -92,7 +92,7 @@ The planned sequence is:
 | V2.10 | **Complete** | Extended programmable-media boundary plus concrete GIF, waveform, and reusable sound-effect integrations, all preserving dependency separation from core/normal SDK execution |
 | V2.11 | **Complete** | Browser/WebCodecs rendering with capability/fallback planning, video plus AAC/Opus audio encoding, H.264/AAC MP4 plus VP9-or-AV1/Opus WebM A/V muxing, Canvas/serializable-DOM capture adapters, Blob/File output, progress, cancellation, and typed backend fallback |
 | V2.12 | **Complete** | Parameterized templates and validated input schemas; browser-safe schemas, deterministic template discovery, validated 16:9/9:16/1:1 variants, reusable scene/storage asset descriptors, and JSON-safe service/agent invocation resolve through the same composition and asset contracts |
-| V2.13 | **In progress** | Hosted/serverless composition rendering; typed provider-neutral composition requests now reuse the existing hosted adapter contract, with worker execution and remote-output adapters following |
+| V2.13 | **In progress** | Hosted/serverless composition rendering; typed provider-neutral requests and the existing job worker bridge now reuse the normal composition renderer, with remote-output adapters following |
 | V2.14 | **Planned** | Agent/MCP/CLI composition workflows |
 | V2.15 | **Planned** | Frame-level visual regression and runtime parity testing |
 | V2.16 | **Planned** | Version 2 release hardening |
@@ -103,7 +103,7 @@ V2.8 is complete. The public browser-safe `@vexa-video/studio` runtime composes 
 
 V2.12 is complete. Windows 11 acceptance passed the focused template, scene, and composition suites (9/9, 26/26, and 12/12), the full repository suite (365/365), TypeScript typecheck/build, and `npm run verify`; README/prohibited-runtime guards and `git diff --check` were clean. Templates remain descriptors around the existing composition runtime, variants reuse dynamic metadata, and reusable assets reuse the existing scene/storage contract rather than adding parallel execution or media-resolution models.
 
-V2.13 has started with a provider-neutral composition request envelope. Bundle references, composition ids, JSON-safe input props, still/frame/range/video targets, explicit artifact identity, and idempotency metadata normalize before `HostedRenderer` delegates to the existing submit/get/cancel adapter. No cloud SDK or execution engine enters core; worker rendering remains on the existing renderer/job boundaries.
+V2.13 has started with a provider-neutral composition request envelope. Bundle references, composition ids, JSON-safe input props, still/frame/range/video targets, explicit artifact identity, and idempotency metadata normalize before `HostedRenderer` delegates to the existing submit/get/cancel adapter. The second slice registers `composition.render` on the existing local/distributed job registration surface, resolves provider-owned bundle/output references through injected callbacks, and delegates execution to `VexaCompositionRenderer` with shared progress and cancellation semantics. No cloud SDK or second queue/render engine is introduced.
 
 Detailed scope and acceptance:
 
