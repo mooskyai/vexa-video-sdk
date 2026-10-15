@@ -813,6 +813,8 @@ Keep cloud SDKs outside core packages.
 
 Make composition discovery and rendering usable by humans, automation, and coding agents through typed operations.
 
+The first V2.14 slice extends the existing Node CLI with programmable composition discovery and bundle creation only. `vexa compositions` reuses `discoverBundleCompositions()` and defaults to `src/video.tsx`; `vexa bundle` reuses `bundleCompositions()` with explicit project-root, output-directory, build-mode, source-map, and JSON-output controls. Existing media-file `render` semantics stay intact until a renderer-backed composition command is introduced, so this slice does not create a second discovery/build path or silently reinterpret existing commands.
+
 CLI targets:
 
 ```bash

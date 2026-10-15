@@ -42,7 +42,7 @@ Vexa keeps those concerns behind a typed SDK:
 | Angular | Browser-safe providers, uploads, render jobs, Signals, RxJS polling, preview helpers |
 | Plugins | Lifecycle-managed custom operations, storage adapters, job handlers, render backends, encoder providers |
 | AI extension | Provider-neutral transcription/captions, FFmpeg scene detection, silence removal, smart reframe, highlight hooks |
-| CLI | Probe, plan, render, hardware inspection, and adaptive streaming from the terminal |
+| CLI | Probe, plan, render, hardware inspection, adaptive streaming, plus deterministic programmable-composition discovery and bundling |
 | Browser editor foundation | Framework-neutral timeline state, snapping, clip edits, viewport state, undo/redo |
 | Hosted rendering | Provider-neutral submit/get/cancel/wait plus typed composition requests, existing job-worker execution, deterministic artifact identity, retry-safe remote publication through the normal Storage upload boundary, and explicit provider publishing for directory artifacts |
 | Programmable authoring | Deterministic composition metadata, JSON-serializable input schemas with defaults/validation, deterministic reusable-template catalogs with validated 16:9/9:16/1:1 variants, reusable scene/storage asset descriptors, and JSON-safe service/agent invocation, frame/time math, scene graphs, serializable shape/effect/transition/typography contracts, reusable logical sound-effect catalogs, visual scene nodes, and React authoring primitives |
@@ -423,12 +423,16 @@ See [docs/ai-extension.md](./docs/ai-extension.md).
 The repository now includes a dependency-light CLI and deployable service templates around the same SDK contracts.
 
 ```bash
+npm run cli -- compositions ./packages/bundler/test/fixtures/basic/entry.ts --json
+npm run cli -- bundle ./packages/bundler/test/fixtures/basic/entry.ts --out-dir ./.tmp/v2.14-cli-bundle --json
 npm run cli -- probe input.mp4
 npm run cli -- plan input.mp4 output.mp4 --width 1280 --height 720 --hardware auto
 npm run cli -- render input.mp4 output.mp4 --video-codec h264 --audio-codec aac
 npm run cli -- hardware --json
 npm run cli -- stream input.mp4 ./hls --protocol hls --preset balanced
 ```
+
+Programmable discovery and bundling reuse `@vexa-video/bundler` directly. The existing media-file `render` command remains unchanged in this first V2.14 slice; composition render/still commands layer on the established renderer contract in subsequent slices instead of overloading media semantics implicitly.
 
 A generic REST render-service template is available with:
 

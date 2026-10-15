@@ -1,7 +1,22 @@
+import {
+  bundleCompositions,
+  discoverBundleCompositions,
+  type VexaBundleMode,
+  type VexaBundleSourceMapMode
+} from "@vexa-video/bundler";
 import { Hardware, Streaming, Video } from "@vexa-video/sdk";
 import type { ExportOptions, HardwareAccelerationPreference, ResizeFit, StreamingPresetName, StreamingProtocol } from "@vexa-video/core";
 
-export type CliCommandName = "help" | "version" | "probe" | "plan" | "render" | "hardware" | "stream";
+export type CliCommandName =
+  | "help"
+  | "version"
+  | "probe"
+  | "plan"
+  | "render"
+  | "hardware"
+  | "stream"
+  | "compositions"
+  | "bundle";
 
 export interface CliInvocation {
   command: CliCommandName;
@@ -22,6 +37,14 @@ Usage:
   vexa render <input> <output> [options]
   vexa hardware
   vexa stream <input> <output-dir> [--protocol hls|dash] [--preset mobile|balanced|hd]
+  vexa compositions [entry] [--root-dir <dir>]
+  vexa bundle <entry> [--out-dir <dir>] [--root-dir <dir>] [--mode development|production]
+
+Composition options:
+  --root-dir <dir>          Project root (defaults to current directory)
+  --out-dir <dir>           Bundle output (defaults to .vexa/bundle)
+  --mode <mode>             development|production
+  --source-map <mode>       none|external|inline
 
 Video options:
   --width <px>              Resize width
@@ -42,7 +65,17 @@ function optionName(raw: string): string {
 
 export function parseCliArgs(argv: readonly string[]): CliInvocation {
   const first = argv[0];
-  const known = new Set<CliCommandName>(["help", "version", "probe", "plan", "render", "hardware", "stream"]);
+  const known = new Set<CliCommandName>([
+    "help",
+    "version",
+    "probe",
+    "plan",
+    "render",
+    "hardware",
+    "stream",
+    "compositions",
+    "bundle"
+  ]);
   const command: CliCommandName = !first || first === "--help" || first === "-h"
     ? "help"
     : first === "--version" || first === "-v"
@@ -139,6 +172,30 @@ function requirePositional(invocation: CliInvocation, index: number, label: stri
   return value;
 }
 
+const DEFAULT_COMPOSITION_ENTRY = "src/video.tsx";
+const DEFAULT_BUNDLE_OUT_DIR = ".vexa/bundle";
+
+function compositionEntry(invocation: CliInvocation): string {
+  const value = invocation.positionals[0]?.trim();
+  return value || DEFAULT_COMPOSITION_ENTRY;
+}
+
+function bundleMode(invocation: CliInvocation): VexaBundleMode {
+  const value = stringOption(invocation, "mode") ?? "development";
+  if (value !== "development" && value !== "production") {
+    throw new Error("--mode must be development or production.");
+  }
+  return value;
+}
+
+function bundleSourceMap(invocation: CliInvocation): VexaBundleSourceMapMode {
+  const value = stringOption(invocation, "source-map") ?? "external";
+  if (value !== "none" && value !== "external" && value !== "inline") {
+    throw new Error("--source-map must be none, external, or inline.");
+  }
+  return value;
+}
+
 export async function runCli(
   argv: readonly string[],
   io: CliIo = {
@@ -164,6 +221,29 @@ export async function runCli(
       case "hardware":
         io.stdout(format(await Hardware.detect(), invocation));
         return 0;
+      case "compositions": {
+        const compositions = await discoverBundleCompositions({
+          entry: compositionEntry(invocation),
+          ...(stringOption(invocation, "root-dir")
+            ? { rootDir: stringOption(invocation, "root-dir")! }
+            : {})
+        });
+        io.stdout(format(compositions, invocation));
+        return 0;
+      }
+      case "bundle": {
+        const result = await bundleCompositions({
+          entry: requirePositional(invocation, 0, "entry"),
+          outDir: stringOption(invocation, "out-dir") ?? DEFAULT_BUNDLE_OUT_DIR,
+          ...(stringOption(invocation, "root-dir")
+            ? { rootDir: stringOption(invocation, "root-dir")! }
+            : {}),
+          mode: bundleMode(invocation),
+          sourceMap: bundleSourceMap(invocation)
+        });
+        io.stdout(format(result, invocation));
+        return 0;
+      }
       case "plan": {
         const input = requirePositional(invocation, 0, "input");
         const output = requirePositional(invocation, 1, "output");

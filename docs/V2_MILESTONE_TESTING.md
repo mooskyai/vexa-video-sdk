@@ -793,6 +793,19 @@ Before committing the closure, run the focused hosted worker, SDK hosted, and co
 
 ## V2.14 — Agent/MCP/CLI workflows
 
+The first slice must verify the real CLI against the checked-in TypeScript composition fixture rather than only parser mocks. Acceptance covers deterministic `vexa compositions` JSON output, persisted `vexa bundle` manifest output, explicit project-root/output/mode/source-map options, and preservation of the existing media-file `render` command semantics. The monorepo root does not contain the normal project default `src/video.tsx`, so repository acceptance passes the fixture entry explicitly and writes generated output under the ignored `.tmp` directory.
+
+```powershell
+npm run cli -- compositions `
+  .\packages\bundler\test\fixtures\basic\entry.ts `
+  --json
+
+npm run cli -- bundle `
+  .\packages\bundler\test\fixtures\basic\entry.ts `
+  --out-dir .\.tmp\v2.14-cli-bundle `
+  --json
+```
+
 ### CLI acceptance
 
 PowerShell commands must cover:

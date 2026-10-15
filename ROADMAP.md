@@ -93,7 +93,7 @@ The planned sequence is:
 | V2.11 | **Complete** | Browser/WebCodecs rendering with capability/fallback planning, video plus AAC/Opus audio encoding, H.264/AAC MP4 plus VP9-or-AV1/Opus WebM A/V muxing, Canvas/serializable-DOM capture adapters, Blob/File output, progress, cancellation, and typed backend fallback |
 | V2.12 | **Complete** | Parameterized templates and validated input schemas; browser-safe schemas, deterministic template discovery, validated 16:9/9:16/1:1 variants, reusable scene/storage asset descriptors, and JSON-safe service/agent invocation resolve through the same composition and asset contracts |
 | V2.13 | **Complete** | Hosted/serverless composition rendering; typed requests, existing job-worker execution, deterministic retry-safe artifact publication, progress/cancellation, and provider-neutral deployment boundaries all reuse the normal renderer, job, and Storage contracts |
-| V2.14 | **Planned** | Agent/MCP/CLI composition workflows |
+| V2.14 | **In progress** | Agent/MCP/CLI composition workflows; deterministic composition discovery and bundle creation now begin on the existing bundler contract |
 | V2.15 | **Planned** | Frame-level visual regression and runtime parity testing |
 | V2.16 | **Planned** | Version 2 release hardening |
 
@@ -104,6 +104,8 @@ V2.8 is complete. The public browser-safe `@vexa-video/studio` runtime composes 
 V2.12 is complete. Windows 11 acceptance passed the focused template, scene, and composition suites (9/9, 26/26, and 12/12), the full repository suite (365/365), TypeScript typecheck/build, and `npm run verify`; README/prohibited-runtime guards and `git diff --check` were clean. Templates remain descriptors around the existing composition runtime, variants reuse dynamic metadata, and reusable assets reuse the existing scene/storage contract rather than adding parallel execution or media-resolution models.
 
 V2.13 is complete. A provider-neutral composition request envelope carries bundle references, JSON-safe props, still/frame/range/video targets, explicit artifact identity, and idempotency metadata through the existing hosted adapter. `composition.render` runs on the existing local/distributed job registration surface and delegates to `VexaCompositionRenderer` with ordinary progress and cancellation. Requested destinations publish only after rendering: single-file outputs reuse `Storage.upload()` and its S3/GCS/Azure/custom adapter boundary, while frame-range directories require an explicit provider publisher. Retry acceptance verifies the same artifact id, local output, destination, and overwrite-safe publication are reused on a second attempt. No cloud SDK, second queue, second renderer, or parallel storage model is introduced.
+
+V2.14 has started at the CLI boundary without redefining composition semantics. `vexa compositions` delegates to `discoverBundleCompositions()` and defaults to the project-local `src/video.tsx` entry, while `vexa bundle` delegates to `bundleCompositions()` with explicit root/output/mode/source-map options and JSON-safe output. Existing media-file `render` behavior remains unchanged until composition rendering is added through the existing renderer surface in a later slice.
 
 Detailed scope and acceptance:
 
