@@ -662,6 +662,8 @@ The sixth slice adds A/V container coverage for AAC `mp4a`/`esds` tracks in frag
 
 The seventh slice adds capture-adapter coverage for Canvas dimension matching, deterministic per-frame paint hooks, DOM SVG/`foreignObject` snapshot construction, reusable raster canvases, immediate ImageBitmap cleanup, stable dimensions, cancellation, and fail-closed unsupported DOM surfaces.
 
+The closure acceptance test composes the Canvas adapter with injected `VideoFrame`/`VideoEncoder` execution and the real WebM muxer, covering the capture-to-encoded-chunk-to-container handoff in one deterministic test without pretending that Node exposes native browser codecs.
+
 Cover:
 
 - WebCodecs unavailable;
@@ -673,9 +675,9 @@ Cover:
 - progress;
 - output Blob metadata.
 
-### Render inspection
+### Real-browser render inspection
 
-Decode/inspect browser-generated output and validate:
+For browser/release acceptance on a runtime that actually exposes the selected WebCodecs, decode/inspect generated output and validate:
 
 - duration;
 - dimensions;

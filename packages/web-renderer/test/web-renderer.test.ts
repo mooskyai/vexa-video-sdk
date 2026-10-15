@@ -10,7 +10,8 @@ import {
   VexaWebMediaMuxError,
   VexaWebMuxError,
   type VexaWebAudioEncodeResult,
-  type VexaWebVideoEncodeResult
+  type VexaWebVideoEncodeResult,
+  type VexaWebVideoEncodingRuntime
 } from "../src/index.js";
 
 function runtime(video: readonly string[], audio: readonly string[] = []) {
@@ -664,4 +665,76 @@ test("captures serializable DOM into a reusable canvas and closes temporary bitm
   assert.equal(bitmap.closeCalled, true);
   assert.match(svg, /<foreignObject/);
   assert.match(svg, /width="16" height="9"/);
+});
+
+
+test("runs Canvas capture through video encoding and WebM muxing", async () => {
+  const { createCanvasFrameCapture, encodeWebVideoFrames } = await import("../src/index.js");
+  const canvas = { width: 16, height: 9 } as unknown as OffscreenCanvas;
+  const painted: number[] = [];
+  const closedTimestamps: number[] = [];
+  const frameTimestamps: number[] = [];
+  let encodedFrames = 0;
+
+  const capture = createCanvasFrameCapture({
+    canvas,
+    renderFrame(context) { painted.push(context.frame); }
+  });
+
+  const videoRuntime: VexaWebVideoEncodingRuntime = {
+    createVideoFrame(source, init) {
+      assert.equal(source, canvas);
+      frameTimestamps.push(init.timestamp);
+      return { close() { closedTimestamps.push(init.timestamp); } };
+    },
+    createVideoEncoder(callbacks) {
+      return {
+        encodeQueueSize: 0,
+        configure() {},
+        encode(_frame, options) {
+          const index = encodedFrames;
+          const timestamp = frameTimestamps[index] ?? 0;
+          const bytes = new Uint8Array([0x80, index]);
+          callbacks.output({
+            type: options?.keyFrame === true ? "key" : "delta",
+            timestamp,
+            duration: 50_000,
+            byteLength: bytes.byteLength,
+            copyTo(destination) {
+              const view = ArrayBuffer.isView(destination)
+                ? new Uint8Array(destination.buffer, destination.byteOffset, destination.byteLength)
+                : new Uint8Array(destination);
+              view.set(bytes);
+            }
+          });
+          encodedFrames += 1;
+        },
+        async flush() {},
+        reset() {},
+        close() {}
+      };
+    }
+  };
+
+  const video = await encodeWebVideoFrames({
+    plan: { kind: "browser", container: "webm", videoCodec: "vp9" },
+    width: 16,
+    height: 9,
+    fps: 20,
+    frameCount: 2,
+    runtime: videoRuntime,
+    renderFrame: capture
+  });
+  const muxed = muxWebVideo(video);
+
+  assert.deepEqual(painted, [0, 1]);
+  assert.deepEqual(closedTimestamps, [0, 50_000]);
+  assert.deepEqual(video.chunks.map((chunk) => [chunk.timestampUs, chunk.type]), [
+    [0, "key"],
+    [50_000, "delta"]
+  ]);
+  assert.equal(muxed.container, "webm");
+  assert.equal(muxed.blob.type, "video/webm");
+  assert.equal(muxed.blob.size, muxed.data.byteLength);
+  assert.equal(containsAscii(muxed.data, "V_VP9"), true);
 });

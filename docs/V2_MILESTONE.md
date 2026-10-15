@@ -710,6 +710,8 @@ The sixth slice muxes those owned audio chunks with the existing browser video o
 
 The seventh slice closes the concrete browser frame-source gap with Canvas and serializable-DOM capture adapters. Canvas capture validates encoder dimensions and runs an optional deterministic per-frame paint callback before returning the browser canvas directly. DOM capture snapshots a cloned element tree with computed styles, wraps it in SVG `foreignObject`, rasterizes it through `createImageBitmap`, draws into a reusable Canvas/OffscreenCanvas, closes each temporary bitmap immediately, waits for document fonts when available, and fails closed for canvas/video/iframe descendants that cannot be faithfully serialized. The resulting canvas plugs directly into the existing `encodeWebVideoFrames` callback without changing composition semantics or adding Node/FFmpeg dependencies.
 
+The closure acceptance slice validates the integrated browser path instead of adding another production API. A deterministic test wires Canvas capture into `encodeWebVideoFrames` and then `muxWebVideo`, asserting frame paint order, `VideoFrame` cleanup, timestamp/keyframe propagation, WebM container identity, and Blob metadata. With capability/fallback planning, video/audio encoding, MP4/WebM A/V muxing, Canvas/DOM capture, progress, cancellation, Blob/File output, and typed fallback all represented behind the same browser-safe boundary, V2.11 is complete. Native codec availability remains a runtime browser capability and continues to fail over through the typed backend plan when unsupported.
+
 ### Goal
 
 Render suitable compositions entirely in the browser.
