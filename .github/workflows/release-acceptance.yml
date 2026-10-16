@@ -53,12 +53,7 @@ jobs:
       - name: Install FFmpeg (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: |
-          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
-            choco install ffmpeg --yes --no-progress
-          }
-          ffmpeg -version
-          ffprobe -version
+        run: ./scripts/install-ffmpeg-windows.ps1
 
       - name: Install FFmpeg (macOS)
         if: runner.os == 'macOS'
@@ -128,10 +123,7 @@ jobs:
       - name: Install FFmpeg (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: |
-          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
-            choco install ffmpeg --yes --no-progress
-          }
+        run: ./scripts/install-ffmpeg-windows.ps1
 
       - name: Install FFmpeg (macOS)
         if: runner.os == 'macOS'
