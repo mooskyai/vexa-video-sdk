@@ -989,6 +989,8 @@ The packed-install gate is required by the protected release workflow. V2.16 cro
 
 The macOS lanes install Homebrew `ffmpeg-full`, prepend its keg-only `bin` directory to `PATH`, and assert that the `drawtext` filter is available before acceptance. Vexa's text/caption rendering requires that FFmpeg capability, so a reduced FFmpeg build must fail during environment setup rather than appear as a renderer regression.
 
+HLS packaging executes FFmpeg from the prepared package directory and uses relative `v%v/...` variant paths. This keeps generated playlist URIs portable and avoids FFmpeg's Windows cross-drive directory-creation failure when a caller's temporary output directory is on a different drive from the process that invoked Vexa. Studio browser acceptance also waits for the props editor to enter the `draft` state before applying negative-render props, so slower CI browsers cannot silently lose the Apply action.
+
 A release may not publish unless every reusable-workflow matrix lane succeeds. Windows Edge Studio acceptance exercises the embedded Player play/pause/frame-step contract as part of the same real browser session, satisfying the Edge Player requirement without a second browser automation stack.
 
 ### Browser package audit

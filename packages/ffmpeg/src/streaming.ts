@@ -129,10 +129,10 @@ export function createStreamingExecutionPlan(
       "-hls_time", number(segmentDuration),
       "-hls_playlist_type", options.hlsPlaylistType ?? "vod",
       "-hls_flags", "independent_segments",
-      "-hls_segment_filename", join(outputDirectory, "v%v", "segment_%05d.ts"),
+      "-hls_segment_filename", "v%v/segment_%05d.ts",
       "-master_pl_name", "master.m3u8",
       "-var_stream_map", variants,
-      join(outputDirectory, "v%v", "index.m3u8")
+      "v%v/index.m3u8"
     );
     optimizations.push("HLS_MASTER_PLAYLIST", "HLS_VARIANT_PLAYLISTS");
     return {
@@ -227,7 +227,7 @@ export function normalizeHlsPlaylistText(content: string): string {
 }
 
 export function streamingExecutionCwd(plan: StreamingExecutionPlan): string | undefined {
-  return plan.protocol === "dash" ? plan.outputDirectory : undefined;
+  return plan.outputDirectory;
 }
 
 async function normalizeHlsPackagePlaylists(root: string, current = root): Promise<void> {

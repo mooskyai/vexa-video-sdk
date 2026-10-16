@@ -67,7 +67,7 @@ test("HLS playlist URI normalization converts Windows separators to portable sla
 });
 
 
-test("DASH execution keeps relative segment templates inside the package directory", () => {
+test("streaming execution keeps generated paths inside the package directory", () => {
   const dash = createStreamingExecutionPlan("input.mp4", "C:/tmp/vexa-dash", { protocol: "dash", preset: "mobile" }, probe);
   const joined = dash.args.join(" ");
   assert.match(joined, /-init_seg_name init-\$RepresentationID\$\.m4s/u);
@@ -75,7 +75,11 @@ test("DASH execution keeps relative segment templates inside the package directo
   assert.equal(streamingExecutionCwd(dash), "C:/tmp/vexa-dash");
 
   const hls = createStreamingExecutionPlan("input.mp4", "C:/tmp/vexa-hls", { protocol: "hls", preset: "mobile" }, probe);
-  assert.equal(streamingExecutionCwd(hls), undefined);
+  const hlsArgs = hls.args.join(" ");
+  assert.match(hlsArgs, /-hls_segment_filename v%v\/segment_%05d\.ts/u);
+  assert.match(hlsArgs, /v%v\/index\.m3u8/u);
+  assert.doesNotMatch(hlsArgs, /C:\/tmp\/vexa-hls/u);
+  assert.equal(streamingExecutionCwd(hls), "C:/tmp/vexa-hls");
 });
 
 test("adaptive streaming can select NVENC for all renditions", () => {

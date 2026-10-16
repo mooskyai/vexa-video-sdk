@@ -92,4 +92,5 @@ test("Studio browser acceptance harness is syntactically valid and supports brow
   assert.match(acceptance, /VEXA_STUDIO_BROWSER_FAMILY/u);
   assert.match(acceptance, /browserFamily/u);
   assert.match(acceptance, /browserVersion/u);
+  assert.match(acceptance, /render-failure props draft readiness/u);
 });

@@ -540,9 +540,14 @@ async function run() {
       const props = document.querySelector("#studioProps");
       props.value = ${JSON.stringify(failingProps)};
       props.dispatchEvent(new Event("input", { bubbles: true }));
-      document.querySelector("#studioApplyProps").click();
       return true;
     })()`);
+    await waitForExpression(
+      cdp,
+      '(() => { const apply = document.querySelector("#studioApplyProps"); return document.querySelector("#studioPropsState")?.textContent === "draft" && Boolean(apply) && !apply.disabled; })()',
+      { label: "render-failure props draft readiness" }
+    );
+    await evaluate(cdp, 'document.querySelector("#studioApplyProps").click(); true');
     await waitForExpression(cdp, 'document.querySelector("#studioPropsState")?.textContent === "resolved"', { label: "render-failure props evaluation" });
     await evaluate(cdp, 'document.querySelector("#studioRenderButton").click(); true');
     const failureTerminal = await waitForStudioRenderTerminal(cdp);
