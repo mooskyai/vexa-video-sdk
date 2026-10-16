@@ -999,6 +999,8 @@ V2.16.3 closed on commit `39ead3e6eb2480f141d8d202c7ea93d58a662a36` with all eig
 
 `release:trusted-publish-check` runs in static mode through `release:check`, validating the canonical repository URL, `release.yml`, `id-token: write`, `npm-release` environment, registry URL, and tokenless publish contract. The protected workflow reruns it with `VEXA_TRUSTED_PUBLISH_RUNTIME=1`, which additionally requires the live GitHub OIDC request variables and exact repository/workflow/environment identity. `release:publish` repeats those runtime requirements and refuses non-tag or token-backed publication. `release:ffmpeg-check` requires FFmpeg and ffprobe 6.1+ plus `drawtext`, `libx264`, and AAC; it runs across every release-acceptance OS/browser lane and again before protected publication.
 
+Release dry-run `38913399579` on commit `875dce3442ea4fb0c384915bd3b5c106de1b4d02` passed seven of eight reusable acceptance lanes. The macOS Chrome lane completed its Studio functional assertions and FFmpeg baseline, then failed only while deleting Chrome's temporary profile with `ENOTEMPTY`. The Studio acceptance harness therefore must wait for browser/server child termination and tolerate bounded transient recursive-removal races before V2.16.4 can close; a replacement non-publishing release run must reach and pass the live `npm-release` OIDC preflight.
+
 ### Browser package audit
 
 Inspect every browser package and fail release if runtime dependencies include:

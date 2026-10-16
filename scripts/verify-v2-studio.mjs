@@ -611,12 +611,34 @@ async function run() {
       ...summary
     }, null, 2));
   } finally {
+    await cdp?.send("Browser.close").catch(() => {});
     cdp?.close();
-    browserProcess.kill();
-    playground.kill();
-    await delay(200);
+
+    const waitForExit = (child, timeoutMs) => {
+      if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
+      return Promise.race([
+        new Promise((resolveExit) => child.once("exit", () => resolveExit(true))),
+        delay(timeoutMs).then(() => false)
+      ]);
+    };
+    const stopChild = async (child) => {
+      if (child.exitCode !== null || child.signalCode !== null) return;
+      const gracefulExit = waitForExit(child, 2_000);
+      child.kill();
+      if (await gracefulExit) return;
+      const forcedExit = waitForExit(child, 2_000);
+      child.kill("SIGKILL");
+      await forcedExit;
+    };
+
+    await Promise.all([stopChild(browserProcess), stopChild(playground)]);
     if (execution.link) await unlink(execution.link).catch(() => {});
-    await rm(acceptanceRoot, { recursive: true, force: true });
+    await rm(acceptanceRoot, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 200
+    });
   }
 }
 
