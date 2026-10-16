@@ -876,7 +876,9 @@ The second V2.15 slice adds checked-in fixture baselines on top of the same comp
 
 The third V2.15 slice adds runtime checkpoint parity on top of the same reviewed wipe manifest. The manifest now carries dimensions, fps, and duration in addition to named frames. Node renderer metadata, Player snapshots, Studio snapshots, and browser-renderer frame contexts are normalized into one semantic contract for frame identity, dimensions, fps, duration, microsecond timestamp, and frame duration. `@vexa-video/test` owns only the generic comparison helper; browser-safe packages do not import Node-only test tooling.
 
-Later V2.15 slices should add actual browser-capture pixel parity where a browser surface exists, expand the remaining deterministic fixture classes, and cover audio duration/sync without creating runtime-specific snapshot or timing models.
+The fourth V2.15 slice adds actual browser-capture pixel parity for the reviewed wipe fixture. Browser-safe transition visibility mirrors the existing FFmpeg progress/easing semantics, Studio applies that shared wipe geometry to its DOM inspection surface, and the existing Chromium DevTools acceptance captures the same five 64×36 checkpoints at device scale factor 1. The Node-side PNG comparator evaluates those real browser captures with the fixture's existing tolerance; no browser package imports `@vexa-video/test` and no second browser automation stack is introduced.
+
+Later V2.15 slices should expand the remaining deterministic fixture classes and cover audio duration/sync without creating runtime-specific snapshot or timing models.
 
 Testing requirements are defined in `V2_MILESTONE_TESTING.md`.
 

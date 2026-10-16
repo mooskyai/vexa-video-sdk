@@ -74,7 +74,7 @@ assertRuntimeCheckpointParity(
   {
     width: 64,
     height: 36,
-    fps: 12,
+    fps: 10,
     durationInFrames: 12,
     checkpoints: [
       { name: "start", frame: 0 },
@@ -86,4 +86,6 @@ assertRuntimeCheckpointParity(
 );
 ```
 
-Parity is exact for frame identity, dimensions, fps, duration, `timestampUs`, and `durationUs`. Missing checkpoints, duplicate observations, unknown checkpoint names, and field mismatches fail with typed `VexaRuntimeParityError` diagnostics. Browser-pixel comparison remains a separate capture concern; Node-only tests must not claim pixel parity for a browser surface they did not actually capture.
+Parity is exact for frame identity, dimensions, fps, duration, `timestampUs`, and `durationUs`. Missing checkpoints, duplicate observations, unknown checkpoint names, and field mismatches fail with typed `VexaRuntimeParityError` diagnostics.
+
+Browser-pixel parity is exercised by the repository's real Chromium Studio acceptance rather than simulated inside this Node-only package. `npm run verify:studio` pins the Vexa-owned `visual-wipe` preview to 64×36 at device scale factor 1, captures the five reviewed frames through Chrome/Edge/Chromium DevTools, and compares those PNGs with the same checked-in baselines and tolerance contract.

@@ -44,7 +44,7 @@ Vexa keeps those concerns behind a typed SDK:
 | AI extension | Provider-neutral transcription/captions, FFmpeg scene detection, silence removal, smart reframe, highlight hooks |
 | CLI | Probe, plan, media rendering, hardware inspection, adaptive streaming, deterministic composition discovery/bundling, bundle-backed composition video/still rendering, executable composition inspection, props validation, and machine-readable output/errors |
 | Agent/MCP | Typed composition tools plus an official MCP protocol server and stdio transport for list/inspect/validate and hosted render start/state/cancel, with stable machine-readable failures and no raw shell execution |
-| Visual testing | Node-side selected-frame checkpoints, checked-in deterministic transition baselines, exact Player/Studio/browser-renderer checkpoint timing parity, and tolerance-aware PNG snapshot comparison |
+| Visual testing | Node-side selected-frame checkpoints, checked-in deterministic transition baselines, exact Player/Studio/browser-renderer checkpoint timing parity, real Chromium Studio wipe captures, and tolerance-aware PNG snapshot comparison |
 | Browser editor foundation | Framework-neutral timeline state, snapping, clip edits, viewport state, undo/redo |
 | Hosted rendering | Provider-neutral submit/get/cancel/wait plus typed composition requests, existing job-worker execution, deterministic artifact identity, retry-safe remote publication through the normal Storage upload boundary, and explicit provider publishing for directory artifacts |
 | Programmable authoring | Deterministic composition metadata, JSON-serializable input schemas with defaults/validation, deterministic reusable-template catalogs with validated 16:9/9:16/1:1 variants, reusable scene/storage asset descriptors, and JSON-safe service/agent invocation, frame/time math, scene graphs, serializable shape/effect/transition/typography contracts, reusable logical sound-effect catalogs, visual scene nodes, and React authoring primitives |
@@ -542,7 +542,7 @@ See [docs/visual-playground.md](./docs/visual-playground.md).
 | `@vexa-video/player` | Browser-safe framework-neutral playback controller, responsive DOM host, controls, events, and fullscreen integration |
 | `@vexa-video/bundler` | Node-side TypeScript/TSX composition bundling, deterministic manifests/discovery, CSS/assets, source maps, and environment filtering |
 | `@vexa-video/renderer` | Node-side bundle-backed composition inspection, props resolution/validation, planning, and still/frame/range/video execution with progress, cancellation, timeout, and hardware controls |
-| `@vexa-video/test` | Node-side selected-frame checkpoints, reviewed PNG baselines, deterministic runtime checkpoint parity, and tolerance-aware comparison built above existing runtime contracts |
+| `@vexa-video/test` | Node-side selected-frame checkpoints, reviewed PNG baselines, deterministic runtime checkpoint parity, and tolerance-aware comparison reused by Node renders and real browser-capture acceptance |
 | `@vexa-video/gif` | Optional Node-side GIF surface adapter with logical source IDs, deterministic frame extraction, fit/loop controls, and private temporary-workspace cleanup |
 | `@vexa-video/waveform` | Optional Node-side audio waveform surface adapter with logical source IDs, deterministic FFmpeg rasterization, and private temporary-workspace cleanup |
 | `@vexa-video/sound-effects` | Browser-safe reusable sound-effect catalogs that emit ordinary programmable audio assets and nodes without adding another execution path |

@@ -4,10 +4,15 @@ import { mkdir, readFile, rm, symlink, unlink, writeFile } from "node:fs/promise
 import { createServer } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { comparePngSnapshotFiles } from "@vexa-video/test";
 
 const repositoryRoot = resolve(import.meta.dirname, "..");
 const studioSourceRelative = "examples/visual-playground/compositions/metadata.ts";
 const acceptanceRoot = resolve(repositoryRoot, ".tmp/v2-studio-browser-acceptance");
+const visualBaselineRoot = resolve(
+  repositoryRoot,
+  "packages/test/test/baselines/wipe-transition"
+);
 
 async function freePort() {
   return await new Promise((resolvePort, reject) => {
@@ -197,6 +202,98 @@ async function createPage(debugPort, pageUrl) {
   return page;
 }
 
+async function captureStudioSurfacePng(cdp, output) {
+  const rect = await evaluate(cdp, `(() => {
+    const element = document.querySelector("#studioSceneSurface");
+    if (!element) throw new Error("Studio scene surface was not found.");
+    const bounds = element.getBoundingClientRect();
+    return { x: bounds.left, y: bounds.top, width: bounds.width, height: bounds.height };
+  })()`);
+  if (rect.width !== 64 || rect.height !== 36) {
+    throw new Error(`Visual parity surface must be 64x36, received ${rect.width}x${rect.height}.`);
+  }
+  const screenshot = await cdp.send("Page.captureScreenshot", {
+    format: "png",
+    fromSurface: true,
+    captureBeyondViewport: true,
+    clip: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, scale: 1 }
+  });
+  await writeFile(output, Buffer.from(screenshot.data, "base64"));
+}
+
+async function verifyVisualWipeParity(cdp, manifest, outputDirectory) {
+  await mkdir(outputDirectory, { recursive: true });
+  await evaluate(cdp, `(() => {
+    const button = [...document.querySelectorAll("#studioCompositionList .studio-composition")]
+      .find((item) => item.querySelector("strong")?.textContent === "visual-wipe");
+    if (!button) throw new Error("visual-wipe composition button was not found.");
+    button.click();
+    return true;
+  })()`);
+  await waitForExpression(
+    cdp,
+    'document.querySelector("#studioPreviewTitle")?.textContent === "visual-wipe"',
+    { label: "visual-wipe parity composition" }
+  );
+  const previousStyle = await evaluate(
+    cdp,
+    'document.querySelector("#studioSceneSurface")?.getAttribute("style") ?? null'
+  );
+  try {
+    await evaluate(cdp, `(() => {
+      const element = document.querySelector("#studioSceneSurface");
+      Object.assign(element.style, {
+        position: "fixed", top: "0", left: "0", right: "auto", bottom: "auto",
+        width: "64px", height: "36px", maxWidth: "none", maxHeight: "none",
+        margin: "0", border: "0", borderRadius: "0", boxShadow: "none",
+        transform: "none", zIndex: "2147483647"
+      });
+      return true;
+    })()`);
+    const results = [];
+    for (const checkpoint of manifest.checkpoints) {
+      await evaluate(cdp, `(() => {
+        const seek = document.querySelector("#studioSeek");
+        seek.value = ${JSON.stringify(String(checkpoint.frame))};
+        seek.dispatchEvent(new Event("input", { bubbles: true }));
+        return true;
+      })()`);
+      await waitForExpression(
+        cdp,
+        `document.querySelector("#studioFrameBadge")?.textContent === ${JSON.stringify(`Frame ${checkpoint.frame}`)}`,
+        { label: `visual parity checkpoint ${checkpoint.name}` }
+      );
+      const actual = join(outputDirectory, `${checkpoint.name}.png`);
+      const expected = join(visualBaselineRoot, `${checkpoint.name}.png`);
+      await captureStudioSurfacePng(cdp, actual);
+      const comparison = await comparePngSnapshotFiles(actual, expected, manifest.tolerance);
+      if (!comparison.matches) {
+        throw new Error(
+          `Studio browser checkpoint ${checkpoint.name} does not match the reviewed baseline: ` +
+          `${comparison.differentPixels}/${comparison.totalPixels} pixels differ ` +
+          `(${comparison.differentPixelRatio.toFixed(6)}), max channel delta ${comparison.maxChannelDelta}.`
+        );
+      }
+      results.push({
+        name: checkpoint.name,
+        frame: checkpoint.frame,
+        differentPixels: comparison.differentPixels,
+        differentPixelRatio: comparison.differentPixelRatio,
+        maxChannelDelta: comparison.maxChannelDelta
+      });
+    }
+    return results;
+  } finally {
+    await evaluate(cdp, `(() => {
+      const element = document.querySelector("#studioSceneSurface");
+      const previous = ${JSON.stringify(previousStyle)};
+      if (previous === null) element.removeAttribute("style");
+      else element.setAttribute("style", previous);
+      return true;
+    })()`);
+  }
+}
+
 async function run() {
   const browser = findBrowser();
   const playgroundPort = await freePort();
@@ -205,6 +302,9 @@ async function run() {
   const userDataDir = resolve(acceptanceRoot, "chromium-profile");
   await rm(acceptanceRoot, { recursive: true, force: true });
   await mkdir(userDataDir, { recursive: true });
+  const visualManifest = JSON.parse(
+    await readFile(join(visualBaselineRoot, "manifest.json"), "utf8")
+  );
   const execution = await createExecutionRoot();
   const executionRoot = execution.root;
   const studioSource = resolve(executionRoot, studioSourceRelative);
@@ -249,6 +349,9 @@ async function run() {
     await cdp.send("Page.enable");
     await cdp.send("Page.bringToFront");
     await cdp.send("Emulation.setFocusEmulationEnabled", { enabled: true });
+    await cdp.send("Emulation.setDeviceMetricsOverride", {
+      width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false
+    });
     await cdp.send("Page.navigate", { url: playgroundUrl });
 
     await waitForExpression(cdp, 'document.readyState === "complete"', { label: "Playground page load" });
@@ -260,7 +363,10 @@ async function run() {
     });
 
     const compositionCount = await evaluate(cdp, 'Number(document.querySelector("#studioCompositionCount")?.textContent || 0)');
-    if (compositionCount < 3) throw new Error(`Expected at least 3 Studio compositions, received ${compositionCount}.`);
+    if (compositionCount < 5) throw new Error(`Expected at least 5 Studio compositions, received ${compositionCount}.`);
+    const visualParity = await verifyVisualWipeParity(
+      cdp, visualManifest, join(acceptanceRoot, "visual-parity")
+    );
 
     await evaluate(cdp, `(() => {
       const button = [...document.querySelectorAll("#studioCompositionList .studio-composition")]
@@ -438,6 +544,7 @@ async function run() {
       browser,
       repositoryPathHasSpaces,
       compositionSwitch: true,
+      visualParity: { compositionId: visualManifest.compositionId, checkpoints: visualParity },
       playbackControl: { playPause: true, steppedFrame },
       frameRender: { progress: renderSuccess.progress, outputUrl: renderSuccess.outputUrl },
       renderFailureSurfaced: true,

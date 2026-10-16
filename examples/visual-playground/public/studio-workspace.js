@@ -1,7 +1,8 @@
 import {
   createProgrammableSceneRenderGraph,
   evaluateExecutableComposition,
-  getExecutableCompositionStaticMetadata
+  getExecutableCompositionStaticMetadata,
+  programmableTransitionVisibility
 } from "@vexa-video/core/browser";
 import { createVexaStudioSession } from "@vexa-video/studio";
 
@@ -348,6 +349,34 @@ function positionSceneNode(element, item, scene) {
   element.style.zIndex = String(100 + item.zIndex);
 }
 
+function applyStudioWipeTransitions(element, item, frame) {
+  const transitions = item.node.transitions;
+  if (!transitions) return;
+  const localFrame = frame - item.absoluteStartFrame;
+  const clipDurationInFrames = item.absoluteEndFrame - item.absoluteStartFrame;
+  const inset = { top: 0, right: 0, bottom: 0, left: 0 };
+  let hasWipe = false;
+  for (const edge of ["in", "out"]) {
+    const transition = transitions[edge];
+    if (!transition || transition.kind !== "wipe") continue;
+    const visibility = programmableTransitionVisibility(
+      transition, edge, localFrame, clipDurationInFrames
+    );
+    const hiddenPercent = Math.max(0, Math.min(100, (1 - visibility) * 100));
+    switch (transition.direction ?? "left") {
+      case "left": inset.right = Math.max(inset.right, hiddenPercent); break;
+      case "right": inset.left = Math.max(inset.left, hiddenPercent); break;
+      case "up": inset.bottom = Math.max(inset.bottom, hiddenPercent); break;
+      case "down": inset.top = Math.max(inset.top, hiddenPercent); break;
+    }
+    hasWipe = true;
+  }
+  if (hasWipe) {
+    element.style.clipPath =
+      `inset(${inset.top}% ${inset.right}% ${inset.bottom}% ${inset.left}%)`;
+  }
+}
+
 function renderScene(snapshot) {
   const container = $("studioSceneSurface");
   container.replaceChildren();
@@ -414,6 +443,7 @@ function renderScene(snapshot) {
     }
     element.classList.add("studio-scene-node");
     if (node.kind !== "fill") positionSceneNode(element, item, scene);
+    applyStudioWipeTransitions(element, item, snapshot.frame);
     container.append(element);
   }
 }

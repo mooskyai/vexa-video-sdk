@@ -4,6 +4,7 @@ import {
   InvalidProgrammableTransitionError,
   normalizeProgrammableTransition,
   normalizeProgrammableTransitions,
+  programmableTransitionVisibility,
   serializeProgrammableTransition,
   serializeProgrammableTransitions
 } from "../src/programmable-transitions.js";
@@ -51,6 +52,42 @@ test("transition pairs freeze normalized values and serialize deterministically"
   );
 });
 
+test("transition visibility matches renderer progress and easing semantics", () => {
+  const linearWipe = { kind: "wipe", durationInFrames: 4 } as const;
+  assert.equal(programmableTransitionVisibility(linearWipe, "in", 0, 9), 0);
+  assert.equal(programmableTransitionVisibility(linearWipe, "in", 2, 9), 0.5);
+  assert.equal(programmableTransitionVisibility(linearWipe, "in", 4, 9), 1);
+  assert.equal(programmableTransitionVisibility(linearWipe, "out", 5, 9), 1);
+  assert.equal(programmableTransitionVisibility(linearWipe, "out", 7, 9), 0.5);
+  assert.equal(programmableTransitionVisibility(linearWipe, "out", 9, 9), 0);
+  assert.equal(
+    programmableTransitionVisibility(
+      { kind: "fade", durationInFrames: 4, easing: "ease-in" }, "in", 2, 9
+    ),
+    0.25
+  );
+  assert.equal(
+    programmableTransitionVisibility(
+      { kind: "fade", durationInFrames: 4, easing: "ease-out" }, "in", 2, 9
+    ),
+    0.75
+  );
+  assert.equal(
+    programmableTransitionVisibility(
+      { kind: "fade", durationInFrames: 4, easing: "ease-in-out" }, "in", 2, 9
+    ),
+    0.5
+  );
+  assert.throws(
+    () => programmableTransitionVisibility(linearWipe, "in", -1, 9),
+    InvalidProgrammableTransitionError
+  );
+  assert.throws(
+    () => programmableTransitionVisibility(linearWipe, "in", 0, 0),
+    InvalidProgrammableTransitionError
+  );
+});
+
 test("invalid transition values fail with typed validation errors", () => {
   assert.throws(
     () => normalizeProgrammableTransition({ kind: "fade", durationInFrames: 0 }),
@@ -89,5 +126,11 @@ test("browser entry exposes the same transition normalization contract", async (
       in: { kind: "push", durationInFrames: 11, easing: "linear", direction: "right" },
       out: { kind: "iris", durationInFrames: 6, easing: "ease-out" }
     }
+  );
+  assert.equal(
+    browser.programmableTransitionVisibility(
+      { kind: "wipe", durationInFrames: 4, direction: "left" }, "in", 2, 9
+    ),
+    0.5
   );
 });

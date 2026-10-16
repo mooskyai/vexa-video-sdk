@@ -1,3 +1,10 @@
+import {
+  easeInOutQuad,
+  easeInQuad,
+  easeOutQuad,
+  linearEasing
+} from "./programmable-timing.js";
+
 export type ProgrammableTransitionErrorCode = "INVALID_PROGRAMMABLE_TRANSITION";
 
 export class InvalidProgrammableTransitionError extends Error {
@@ -177,6 +184,51 @@ export function normalizeProgrammableTransitions(
       ? { out: normalizeProgrammableTransition(transitions.out) }
       : {})
   });
+}
+
+export type ProgrammableTransitionEdge = "in" | "out";
+
+function transitionEasingValue(
+  easing: ProgrammableTransitionEasing,
+  progress: number
+): number {
+  switch (easing) {
+    case "ease-in": return easeInQuad(progress);
+    case "ease-out": return easeOutQuad(progress);
+    case "ease-in-out": return easeInOutQuad(progress);
+    case "linear": return linearEasing(progress);
+  }
+  const exhaustive: never = easing;
+  return exhaustive;
+}
+
+export function programmableTransitionVisibility(
+  transition: ProgrammableTransition,
+  edge: ProgrammableTransitionEdge,
+  localFrame: number,
+  clipDurationInFrames: number
+): number {
+  const normalized = normalizeProgrammableTransition(transition);
+  if (edge !== "in" && edge !== "out") {
+    throw new InvalidProgrammableTransitionError("transition edge must be in or out.");
+  }
+  if (!Number.isSafeInteger(localFrame) || localFrame < 0) {
+    throw new InvalidProgrammableTransitionError(
+      "transition localFrame must be a non-negative safe integer."
+    );
+  }
+  if (!Number.isSafeInteger(clipDurationInFrames) || clipDurationInFrames <= 0) {
+    throw new InvalidProgrammableTransitionError(
+      "transition clipDurationInFrames must be a positive safe integer."
+    );
+  }
+  const rawProgress = edge === "in"
+    ? localFrame / normalized.durationInFrames
+    : (localFrame - (clipDurationInFrames - normalized.durationInFrames)) /
+      normalized.durationInFrames;
+  const progress = Math.min(1, Math.max(0, rawProgress));
+  const eased = transitionEasingValue(normalized.easing ?? "linear", progress);
+  return edge === "in" ? eased : 1 - eased;
 }
 
 export function serializeProgrammableTransition(
