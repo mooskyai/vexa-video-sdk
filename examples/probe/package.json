@@ -4,6 +4,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@vexa-video/sdk": "1.0.0"
+    "@vexa-video/sdk": "2.0.0"
   }
 }

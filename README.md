@@ -9,7 +9,7 @@ A typed, modular media-processing SDK for Node.js and TypeScript.
 
 Vexa provides high-level APIs for video editing, timeline composition, audio processing, captions, adaptive streaming, hardware-accelerated encoding, remote media, background jobs, and browser-safe Angular integration while keeping FFmpeg behind a backend-neutral API.
 
-> **Project status:** active development. The eighteen public packages are versioned together at 1.0.0; example workspaces remain private.
+> **Project status:** Version 2 release-ready. The eighteen public packages are versioned together at 2.0.0; example workspaces remain private. Existing applications should review the [Version 2 migration guide](./docs/V2_MIGRATION.md) before upgrading.
 
 ## Why Vexa?
 

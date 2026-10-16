@@ -888,7 +888,7 @@ Testing requirements are defined in `V2_MILESTONE_TESTING.md`.
 
 ## V2.16 — Version 2 release readiness
 
-**Status:** Validation
+**Status:** Complete
 
 ### Goal
 
@@ -917,7 +917,11 @@ The third V2.16 slice hardens the public publishing contract without adding a se
 
 The fourth V2.16 slice makes release-operator assumptions executable. `release:trusted-publish-check` audits the checked-in `release.yml` trust identity in normal CI and, inside the protected workflow, requires GitHub Actions OIDC, the canonical repository/workflow/environment identity, and the absence of `NPM_TOKEN`/`NODE_AUTH_TOKEN`. `release:publish` independently enforces the same tokenless trusted-publishing boundary and additionally requires a tag ref. The release workflow remains GitHub-hosted, uses `id-token: write`, and publishes with npm provenance.
 
-The same slice defines the first-public-release media baseline as FFmpeg/ffprobe 6.1+ with `drawtext`, `libx264`, and AAC available. `release:ffmpeg-check` runs in every repository and browser acceptance lane plus the protected release job, while hardware encoders remain optional and runtime-detected. The supported Windows/Linux/macOS and Chrome/Edge matrix plus trusted-publisher bootstrap procedure are documented in `release-operations.md`. External npm trusted-publisher entries, Version 2 migration/release notes, and the eventual synchronized version cut remain later V2.16 work.
+The same slice defines the first-public-release media baseline as FFmpeg/ffprobe 6.1+ with `drawtext`, `libx264`, and AAC available. `release:ffmpeg-check` runs in every repository and browser acceptance lane plus the protected release job, while hardware encoders remain optional and runtime-detected. The supported Windows/Linux/macOS and Chrome/Edge matrix plus trusted-publisher bootstrap procedure are documented in `release-operations.md`.
+
+V2.16.4 proved the protected tokenless publishing boundary in non-publishing run `38925542900`: all eight reusable acceptance lanes and `verify-and-release` passed, including the live `npm-release` OIDC preflight, while npm publication and GitHub release creation remained skipped. V2.16.5 then upgraded release workflows to `actions/checkout@v7` / `actions/setup-node@v7`, pinned release-critical Linux jobs to Ubuntu 24.04, and closed on commit `579d81e03724f8d61b55936bc7c92bee9ea5c281` with final dry-run `38929706513` green across all eight lanes and the protected release job.
+
+The final release-cut slice synchronizes the root and all eighteen public packages to `2.0.0`, updates exact internal Vexa dependency references and private example dependencies, and adds the Version 2 migration/release notes. Registry trusted-publisher configuration and actual npm publication remain protected operator actions after the release-ready branch is merged and the exact `main` commit is tagged.
 
 ## Recommended implementation order
 

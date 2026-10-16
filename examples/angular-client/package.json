@@ -8,7 +8,7 @@
     "@angular/compiler": "21.2.24",
     "@angular/core": "21.2.24",
     "@angular/platform-browser": "21.2.24",
-    "@vexa-video/angular": "1.0.0",
+    "@vexa-video/angular": "2.0.0",
     "rxjs": ">=7.8 <8"
   }
 }

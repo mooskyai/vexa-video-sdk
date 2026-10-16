@@ -88,16 +88,28 @@ Verify an existing package's configured relationship with:
 npm trust list @vexa-video/core
 ```
 
+## Version cut
+
+Use the checked-in version helper so the root package, all eighteen public packages, and exact internal Vexa dependency references move together:
+
+```bash
+npm run release:version -- 2.0.0
+npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+```
+
+The version helper deliberately does not hand-edit `package-lock.json`; npm must regenerate the workspace lock metadata with the repository-pinned npm version. Private example packages keep their own package version but update their `@vexa-video/*` dependencies to the release version.
+
 ## Final release sequence
 
 Before a Version 2 tag or publication:
 
 1. Confirm every public package exists in npm and has the canonical trusted-publisher relationship.
 2. Confirm the `npm-release` GitHub environment has the intended deployment protection rules.
-3. Run `npm run format:check`, `npm run verify`, `npm run release:check`, `npm run release:ffmpeg-check`, `npm run release:pack`, and `npm run release:install-check`.
-4. Complete migration notes and the release notes file for the exact version tag.
-5. Perform the synchronized version cut across the root and all eighteen public packages.
-6. Push the reviewed version commit and tag.
-7. Confirm the reusable eight-lane release-acceptance workflow is green for the tag.
-8. Dispatch `release.yml` on that tag with `publish=true` only after the protected environment approves the deployment.
-9. Verify npm provenance and installed package versions from a clean consumer after publication.
+3. Complete the migration notes and release notes, run the synchronized version cut, and regenerate `package-lock.json`.
+4. Run `npm run format:check`, `npm run verify`, `npm run release:check`, `npm run release:ffmpeg-check`, `npm run release:pack`, and `npm run release:install-check`.
+5. Push the reviewed release-cut commit on `feature/v2-programmable-video`; require all eight PR acceptance lanes plus a `publish=false` `release.yml` run on that exact commit.
+6. Merge the release-ready PR into `main` and verify the exact merged commit still contains version `2.0.0`.
+7. Create `v2.0.0` from that exact `main` commit; do not tag the feature branch.
+8. Confirm the tag-triggered reusable eight-lane release-acceptance workflow is green.
+9. Dispatch `release.yml` on the `v2.0.0` tag with `publish=true` only after the protected environment approves the deployment.
+10. Verify npm provenance and installed package versions from a clean consumer after publication.

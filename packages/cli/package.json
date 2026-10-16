@@ -1,6 +1,6 @@
 {
   "name": "@vexa-video/cli",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "private": false,
   "bin": {
@@ -18,10 +18,10 @@
     "dist/**/*.map"
   ],
   "dependencies": {
-    "@vexa-video/bundler": "1.0.0",
-    "@vexa-video/core": "1.0.0",
-    "@vexa-video/renderer": "1.0.0",
-    "@vexa-video/sdk": "1.0.0"
+    "@vexa-video/bundler": "2.0.0",
+    "@vexa-video/core": "2.0.0",
+    "@vexa-video/renderer": "2.0.0",
+    "@vexa-video/sdk": "2.0.0"
   },
   "scripts": {
     "build": "tsc -b"

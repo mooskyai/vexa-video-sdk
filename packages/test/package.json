@@ -1,6 +1,6 @@
 {
   "name": "@vexa-video/test",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "private": false,
   "sideEffects": false,
@@ -16,7 +16,7 @@
     "dist/**/*.map"
   ],
   "dependencies": {
-    "@vexa-video/renderer": "1.0.0"
+    "@vexa-video/renderer": "2.0.0"
   },
   "scripts": {
     "build": "tsc -b"

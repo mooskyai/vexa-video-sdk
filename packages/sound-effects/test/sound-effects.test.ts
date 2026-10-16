@@ -121,7 +121,8 @@ test("rejects invalid catalogs, missing effects, and invalid instances", () => {
 
 test("package dependency boundary stays browser-safe", async () => {
   const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")) as {
+    version: string;
     dependencies?: Record<string, string>;
   };
-  assert.deepEqual(manifest.dependencies, { "@vexa-video/core": "1.0.0" });
+  assert.deepEqual(manifest.dependencies, { "@vexa-video/core": manifest.version });
 });

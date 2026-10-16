@@ -61,18 +61,17 @@ The runnable Angular demo remains a separate validation item; AI/provider adapte
 
 ## Ecosystem and distribution
 
-The ecosystem/distribution implementation is in place: CLI and REST surfaces, Docker worker recipe, React/Vue examples, framework-neutral timeline-editor state, hosted-render contracts, synchronized package metadata, and controlled release automation. Public registry publication and cross-platform/browser release acceptance remain operator/release validation items.
+The ecosystem/distribution implementation is in place: CLI and REST surfaces, Docker worker recipe, React/Vue examples, framework-neutral timeline-editor state, hosted-render contracts, synchronized package metadata, and controlled release automation. Cross-platform/browser release acceptance is green; public registry publication remains an operator release action.
 
 ## Package and release readiness
 
-Release preparation now includes public package metadata, explicit exports/files, package READMEs, semantic-versioning policy, dry-run package validation, synchronized package versions, clean installation/import verification from real packed tarballs, Angular compiler consumer acceptance, a green eight-lane release matrix across Windows/Linux/macOS/Chrome/Edge, an executable FFmpeg 6.1+ capability baseline, and tokenless GitHub Actions OIDC publishing preflight. Remaining release validation items are:
+Release preparation now includes public package metadata, explicit exports/files, package READMEs, semantic-versioning policy, dry-run package validation, synchronized `2.0.0` package versions, clean installation/import verification from real packed tarballs, Angular compiler consumer acceptance, a green eight-lane release matrix across Windows/Linux/macOS/Chrome/Edge, an executable FFmpeg 6.1+ capability baseline, final Version 2 migration/release notes, and tokenless GitHub Actions OIDC publishing preflight.
 
-- configure the canonical npm trusted-publisher entry for every public package once that package exists in the registry; the protected `npm-release` environment and live GitHub OIDC workflow identity are verified by non-publishing release run `38925542900`;
-- complete Version 2 migration/release notes and perform the final synchronized version cut.
+The remaining operator release work is to configure the canonical npm trusted-publisher relationship for any public package that is not already configured, then merge the exact release-cut commit to `main`, tag that merged commit, and perform the protected publication. The `npm-release` environment and live GitHub OIDC identity were verified again by non-publishing release run `38929706513`.
 
 ## Version 2 — programmable video creation
 
-Version 2 is the active product direction. It adds a Vexa-native code-defined composition layer built directly on the repository's existing deterministic media, timeline, browser-safety, storage, job, and rendering contracts.
+Version 2 is complete on the release branch. It adds a Vexa-native code-defined composition layer built directly on the repository's existing deterministic media, timeline, browser-safety, storage, job, and rendering contracts.
 
 The planned sequence is:
 
@@ -93,7 +92,7 @@ The planned sequence is:
 | V2.13 | **Complete** | Hosted/serverless composition rendering; typed requests, existing job-worker execution, deterministic retry-safe artifact publication, progress/cancellation, and provider-neutral deployment boundaries all reuse the normal renderer, job, and Storage contracts |
 | V2.14 | **Complete** | Agent/MCP/CLI composition workflows; CLI, typed agent operations, official MCP protocol handling, and stdio transport all reuse the existing bundler, renderer, and hosted-render contracts |
 | V2.15 | **Complete** | Frame-level visual regression with reviewed wipe baselines, exact runtime timing parity, real Chromium Studio pixel parity, deterministic shape/image/video/audio/caption/props fixtures, and frame-derived A/V duration/sync assertions |
-| V2.16 | **Validation** | Version 2 release hardening; packed-tarball clean-install/import acceptance is active before cross-platform/browser release validation |
+| V2.16 | **Complete** | Version 2 release hardening; synchronized packages, packed installs, cross-platform/browser acceptance, FFmpeg baseline, and tokenless OIDC release preflight |
 
 V2.1 through V2.7 are complete on the Version 2 branch. V2.7 bundle-backed execution resolves executable compositions and dynamic metadata, materializes still/single-frame images and bounded frame ranges, encodes exact exclusive-end MP4/WebM ranges, exposes progress/cancellation/timeouts/hardware selection, and resolves storage-backed scene assets through managed workspaces. Windows acceptance verified a 1920x1080 H.264 render at 30fps with exactly 60 frames over 2 seconds.
 
@@ -121,9 +120,9 @@ The fifth slice expands the deterministic acceptance matrix beyond transitions. 
 
 The V2.15 closure audit confirms that every required fixture class is represented and each runtime is tested at the capability it actually owns: Node renderer for reviewed PNG/metadata output; Player and Studio for exact seek/timing state; browser renderer for exact frame/timestamp/duration context; and real Chromium Studio capture for browser pixels. Audio acceptance probes real video/audio streams against the frame-derived duration and bounded A/V skew. `@vexa-video/test` remains Node-only and does not create a browser dependency path. V2.15 is complete; broader browser/codec-specific pixel equivalence remains release-hardening work rather than a parallel snapshot model.
 
-V2.16 has started at the release-artifact boundary. One canonical registry now drives metadata checks, dry-run packing, publication order, and clean-install acceptance for all eighteen public packages. `release:install-check` creates real tarballs, installs them into an isolated consumer project instead of workspace links, verifies shipped export/bin files and synchronized versions, rejects symlinked package roots, and imports every shipped runtime export. The root/package version remains unchanged until the final Version 2 release cut.
+V2.16 is complete. One canonical registry drives metadata checks, dry-run packing, publication order, and clean-install acceptance for all eighteen public packages. `release:install-check` creates real tarballs, installs them into an isolated consumer project instead of workspace links, verifies shipped export/bin files and synchronized versions, rejects symlinked package roots, imports every shipped runtime export, and compiles an isolated Angular consumer.
 
-The second V2.16 slice makes the release matrix executable instead of operator-only. One reusable GitHub Actions workflow now runs Node 24.21 verification plus packed-tarball clean installs on Ubuntu, Windows, and macOS, retains the Node 26 Ubuntu compatibility lane, and runs the existing Studio/CDP acceptance in Chrome on all three operating systems plus Microsoft Edge on Windows. The Studio verifier records and can require the concrete browser family/version, so an Edge release lane cannot silently pass by selecting Chrome. Both normal CI and the protected release workflow call the same matrix before publication.
+The shared release matrix runs Node 24.21 verification plus packed-tarball clean installs on Ubuntu 24.04, Windows, and macOS, retains Node 26 compatibility on Ubuntu 24.04, and runs Studio/CDP acceptance in Chrome on all three operating systems plus Microsoft Edge on Windows. Release dry-run `38929706513` on commit `579d81e03724f8d61b55936bc7c92bee9ea5c281` passed all eight lanes plus the protected live OIDC, FFmpeg, repository, metadata, pack, and clean-install gates with publication disabled. The final release-cut slice synchronizes the root/public packages to `2.0.0`, updates example Vexa dependencies, and ships the migration/release notes; registry publication remains a separate protected operator action after merge and tag.
 
 Detailed scope and acceptance:
 

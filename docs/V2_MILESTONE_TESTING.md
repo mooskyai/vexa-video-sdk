@@ -969,6 +969,8 @@ Pixel-perfect equality is not required across different browser/codec backends, 
 
 ## V2.16 — Release acceptance
 
+**Status:** Complete
+
 Before a 2.0.0 release candidate:
 
 ```bash
@@ -1004,6 +1006,10 @@ Release dry-run `38913399579` on commit `875dce3442ea4fb0c384915bd3b5c106de1b4d0
 V2.16.4 closed on commit `3df98475d01e730fd78fa6daa1bb6f084f652c95`. Release dry-run `38925542900` passed all eight reusable acceptance lanes plus the protected `verify-and-release` job. The live `npm-release` OIDC/trusted-publishing preflight, FFmpeg baseline, repository verification, metadata validation, package dry-run, and clean packed-package install all passed; npm publication and GitHub release creation were correctly skipped with `publish=false`. An earlier live run exposed `setup-node@v4` injecting a placeholder `NODE_AUTH_TOKEN`; the tokenless guard correctly rejected it, and the protected release job moved to `checkout@v7` / `setup-node@v7` rather than weakening the guard.
 
 V2.16.5 hardens CI runtime determinism by moving the reusable repository/browser matrix to `checkout@v7` / `setup-node@v7` and pinning all Linux acceptance plus protected-release jobs to `ubuntu-24.04`. The Node 26 compatibility lane stays on that same OS so a Node compatibility result cannot be conflated with GitHub's `ubuntu-latest` image migration.
+
+V2.16.5 closed on commit `579d81e03724f8d61b55936bc7c92bee9ea5c281`. Final non-publishing release run `38929706513` passed all eight reusable acceptance lanes and `verify-and-release`; the live trusted-publishing/OIDC preflight, FFmpeg baseline, repository verification, metadata validation, package dry-run, and clean packed-package install passed, while npm publication and GitHub release creation were correctly skipped.
+
+The exact `2.0.0` release-cut commit must repeat the local release gates, all eight PR acceptance lanes, and a `publish=false` `release.yml` run before PR #1 may merge. That post-cut validation proves the synchronized manifests and npm-generated lockfile without changing the already-closed V2.16 implementation surface.
 
 ### Browser package audit
 

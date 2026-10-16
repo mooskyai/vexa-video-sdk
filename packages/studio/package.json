@@ -1,6 +1,6 @@
 {
   "name": "@vexa-video/studio",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "private": false,
   "sideEffects": false,
@@ -16,9 +16,9 @@
     "dist/**/*.map"
   ],
   "dependencies": {
-    "@vexa-video/core": "1.0.0",
-    "@vexa-video/editor": "1.0.0",
-    "@vexa-video/player": "1.0.0"
+    "@vexa-video/core": "2.0.0",
+    "@vexa-video/editor": "2.0.0",
+    "@vexa-video/player": "2.0.0"
   },
   "scripts": {
     "build": "tsc -b"

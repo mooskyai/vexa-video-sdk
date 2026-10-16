@@ -1,6 +1,6 @@
 {
   "name": "vexa-video-sdk",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "description": "Production-grade video processing and composition SDK for Node.js and TypeScript.",
   "type": "module",
@@ -27,6 +27,7 @@
     "example:angular-service": "npm run build && node examples/angular-render-service/dist/index.js",
     "cli": "npm run build && node packages/cli/dist/bin.js",
     "example:rest-service": "npm run build && node examples/rest-service/dist/index.js",
+    "release:version": "node scripts/set-release-version.mjs",
     "release:check": "node scripts/check-release.mjs && node scripts/check-trusted-publishing.mjs",
     "release:ffmpeg-check": "node scripts/check-ffmpeg-baseline.mjs",
     "release:pack": "node scripts/release-pack.mjs",

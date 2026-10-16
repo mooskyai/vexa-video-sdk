@@ -61,8 +61,11 @@ test("returns typed codec and container fallback reasons", async () => {
 });
 
 test("package dependency boundary stays browser-safe", async () => {
-  const manifest = JSON.parse(await (await import("node:fs/promises")).readFile(new URL("../package.json", import.meta.url), "utf8"));
-  assert.deepEqual(manifest.dependencies, { "@vexa-video/core": "1.0.0" });
+  const manifest = JSON.parse(await (await import("node:fs/promises")).readFile(new URL("../package.json", import.meta.url), "utf8")) as {
+    version: string;
+    dependencies?: Record<string, string>;
+  };
+  assert.deepEqual(manifest.dependencies, { "@vexa-video/core": manifest.version });
   const source = await (await import("node:fs/promises")).readFile(new URL("../src/index.ts", import.meta.url), "utf8");
   assert.equal(/from ["'](?:node:|@vexa-video\/(?:sdk|ffmpeg|renderer))/.test(source), false);
 });
