@@ -438,15 +438,21 @@ async function run() {
     await delay(250);
     const pausedFrameAfterDelay = await evaluate(cdp, 'document.querySelector("#studioFrameBadge")?.textContent');
     if (pausedFrame !== pausedFrameAfterDelay) throw new Error(`Studio did not remain paused: ${pausedFrame} -> ${pausedFrameAfterDelay}`);
+    const pausedFrameNumber = Number(String(pausedFrame ?? "").replace(/^Frame\s+/u, ""));
+    if (!Number.isInteger(pausedFrameNumber)) {
+      throw new Error(`Studio paused frame could not be parsed: ${JSON.stringify(pausedFrame)}`);
+    }
+    const expectedSteppedFrame = `Frame ${pausedFrameNumber + 1}`;
 
     // Headless Chromium may suspend requestAnimationFrame despite an active Player state.
     // Browser acceptance therefore verifies the play/pause contract here, while the
     // Studio unit suite deterministically covers play + advanceByMilliseconds timing.
     await evaluate(cdp, 'document.querySelector("#studioStepForward").click(); true');
-    const steppedFrame = await waitForExpression(cdp, 'document.querySelector("#studioFrameBadge")?.textContent === "Frame 1" && document.querySelector("#studioFrameBadge")?.textContent', {
-      timeoutMs: 2_000,
-      label: "Studio frame-step control"
-    });
+    const steppedFrame = await waitForExpression(
+      cdp,
+      `document.querySelector("#studioFrameBadge")?.textContent === ${JSON.stringify(expectedSteppedFrame)} && document.querySelector("#studioFrameBadge")?.textContent`,
+      { timeoutMs: 2_000, label: "Studio frame-step control" }
+    );
 
     await evaluate(cdp, `(() => {
       const seek = document.querySelector("#studioSeek");

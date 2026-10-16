@@ -80,6 +80,10 @@ test("Studio development host exposes SSE hot reload without moving Node work in
   assert.match(client, /studioErrorOverlay/u);
   assert.doesNotMatch(client, /from\s+["']node:/u);
   assert.doesNotMatch(client, /@vexa-video\/(?:sdk|renderer|ffmpeg)/u);
+  assert.match(
+    client,
+    /state\.scene = evaluated\.scene;\s+state\.draftDirty = false;\s+state\.session\.applyResolvedComposition\(evaluated\.resolved\);/u
+  );
 });
 
 test("Studio browser acceptance harness is syntactically valid and supports browser-family pinning", async () => {
@@ -93,4 +97,5 @@ test("Studio browser acceptance harness is syntactically valid and supports brow
   assert.match(acceptance, /browserFamily/u);
   assert.match(acceptance, /browserVersion/u);
   assert.match(acceptance, /render-failure props draft readiness/u);
+  assert.match(acceptance, /expectedSteppedFrame/u);
 });

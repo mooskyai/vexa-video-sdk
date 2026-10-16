@@ -544,8 +544,8 @@ async function evaluateSelected({ useDraft = false } = {}) {
   try {
     const evaluated = await evaluateExecutableComposition(executable, props);
     state.scene = evaluated.scene;
-    state.session.applyResolvedComposition(evaluated.resolved);
     state.draftDirty = false;
+    state.session.applyResolvedComposition(evaluated.resolved);
     state.draftText = JSON.stringify(evaluated.resolved.props, null, 2);
     $("studioProps").value = state.draftText;
     clearStudioError();
