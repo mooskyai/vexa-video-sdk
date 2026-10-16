@@ -31,3 +31,34 @@ assertPngSnapshot(actual, expected, {
 PNG comparison normalizes supported grayscale, RGB, grayscale-alpha, and RGBA inputs to RGBA before comparing pixels. Unsupported bit depths, interlacing, malformed PNG data, unsafe checkpoint names, duplicate checkpoint names, and invalid tolerance values fail with typed `VexaVisualTestError` errors.
 
 This package is the V2.15 frame-level testing foundation. Cross-runtime Player/Studio/browser-renderer parity fixtures and checked-in regression baselines build on this surface rather than defining separate comparison semantics.
+
+## Checked-in baselines
+
+For durable regression coverage, render named checkpoints and compare them with reviewed PNGs committed beside the fixture:
+
+```ts
+import {
+  assertVisualCheckpointBaselines,
+  renderVisualCheckpoints
+} from "@vexa-video/test";
+
+const checkpoints = await renderVisualCheckpoints(renderer, {
+  compositionId: "visual-wipe",
+  outputDirectory: ".tmp/visual-wipe",
+  checkpoints: [
+    { name: "start", frame: 0 },
+    { name: "pre-transition", frame: 1 },
+    { name: "transition-midpoint", frame: 4 },
+    { name: "post-transition", frame: 6 },
+    { name: "final-visible", frame: 10 }
+  ]
+});
+
+await assertVisualCheckpointBaselines(checkpoints, {
+  baselineDirectory: "test/baselines/wipe-transition",
+  channelTolerance: 6,
+  maxDifferentPixelRatio: 0.02
+});
+```
+
+Keep baseline fixtures small, deterministic, and free of platform-dependent fonts when testing geometry/timing. Tolerances should cover known codec/raster rounding only; they must not be widened enough to hide incorrect transition boundaries, colors, or content.

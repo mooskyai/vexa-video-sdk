@@ -872,7 +872,9 @@ Package:
 - deterministic test assets;
 - audio duration/sync assertions.
 
-Later V2.15 slices should add checked-in fixture baselines plus Player/Studio/browser-renderer parity on top of this one comparison contract rather than creating runtime-specific snapshot semantics.
+The second V2.15 slice adds checked-in fixture baselines on top of the same comparison contract. A font-free 64×36 wipe composition records start, pre-transition, transition-midpoint, post-transition, and final-visible PNGs; `assertVisualCheckpointBaselines()` pairs named renderer outputs with those reviewed files and applies explicit tolerance from the fixture manifest. The fixture deliberately avoids fonts, external media, and browser-only execution so transition timing/geometry can be tested with narrow cross-platform tolerances.
+
+Later V2.15 slices should add Player/Studio/browser-renderer parity on top of these same checkpoint and comparison semantics rather than creating runtime-specific snapshot models.
 
 Testing requirements are defined in `V2_MILESTONE_TESTING.md`.
 

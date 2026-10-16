@@ -889,6 +889,8 @@ node --import tsx --test "packages/test/**/*.test.ts"
 
 The PNG comparator intentionally supports the ordinary 8-bit, non-interlaced grayscale/RGB/grayscale-alpha/RGBA output classes used by Vexa's renderer acceptance. Unsupported bit depths, palette/interlaced images, malformed compressed data, and dimension mismatches must fail closed rather than being silently converted with platform-specific image libraries.
 
+The second slice must add reviewed checked-in baselines rather than only repeat-render comparisons. Acceptance uses a Vexa-owned, font-free 64×36 wipe composition with one transition-bearing fill and exactly these checkpoints: `start` frame 0, `pre-transition` frame 1, `transition-midpoint` frame 4, `post-transition` frame 6, and `final-visible` frame 10. Baselines must prove the pre-transition image matches start, midpoint differs from both endpoints, and post-transition matches the final visible frame. The real renderer must match all five through `assertVisualCheckpointBaselines()`. Keep `channelTolerance` narrow and permit at most one transition-boundary column of changed pixels; do not widen tolerance to hide incorrect timing, geometry, or colors.
+
 ### Required fixture classes
 
 Maintain small deterministic fixtures for:

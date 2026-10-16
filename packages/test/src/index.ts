@@ -482,3 +482,101 @@ export async function renderVisualCheckpoints(
 
   return Object.freeze(results);
 }
+
+export interface VexaVisualBaselineOptions extends VexaPngSnapshotTolerance {
+  readonly baselineDirectory: string;
+}
+
+export interface VexaVisualCheckpointBaselineComparison {
+  readonly name: string;
+  readonly frame: number;
+  readonly actualPath: string;
+  readonly expectedPath: string;
+  readonly comparison: VexaPngSnapshotComparison;
+}
+
+export type VexaVisualCheckpointOutput = Pick<
+  VexaRenderedVisualCheckpoint,
+  "name" | "frame" | "output"
+>;
+
+function normalizeVisualCheckpointOutput(
+  checkpoint: VexaVisualCheckpointOutput,
+  index: number
+): VexaVisualCheckpointOutput {
+  if (!checkpoint || typeof checkpoint !== "object") {
+    throw invalidOptions(`checkpoints[${index}] must be an object.`);
+  }
+  const normalized = normalizeCheckpoint(checkpoint, index);
+  if (typeof checkpoint.output !== "string" || checkpoint.output.trim() === "") {
+    throw invalidOptions(`checkpoints[${index}].output must be a non-empty string.`);
+  }
+  return Object.freeze({
+    name: normalized.name,
+    frame: normalized.frame,
+    output: checkpoint.output
+  });
+}
+
+export async function compareVisualCheckpointBaselines(
+  checkpoints: readonly VexaVisualCheckpointOutput[],
+  options: VexaVisualBaselineOptions
+): Promise<readonly VexaVisualCheckpointBaselineComparison[]> {
+  if (!Array.isArray(checkpoints) || checkpoints.length === 0) {
+    throw invalidOptions("checkpoints must contain at least one rendered visual checkpoint.");
+  }
+  if (!options || typeof options !== "object") {
+    throw invalidOptions("visual baseline options are required.");
+  }
+  if (
+    typeof options.baselineDirectory !== "string" ||
+    options.baselineDirectory.trim() === ""
+  ) {
+    throw invalidOptions("baselineDirectory must be a non-empty string.");
+  }
+
+  const normalized = checkpoints.map(normalizeVisualCheckpointOutput);
+  const names = new Set<string>();
+  for (const checkpoint of normalized) {
+    if (names.has(checkpoint.name)) {
+      throw invalidOptions(`checkpoint name "${checkpoint.name}" is duplicated.`);
+    }
+    names.add(checkpoint.name);
+  }
+
+  const { baselineDirectory, ...tolerance } = options;
+  const results: VexaVisualCheckpointBaselineComparison[] = [];
+  for (const checkpoint of normalized) {
+    const expectedPath = join(baselineDirectory, `${checkpoint.name}.png`);
+    const comparison = await comparePngSnapshotFiles(
+      checkpoint.output,
+      expectedPath,
+      tolerance
+    );
+    results.push(Object.freeze({
+      name: checkpoint.name,
+      frame: checkpoint.frame,
+      actualPath: checkpoint.output,
+      expectedPath,
+      comparison
+    }));
+  }
+  return Object.freeze(results);
+}
+
+export async function assertVisualCheckpointBaselines(
+  checkpoints: readonly VexaVisualCheckpointOutput[],
+  options: VexaVisualBaselineOptions
+): Promise<readonly VexaVisualCheckpointBaselineComparison[]> {
+  const comparisons = await compareVisualCheckpointBaselines(checkpoints, options);
+  const mismatch = comparisons.find((entry) => !entry.comparison.matches);
+  if (mismatch) {
+    const comparison = mismatch.comparison;
+    throw new VexaVisualTestError(
+      `Visual checkpoint "${mismatch.name}" at frame ${mismatch.frame} does not match its baseline: ${comparison.differentPixels}/${comparison.totalPixels} pixels differ (${comparison.differentPixelRatio.toFixed(6)}), max channel delta ${comparison.maxChannelDelta}.`,
+      "VISUAL_SNAPSHOT_MISMATCH",
+      { comparison }
+    );
+  }
+  return comparisons;
+}
