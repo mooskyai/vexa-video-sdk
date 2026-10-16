@@ -26,7 +26,7 @@ jobs:
 
   verify-and-release:
     needs: release-acceptance
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: npm-release
     env:
       VEXA_RELEASE_ENVIRONMENT: npm-release

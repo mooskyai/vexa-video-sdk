@@ -11,9 +11,11 @@ This document defines the operator contract for the first public Vexa Video SDK 
 | FFmpeg | 6.1 or newer with `drawtext`, `libx264`, and AAC encoding available |
 | ffprobe | 6.1 or newer, preferably shipped with the same FFmpeg distribution/build |
 | Windows | Windows 11 local acceptance plus GitHub `windows-latest` release verification |
-| Linux | GitHub `ubuntu-latest`; the release baseline remains compatible with Ubuntu 24.04's FFmpeg 6.1 series |
+| Linux | GitHub `ubuntu-24.04`; the release baseline is pinned to Ubuntu 24.04 and its FFmpeg 6.1 series |
 | macOS | GitHub `macos-latest` with Homebrew `ffmpeg-full` so text/caption rendering has `drawtext` |
 | Browsers | Chrome on Ubuntu/Windows/macOS and Microsoft Edge on Windows through the existing Studio/CDP acceptance harness |
+
+Release-critical Linux jobs intentionally use `ubuntu-24.04` rather than `ubuntu-latest`, so a GitHub runner-label migration cannot silently change the OS or packaged FFmpeg baseline. The Node 26 compatibility lane runs on the same Ubuntu 24.04 image to isolate Node compatibility from operating-system changes. Release workflows use `actions/checkout@v7` and `actions/setup-node@v7`, keeping the action runtime on supported Node 24 while preserving tokenless npm OIDC publication.
 
 `npm run release:ffmpeg-check` is the executable media baseline. It validates FFmpeg/ffprobe versions and the required software-rendering capabilities. Hardware encoders such as NVENC, Quick Sync, AMF, and VideoToolbox are optional and remain runtime-detected with CPU fallback.
 

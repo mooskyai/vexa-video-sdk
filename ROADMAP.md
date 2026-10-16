@@ -67,7 +67,7 @@ The ecosystem/distribution implementation is in place: CLI and REST surfaces, Do
 
 Release preparation now includes public package metadata, explicit exports/files, package READMEs, semantic-versioning policy, dry-run package validation, synchronized package versions, clean installation/import verification from real packed tarballs, Angular compiler consumer acceptance, a green eight-lane release matrix across Windows/Linux/macOS/Chrome/Edge, an executable FFmpeg 6.1+ capability baseline, and tokenless GitHub Actions OIDC publishing preflight. Remaining release validation items are:
 
-- configure and verify the protected `npm-release` environment plus trusted-publisher entry for every public npm package once that package exists in the registry;
+- configure the canonical npm trusted-publisher entry for every public package once that package exists in the registry; the protected `npm-release` environment and live GitHub OIDC workflow identity are verified by non-publishing release run `38925542900`;
 - complete Version 2 migration/release notes and perform the final synchronized version cut.
 
 ## Version 2 — programmable video creation

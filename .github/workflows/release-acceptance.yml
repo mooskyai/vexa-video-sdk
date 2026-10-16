@@ -15,7 +15,7 @@ jobs:
       matrix:
         include:
           - label: ubuntu-node-24
-            os: ubuntu-latest
+            os: ubuntu-24.04
             node_version: 24.21.0
             packed_install: true
           - label: windows-node-24
@@ -27,17 +27,17 @@ jobs:
             node_version: 24.21.0
             packed_install: true
           - label: ubuntu-node-26
-            os: ubuntu-latest
+            os: ubuntu-24.04
             node_version: 26.x
             packed_install: false
     runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node_version }}
           cache: npm
@@ -96,7 +96,7 @@ jobs:
       matrix:
         include:
           - label: ubuntu-chrome
-            os: ubuntu-latest
+            os: ubuntu-24.04
             browser_family: chrome
           - label: windows-chrome
             os: windows-latest
@@ -111,10 +111,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
           cache: npm

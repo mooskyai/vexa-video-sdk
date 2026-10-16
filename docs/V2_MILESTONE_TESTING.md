@@ -1001,6 +1001,10 @@ V2.16.3 closed on commit `39ead3e6eb2480f141d8d202c7ea93d58a662a36` with all eig
 
 Release dry-run `38913399579` on commit `875dce3442ea4fb0c384915bd3b5c106de1b4d02` passed seven of eight reusable acceptance lanes. The macOS Chrome lane completed its Studio functional assertions and FFmpeg baseline, then failed only while deleting Chrome's temporary profile with `ENOTEMPTY`. The Studio acceptance harness therefore must wait for browser/server child termination and tolerate bounded transient recursive-removal races before V2.16.4 can close; a replacement non-publishing release run must reach and pass the live `npm-release` OIDC preflight.
 
+V2.16.4 closed on commit `3df98475d01e730fd78fa6daa1bb6f084f652c95`. Release dry-run `38925542900` passed all eight reusable acceptance lanes plus the protected `verify-and-release` job. The live `npm-release` OIDC/trusted-publishing preflight, FFmpeg baseline, repository verification, metadata validation, package dry-run, and clean packed-package install all passed; npm publication and GitHub release creation were correctly skipped with `publish=false`. An earlier live run exposed `setup-node@v4` injecting a placeholder `NODE_AUTH_TOKEN`; the tokenless guard correctly rejected it, and the protected release job moved to `checkout@v7` / `setup-node@v7` rather than weakening the guard.
+
+V2.16.5 hardens CI runtime determinism by moving the reusable repository/browser matrix to `checkout@v7` / `setup-node@v7` and pinning all Linux acceptance plus protected-release jobs to `ubuntu-24.04`. The Node 26 compatibility lane stays on that same OS so a Node compatibility result cannot be conflated with GitHub's `ubuntu-latest` image migration.
+
 ### Browser package audit
 
 Inspect every browser package and fail release if runtime dependencies include:
