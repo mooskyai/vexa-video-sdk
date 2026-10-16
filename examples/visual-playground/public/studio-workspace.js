@@ -303,7 +303,8 @@ function syncRenderTargets(snapshot) {
     return option;
   }));
   if (options.some(([value]) => value === previous)) select.value = previous;
-  $("studioHardware").disabled = select.value !== "video" || state.renderController !== null;
+  $("studioRenderButton").disabled = state.busy || state.renderController !== null;
+  $("studioHardware").disabled = select.value !== "video" || state.busy || state.renderController !== null;
 }
 
 function renderCompositions(snapshot) {
@@ -574,12 +575,13 @@ async function selectComposition(id) {
 }
 
 async function loadBundle({ preserve = true, reason = "manual" } = {}) {
-  if (state.busy || (reason === "hot-reload" && state.renderController)) {
+  if (state.busy || state.renderController) {
     if (reason === "hot-reload") state.pendingHotReload = { revision: state.lastHotReloadRevision };
     return false;
   }
   state.busy = true;
   $("studioReloadButton").disabled = true;
+  $("studioRenderButton").disabled = true;
   setStatus(reason === "hot-reload" ? "Refreshing…" : "Building…");
   if (reason === "hot-reload") setWatchState("Reloading", "busy");
   try {
@@ -773,7 +775,7 @@ function setRenderProgress(progress, text) {
 }
 
 async function renderComposition() {
-  if (!state.session || state.renderController) return;
+  if (!state.session || state.renderController || state.busy) return;
   const snapshot = state.session.getSnapshot();
   const target = $("studioRenderTarget").value;
   const controller = new AbortController();

@@ -470,15 +470,24 @@ async function run() {
       return props.value;
     })()`);
 
+    const previousHotReloadRevision = await evaluate(
+      cdp,
+      'Number(document.querySelector("#studioWatchState")?.dataset.revision || 0)'
+    );
     const sourceText = await readFile(studioSource, "utf8");
     await writeFile(studioSource, sourceText, "utf8");
-    await waitForExpression(cdp, 'Number(document.querySelector("#studioWatchState")?.dataset.revision || 0) > 0', {
+    await waitForExpression(cdp, `Number(document.querySelector("#studioWatchState")?.dataset.revision || 0) > ${previousHotReloadRevision}`, {
       timeoutMs: 20_000,
       label: "source watch event"
     });
-    await waitForExpression(cdp, 'document.querySelector("#studioStatus")?.textContent === "Bundle ready"', {
+    await waitForExpression(cdp, `(() => {
+      const watch = document.querySelector("#studioWatchState");
+      return Number(watch?.dataset.revision || 0) > ${previousHotReloadRevision} &&
+        watch?.textContent.trim() === "Watching" &&
+        document.querySelector("#studioStatus")?.textContent === "Bundle ready";
+    })()`, {
       timeoutMs: 30_000,
-      label: "automatic hot reload"
+      label: "automatic hot reload completion"
     });
 
     const preserved = await evaluate(cdp, `(() => ({

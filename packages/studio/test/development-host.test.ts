@@ -78,6 +78,8 @@ test("Studio development host exposes SSE hot reload without moving Node work in
   assert.match(client, /source-change/u);
   assert.match(client, /pendingHotReload/u);
   assert.match(client, /studioErrorOverlay/u);
+  assert.match(client, /if \(state\.busy \|\| state\.renderController\) \{/u);
+  assert.match(client, /if \(!state\.session \|\| state\.renderController \|\| state\.busy\) return;/u);
   assert.doesNotMatch(client, /from\s+["']node:/u);
   assert.doesNotMatch(client, /@vexa-video\/(?:sdk|renderer|ffmpeg)/u);
   assert.match(
@@ -98,4 +100,6 @@ test("Studio browser acceptance harness is syntactically valid and supports brow
   assert.match(acceptance, /browserVersion/u);
   assert.match(acceptance, /render-failure props draft readiness/u);
   assert.match(acceptance, /expectedSteppedFrame/u);
+  assert.match(acceptance, /previousHotReloadRevision/u);
+  assert.match(acceptance, /automatic hot reload completion/u);
 });
