@@ -582,3 +582,4 @@ export async function assertVisualCheckpointBaselines(
 }
 
 export * from "./runtime-parity.js";
+export * from "./media-sync.js";

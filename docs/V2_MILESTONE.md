@@ -878,7 +878,9 @@ The third V2.15 slice adds runtime checkpoint parity on top of the same reviewed
 
 The fourth V2.15 slice adds actual browser-capture pixel parity for the reviewed wipe fixture. Browser-safe transition visibility mirrors the existing FFmpeg progress/easing semantics, Studio applies that shared wipe geometry to its DOM inspection surface, and the existing Chromium DevTools acceptance captures the same five 64×36 checkpoints at device scale factor 1. The Node-side PNG comparator evaluates those real browser captures with the fixture's existing tolerance; no browser package imports `@vexa-video/test` and no second browser automation stack is introduced.
 
-Later V2.15 slices should expand the remaining deterministic fixture classes and cover audio duration/sync without creating runtime-specific snapshot or timing models.
+The fifth V2.15 slice expands the deterministic fixture matrix without adding another renderer or asset model. A Vexa-owned 64×36/10fps fixture bundle covers shape/text timing, generated image and video media, an audio-bearing composition, captions, and parameterized props. Test media is generated through the existing FFmpeg boundary and injected through `resolvedAssets`; visual assertions continue to use the PNG comparator while `compareMediaDurationSync()` / `assertMediaDurationSync()` derive expected duration from fps/frame count and report typed duration or A/V-skew failures.
+
+Remaining V2.15 work is a closure audit of fixture/runtime applicability and final acceptance evidence rather than another rendering path.
 
 Testing requirements are defined in `V2_MILESTONE_TESTING.md`.
 
