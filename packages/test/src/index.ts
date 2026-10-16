@@ -580,3 +580,5 @@ export async function assertVisualCheckpointBaselines(
   }
   return comparisons;
 }
+
+export * from "./runtime-parity.js";

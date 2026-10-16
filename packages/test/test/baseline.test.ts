@@ -19,6 +19,8 @@ interface BaselineManifest {
   readonly compositionId: string;
   readonly width: number;
   readonly height: number;
+  readonly fps: number;
+  readonly durationInFrames: number;
   readonly tolerance: {
     readonly channelTolerance: number;
     readonly maxDifferentPixelRatio: number;
@@ -40,6 +42,10 @@ test("checked-in wipe baselines encode meaningful transition checkpoints", async
   const manifest = await readBaselineManifest();
   assert.equal(manifest.schemaVersion, 1);
   assert.equal(manifest.compositionId, "visual-wipe");
+  assert.equal(manifest.width, 64);
+  assert.equal(manifest.height, 36);
+  assert.equal(manifest.fps, 10);
+  assert.equal(manifest.durationInFrames, 12);
   assert.deepEqual(manifest.checkpoints, [
     { name: "start", frame: 0 },
     { name: "pre-transition", frame: 1 },
@@ -129,6 +135,16 @@ test("real renderer frames match the checked-in wipe transition baselines", asyn
       outputDirectory: join(root, "actual"),
       checkpoints: manifest.checkpoints
     });
+
+    for (const checkpoint of rendered) {
+      assert.equal(checkpoint.render.metadata.width, manifest.width);
+      assert.equal(checkpoint.render.metadata.height, manifest.height);
+      assert.equal(checkpoint.render.metadata.kind, "video");
+      if (checkpoint.render.metadata.kind === "video") {
+        assert.equal(checkpoint.render.metadata.fps, manifest.fps);
+        assert.equal(checkpoint.render.metadata.durationInFrames, manifest.durationInFrames);
+      }
+    }
 
     const comparisons = await assertVisualCheckpointBaselines(rendered, {
       baselineDirectory,

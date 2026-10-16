@@ -3,6 +3,8 @@
   "compositionId": "visual-wipe",
   "width": 64,
   "height": 36,
+  "fps": 10,
+  "durationInFrames": 12,
   "tolerance": {
     "channelTolerance": 6,
     "maxDifferentPixelRatio": 0.02

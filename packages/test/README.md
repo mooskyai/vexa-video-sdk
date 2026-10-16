@@ -30,7 +30,7 @@ assertPngSnapshot(actual, expected, {
 
 PNG comparison normalizes supported grayscale, RGB, grayscale-alpha, and RGBA inputs to RGBA before comparing pixels. Unsupported bit depths, interlacing, malformed PNG data, unsafe checkpoint names, duplicate checkpoint names, and invalid tolerance values fail with typed `VexaVisualTestError` errors.
 
-This package is the V2.15 frame-level testing foundation. Cross-runtime Player/Studio/browser-renderer parity fixtures and checked-in regression baselines build on this surface rather than defining separate comparison semantics.
+This package is the V2.15 frame-level testing foundation. Checked-in regression baselines and runtime checkpoint parity build on this surface rather than defining separate comparison semantics.
 
 ## Checked-in baselines
 
@@ -62,3 +62,28 @@ await assertVisualCheckpointBaselines(checkpoints, {
 ```
 
 Keep baseline fixtures small, deterministic, and free of platform-dependent fonts when testing geometry/timing. Tolerances should cover known codec/raster rounding only; they must not be widened enough to hide incorrect transition boundaries, colors, or content.
+
+## Runtime checkpoint parity
+
+`assertRuntimeCheckpointParity()` compares semantic frame observations from existing runtimes against one reviewed checkpoint contract. The contract owns composition dimensions, fps, duration, named frames, canonical microsecond timestamps, and per-frame duration. Runtime integrations remain outside this package; tests translate the existing Player snapshot, Studio snapshot, and browser-renderer `VexaWebVideoFrameContext` into generic observations.
+
+```ts
+import { assertRuntimeCheckpointParity } from "@vexa-video/test";
+
+assertRuntimeCheckpointParity(
+  {
+    width: 64,
+    height: 36,
+    fps: 12,
+    durationInFrames: 12,
+    checkpoints: [
+      { name: "start", frame: 0 },
+      { name: "transition-midpoint", frame: 4 }
+    ]
+  },
+  observations,
+  { requiredRuntimes: ["player", "studio", "browser-renderer"] }
+);
+```
+
+Parity is exact for frame identity, dimensions, fps, duration, `timestampUs`, and `durationUs`. Missing checkpoints, duplicate observations, unknown checkpoint names, and field mismatches fail with typed `VexaRuntimeParityError` diagnostics. Browser-pixel comparison remains a separate capture concern; Node-only tests must not claim pixel parity for a browser surface they did not actually capture.

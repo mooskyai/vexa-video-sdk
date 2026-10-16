@@ -874,7 +874,9 @@ Package:
 
 The second V2.15 slice adds checked-in fixture baselines on top of the same comparison contract. A font-free 64×36 wipe composition records start, pre-transition, transition-midpoint, post-transition, and final-visible PNGs; `assertVisualCheckpointBaselines()` pairs named renderer outputs with those reviewed files and applies explicit tolerance from the fixture manifest. The fixture deliberately avoids fonts, external media, and browser-only execution so transition timing/geometry can be tested with narrow cross-platform tolerances.
 
-Later V2.15 slices should add Player/Studio/browser-renderer parity on top of these same checkpoint and comparison semantics rather than creating runtime-specific snapshot models.
+The third V2.15 slice adds runtime checkpoint parity on top of the same reviewed wipe manifest. The manifest now carries dimensions, fps, and duration in addition to named frames. Node renderer metadata, Player snapshots, Studio snapshots, and browser-renderer frame contexts are normalized into one semantic contract for frame identity, dimensions, fps, duration, microsecond timestamp, and frame duration. `@vexa-video/test` owns only the generic comparison helper; browser-safe packages do not import Node-only test tooling.
+
+Later V2.15 slices should add actual browser-capture pixel parity where a browser surface exists, expand the remaining deterministic fixture classes, and cover audio duration/sync without creating runtime-specific snapshot or timing models.
 
 Testing requirements are defined in `V2_MILESTONE_TESTING.md`.
 
