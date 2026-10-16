@@ -8,6 +8,7 @@ export function normalizeStudioChangePath(filename) {
   if (!normalized || normalized.includes("\0")) return null;
   const parts = normalized.split("/");
   if (parts.some((part) => !part || part === "." || part === "..")) return null;
+  if (parts.some((part) => part.startsWith(".vexa-discovery-"))) return null;
   if (!supportedSourceExtension.test(normalized)) return null;
   return normalized;
 }

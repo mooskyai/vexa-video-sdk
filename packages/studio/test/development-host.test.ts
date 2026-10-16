@@ -21,6 +21,7 @@ test("Studio development host normalizes Windows paths and debounces source chan
     assert.equal(host.normalizeStudioChangePath("public/image.png"), "public/image.png");
     assert.equal(host.normalizeStudioChangePath("README.md"), null);
     assert.equal(host.normalizeStudioChangePath("../entry.tsx"), null);
+    assert.equal(host.normalizeStudioChangePath(".vexa-discovery-probe/entry.mjs"), null);
     let callback = null;
     let errorHandler = null;
     let closed = false;
@@ -46,6 +47,7 @@ test("Studio development host normalizes Windows paths and debounces source chan
     assert.equal(typeof errorHandler, "function");
     callback("change", "entry.tsx");
     callback("rename", ${windowsScene});
+    callback("change", ".vexa-discovery-probe/entry.mjs");
     callback("change", "notes.md");
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 25));
     assert.equal(changes.length, 1);

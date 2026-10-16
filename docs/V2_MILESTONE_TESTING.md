@@ -897,6 +897,39 @@ The fourth slice must capture actual Studio pixels for that same wipe fixture. `
 
 The fifth slice must cover every remaining deterministic fixture class through one Vexa-owned matrix: shape/text timing, image, video, audio, captions, and parameterized props. Generate tiny media inputs through the repository's configured FFmpeg/ffprobe boundary, inject them through `resolvedAssets`, and keep the fixture at 64×36, 10fps, 12 frames (1.2s). Image/video assertions must compare meaningful source/render checkpoints, caption and prop checkpoints must visibly differ when their authored state changes, and the audio composition must render a real MP4 containing both video and audio streams. `assertMediaDurationSync()` must compare each stream with the frame-derived 1.2s duration and enforce no more than 50ms duration drift or A/V skew.
 
+### V2.15 closure acceptance
+
+The closure audit maps each requirement to an existing acceptance surface rather than adding another runtime:
+
+- `@vexa-video/test` owns PNG decoding/comparison, selected-frame rendering, reviewed-baseline assertions, runtime timing comparison, and media duration/A/V-sync comparison;
+- the reviewed wipe fixture covers transition geometry/timing through Node-rendered PNG baselines;
+- Node renderer metadata is checked against the reviewed manifest for every wipe checkpoint;
+- Player, Studio, and browser renderer share exact frame, dimensions, fps, duration, `timestampUs`, and `durationUs` observations;
+- `npm run verify:studio` supplies the real Chromium/Edge Studio pixel path against the same reviewed Node baselines;
+- the deterministic fixture matrix covers shape/text, image, video, audio, captions, and parameterized props through the existing renderer plus `resolvedAssets`;
+- the audio-bearing fixture probes both video and audio stream durations against the frame-derived 1.2s timeline with a 50ms duration/skew budget;
+- `@vexa-video/test` remains Node-only, so browser packages do not acquire Node/FFmpeg test dependencies.
+
+Before committing V2.15 closure, run:
+
+```powershell
+node --import tsx --test "packages/test/**/*.test.ts"
+npm run verify:studio
+npm run format:check
+npm run typecheck
+npm test
+npm run build
+npm run verify
+npm run release:check
+npm run release:pack
+rg -n "Milestone" README.md
+$prohibitedRuntime = "remo" + "tion"
+rg -n -i $prohibitedRuntime . -g "!node_modules/**" -g "!dist/**"
+git diff --check
+```
+
+The focused `@vexa-video/test` closure suite contains 16 tests. V2.15 may be marked complete only when that focused suite and the repository-wide gates above are green together.
+
 ### Required fixture classes
 
 Maintain small deterministic fixtures for:

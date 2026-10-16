@@ -849,6 +849,8 @@ The `@vexa-video/mcp` package must continue to expose the same typed composition
 
 ## V2.15 — Visual regression and parity testing
 
+**Status:** Complete
+
 ### Goal
 
 Make programmable rendering testable at the frame level.
@@ -880,7 +882,7 @@ The fourth V2.15 slice adds actual browser-capture pixel parity for the reviewed
 
 The fifth V2.15 slice expands the deterministic fixture matrix without adding another renderer or asset model. A Vexa-owned 64×36/10fps fixture bundle covers shape/text timing, generated image and video media, an audio-bearing composition, captions, and parameterized props. Test media is generated through the existing FFmpeg boundary and injected through `resolvedAssets`; visual assertions continue to use the PNG comparator while `compareMediaDurationSync()` / `assertMediaDurationSync()` derive expected duration from fps/frame count and report typed duration or A/V-skew failures.
 
-Remaining V2.15 work is a closure audit of fixture/runtime applicability and final acceptance evidence rather than another rendering path.
+The V2.15 closure audit confirms that the required fixture classes, frame-level regression surface, exact runtime timing contract, real Chromium Studio capture, and frame-derived media duration/A/V-sync assertions are all covered without adding another renderer, browser runtime, or asset model. Runtime comparison remains capability-specific: Node owns reviewed PNG/metadata output, Player and Studio own deterministic seek state, browser rendering exposes exact frame/timestamp context, and Studio supplies the real browser-pixel acceptance path.
 
 Testing requirements are defined in `V2_MILESTONE_TESTING.md`.
 
