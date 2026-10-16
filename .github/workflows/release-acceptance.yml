@@ -63,11 +63,12 @@ jobs:
       - name: Install FFmpeg (macOS)
         if: runner.os == 'macOS'
         run: |
-          if ! command -v ffmpeg >/dev/null 2>&1; then
-            brew install ffmpeg
-          fi
-          ffmpeg -version
-          ffprobe -version
+          brew install ffmpeg-full
+          ffmpeg_full_bin="$(brew --prefix ffmpeg-full)/bin"
+          echo "$ffmpeg_full_bin" >> "$GITHUB_PATH"
+          "$ffmpeg_full_bin/ffmpeg" -version
+          "$ffmpeg_full_bin/ffmpeg" -hide_banner -filters | grep -q ' drawtext '
+          "$ffmpeg_full_bin/ffprobe" -version
 
       - name: Install dependencies
         run: npm ci
@@ -132,9 +133,10 @@ jobs:
       - name: Install FFmpeg (macOS)
         if: runner.os == 'macOS'
         run: |
-          if ! command -v ffmpeg >/dev/null 2>&1; then
-            brew install ffmpeg
-          fi
+          brew install ffmpeg-full
+          ffmpeg_full_bin="$(brew --prefix ffmpeg-full)/bin"
+          echo "$ffmpeg_full_bin" >> "$GITHUB_PATH"
+          "$ffmpeg_full_bin/ffmpeg" -hide_banner -filters | grep -q ' drawtext '
 
       - name: Install dependencies
         run: npm ci
