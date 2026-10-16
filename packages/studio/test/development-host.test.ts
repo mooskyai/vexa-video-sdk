@@ -82,10 +82,14 @@ test("Studio development host exposes SSE hot reload without moving Node work in
   assert.doesNotMatch(client, /@vexa-video\/(?:sdk|renderer|ffmpeg)/u);
 });
 
-test("Studio browser acceptance harness is syntactically valid", () => {
+test("Studio browser acceptance harness is syntactically valid and supports browser-family pinning", async () => {
   const result = spawnSync(process.execPath, ["--check", acceptancePath], {
     cwd: root,
     encoding: "utf8"
   });
   assert.equal(result.status, 0, result.stderr || result.stdout);
+  const acceptance = await readFile(acceptancePath, "utf8");
+  assert.match(acceptance, /VEXA_STUDIO_BROWSER_FAMILY/u);
+  assert.match(acceptance, /browserFamily/u);
+  assert.match(acceptance, /browserVersion/u);
 });

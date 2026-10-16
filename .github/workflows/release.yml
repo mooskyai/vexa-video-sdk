@@ -21,7 +21,11 @@ permissions:
   id-token: write
 
 jobs:
+  release-acceptance:
+    uses: ./.github/workflows/release-acceptance.yml
+
   verify-and-release:
+    needs: release-acceptance
     runs-on: ubuntu-latest
     environment: npm-release
 

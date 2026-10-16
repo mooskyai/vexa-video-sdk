@@ -907,7 +907,9 @@ Release the programmable-video layer without weakening the Version 1 guarantees.
 - documentation and examples are synchronized;
 - migration/release notes explain all Version 2 public API changes.
 
-The first V2.16 slice hardens the npm artifact boundary before any 2.0.0 version cut. A single release-package registry now drives metadata validation, dry-run packing, publication order, and packed-install acceptance for all eighteen public workspaces. `release:install-check` packs real tarballs, installs them into an isolated temporary consumer, rejects workspace symlinks, verifies shipped export/type/bin targets, and imports every shipped runtime export. The protected release workflow runs this gate before publication; cross-platform CI/browser coverage and final release-note/version work remain subsequent slices.
+The first V2.16 slice hardens the npm artifact boundary before any 2.0.0 version cut. A single release-package registry now drives metadata validation, dry-run packing, publication order, and packed-install acceptance for all eighteen public workspaces. `release:install-check` packs real tarballs, installs them into an isolated temporary consumer, rejects workspace symlinks, verifies shipped export/type/bin targets, and imports every shipped runtime export. The protected release workflow runs this gate before publication.
+
+The second V2.16 slice adds one reusable cross-platform release-acceptance workflow shared by pull-request/main CI and the protected tag/publish workflow. Node 24.21 verification and clean packed installs run on Ubuntu, Windows, and macOS, while Ubuntu also retains the Node 26 compatibility lane. The existing Studio/CDP harness runs unchanged in Chrome on all three operating systems and in Microsoft Edge on Windows; `VEXA_STUDIO_BROWSER_FAMILY` makes each lane fail if a different installed Chromium browser is selected. Final version-cut, migration-note, and release-note work remains subsequent V2.16 work.
 
 ## Recommended implementation order
 

@@ -590,7 +590,7 @@ npm run release:pack           # dry-run published package contents
 npm run release:install-check  # clean install + import from real packed tarballs
 ```
 
-CI uses the repository's supported Node.js line and installs FFmpeg before running verification. Release validation additionally packs all eighteen public packages into an isolated temporary consumer project, rejects workspace symlinks, verifies shipped export/bin files, and imports every shipped runtime export before publication.
+CI validates Node.js 24.21.0 on Ubuntu, Windows, and macOS, retains a Node 26 Ubuntu compatibility lane, and exercises Studio in Chrome plus Windows Edge through the existing CDP acceptance harness. Release validation also runs clean packed-package installs on the three primary operating systems before publication.
 
 ## Documentation
 

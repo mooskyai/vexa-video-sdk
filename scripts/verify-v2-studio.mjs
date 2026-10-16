@@ -93,6 +93,43 @@ async function waitForHttp(url, timeoutMs = 20_000) {
   throw new Error(`Timed out waiting for ${url}${lastError ? `: ${lastError.message}` : ""}`);
 }
 
+const supportedBrowserFamilies = new Set(["chrome", "edge", "chromium"]);
+
+function expectedBrowserFamily() {
+  const expected = String(process.env.VEXA_STUDIO_BROWSER_FAMILY ?? "").trim().toLowerCase();
+  if (!expected) return null;
+  if (!supportedBrowserFamilies.has(expected)) {
+    throw new Error(
+      `VEXA_STUDIO_BROWSER_FAMILY must be chrome, edge, or chromium; received ${JSON.stringify(expected)}.`
+    );
+  }
+  return expected;
+}
+
+function classifyBrowserFamily(version, browser) {
+  const normalizedVersion = version.toLowerCase();
+  const normalizedPath = browser.toLowerCase();
+  if (normalizedVersion.includes("edg/") || normalizedVersion.includes("edge/") || normalizedPath.includes("msedge")) return "edge";
+  if (normalizedPath.includes("chromium")) return "chromium";
+  if (normalizedVersion.includes("chrome/") || normalizedPath.includes("chrome")) return "chrome";
+  return "unknown";
+}
+
+async function inspectRunningBrowser(debugPort, browser) {
+  const response = await waitForHttp(`http://127.0.0.1:${debugPort}/json/version`);
+  const metadata = await response.json();
+  const version = String(metadata.Browser ?? "").trim();
+  const family = classifyBrowserFamily(version, browser);
+  const expected = expectedBrowserFamily();
+  if (family === "unknown") {
+    throw new Error(`Unable to identify Chromium browser family from ${version || browser}.`);
+  }
+  if (expected && family !== expected) {
+    throw new Error(`Expected ${expected} browser, received ${family}: ${version || browser}`);
+  }
+  return { family, version };
+}
+
 class CdpClient {
   #socket;
   #nextId = 1;
@@ -342,6 +379,7 @@ async function run() {
 
   let cdp = null;
   try {
+    const browserInfo = await inspectRunningBrowser(debugPort, browser);
     await waitForHttp(playgroundUrl);
     const page = await createPage(debugPort, playgroundUrl);
     cdp = await connectWebSocket(page.webSocketDebuggerUrl);
@@ -542,6 +580,8 @@ async function run() {
     console.log(JSON.stringify({
       acceptance: "v2-studio",
       browser,
+      browserFamily: browserInfo.family,
+      browserVersion: browserInfo.version,
       repositoryPathHasSpaces,
       compositionSwitch: true,
       visualParity: { compositionId: visualManifest.compositionId, checkpoints: visualParity },

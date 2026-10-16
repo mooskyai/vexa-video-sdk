@@ -985,7 +985,9 @@ npm run release:install-check
 
 `release:install-check` is the clean-install gate: it packs all eighteen public workspaces into real tarballs, installs those tarballs into an isolated temporary consumer instead of using workspace links, verifies synchronized installed versions plus exported runtime/type and bin files, rejects symlinked package roots, and imports every shipped runtime export. Set `VEXA_RELEASE_KEEP_TEMP=1` only when diagnosing a failed local release check and remove the preserved temporary workspace afterward.
 
-The packed-install gate is required by the protected release workflow. Cross-platform Windows/Linux/macOS and Chromium/Edge release acceptance remains separate V2.16 work so artifact integrity failures and platform/browser failures stay independently diagnosable.
+The packed-install gate is required by the protected release workflow. V2.16 cross-platform acceptance is centralized in `.github/workflows/release-acceptance.yml` so normal CI and tagged/publish releases cannot drift. The repository matrix runs Node 24.21 verification and packed-install acceptance on Ubuntu, Windows, and macOS plus a Node 26 Ubuntu compatibility lane. The browser matrix runs the existing Studio/CDP acceptance in Ubuntu Chrome, Windows Chrome, Windows Edge, and macOS Chrome. `VEXA_STUDIO_BROWSER_FAMILY` pins the expected browser family and the verifier records the concrete browser version in its JSON summary.
+
+A release may not publish unless every reusable-workflow matrix lane succeeds. Windows Edge Studio acceptance exercises the embedded Player play/pause/frame-step contract as part of the same real browser session, satisfying the Edge Player requirement without a second browser automation stack.
 
 ### Browser package audit
 
