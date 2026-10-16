@@ -65,10 +65,9 @@ The ecosystem/distribution implementation is in place: CLI and REST surfaces, Do
 
 ## Package and release readiness
 
-Release preparation now includes public package metadata, explicit exports/files, package READMEs, semantic-versioning policy, npm provenance workflow, dry-run package validation, synchronized package versions, and clean installation/import verification from real packed tarballs. Remaining release validation items are:
+Release preparation now includes public package metadata, explicit exports/files, package READMEs, semantic-versioning policy, npm provenance workflow, dry-run package validation, synchronized package versions, clean installation/import verification from real packed tarballs, and a green eight-lane release matrix across Windows, Linux, macOS, Chrome, and Edge. Remaining release validation items are:
 
-- run the release matrix across Windows, Linux, macOS, Chromium, and Edge;
-- verify Angular Package Format expectations in the final public publishing environment;
+- verify the packed `@vexa-video/angular` publishing/consumer contract with Angular compiler acceptance across the primary operating systems;
 - configure the protected `npm-release` environment/trusted publisher for the canonical repository;
 - document the final supported FFmpeg baseline and platform support matrix for the first public release.
 

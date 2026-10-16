@@ -587,10 +587,10 @@ npm run dev                    # watch + tests + visual playground
 npm run playground             # build + visual playground
 npm run release:check          # synchronized public-package metadata
 npm run release:pack           # dry-run published package contents
-npm run release:install-check  # clean install + import from real packed tarballs
+npm run release:install-check  # clean tarball install/import + Angular consumer compile
 ```
 
-CI validates Node.js 24.21.0 on Ubuntu, Windows, and macOS, retains a Node 26 Ubuntu compatibility lane, and exercises Studio in Chrome plus Windows Edge through the existing CDP acceptance harness. Release validation also runs clean packed-package installs on the three primary operating systems before publication.
+CI validates Node.js 24.21.0 on Ubuntu, Windows, and macOS, retains a Node 26 Ubuntu compatibility lane, and exercises Studio in Chrome plus Windows Edge through the existing CDP acceptance harness. Release validation also runs clean packed-package installs on the three primary operating systems before publication, including an Angular compiler consumer check against the installed `@vexa-video/angular` tarball.
 
 ## Documentation
 

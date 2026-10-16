@@ -46,7 +46,8 @@ export interface HardwareProviderCapability {
 export interface HardwareAccelerationCapabilities {
   schemaVersion: 1;
   backend: "ffmpeg";
-  platform: NodeJS.Platform;
+  /** Runtime platform identifier reported by the execution backend. */
+  platform: string;
   hwaccels: readonly string[];
   encoders: readonly string[];
   providers: readonly HardwareProviderCapability[];
