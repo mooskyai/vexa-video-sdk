@@ -5,6 +5,7 @@ const canonicalRepository = "mooskyai/vexa-video-sdk";
 const canonicalRepositoryUrl = "https://github.com/mooskyai/vexa-video-sdk.git";
 const workflowFilename = "release.yml";
 const environmentName = "npm-release";
+const publishRunner = "ubuntu-24.04";
 const minimumNpmVersion = [11, 15, 0];
 const failures = [];
 
@@ -62,7 +63,7 @@ requireText(releaseWorkflow, `VEXA_RELEASE_ENVIRONMENT: ${environmentName}`, "re
 requireText(releaseWorkflow, "registry-url: https://registry.npmjs.org", "release npm registry");
 requireText(releaseWorkflow, "VEXA_TRUSTED_PUBLISH_RUNTIME: \"1\"", "live trusted-publishing preflight");
 requireText(releaseWorkflow, "npm run release:trusted-publish-check", "trusted-publishing preflight command");
-requireText(releaseWorkflow, "runs-on: ubuntu-latest", "GitHub-hosted publish runner");
+requireText(releaseWorkflow, `runs-on: ${publishRunner}`, "GitHub-hosted publish runner");
 
 if (/^\s*(?:NPM_TOKEN|NODE_AUTH_TOKEN)\s*:/mu.test(releaseWorkflow)) {
   failures.push("release workflow must not configure NPM_TOKEN or NODE_AUTH_TOKEN for publication.");
