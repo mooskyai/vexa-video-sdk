@@ -981,6 +981,8 @@ npm run verify
 npm run release:check
 npm run release:pack
 npm run release:install-check
+npm run release:ffmpeg-check
+npm run release:trusted-publish-check
 ```
 
 `release:install-check` is the clean-install gate: it packs all eighteen public workspaces into real tarballs, installs those tarballs into an isolated temporary consumer instead of using workspace links, verifies synchronized installed versions plus exported runtime/type and bin files, rejects symlinked package roots, imports every shipped runtime export, and compiles an isolated Angular consumer against the installed `@vexa-video/angular` package with Angular's `ngc` compiler. The Angular acceptance also verifies the packed package remains ESM-only, side-effect-free, exposes explicit declaration/runtime export targets, and keeps Angular/RxJS as peer dependencies. Set `VEXA_RELEASE_KEEP_TEMP=1` only when diagnosing a failed local release check and remove the preserved temporary workspace afterward.
@@ -992,6 +994,10 @@ The macOS lanes install Homebrew `ffmpeg-full`, prepend its keg-only `bin` direc
 HLS packaging executes FFmpeg from the prepared package directory and uses relative `v%v/...` variant paths. This keeps generated playlist URIs portable and avoids FFmpeg's Windows cross-drive directory-creation failure when a caller's temporary output directory is on a different drive from the process that invoked Vexa. Studio browser acceptance also waits for the props editor to enter the `draft` state before applying negative-render props, verifies frame stepping relative to the actual paused frame, requires resolved props state to be rendered after composition evaluation, and waits for the specific source revision to return to `Watching` + `Bundle ready` before rendering. Studio prevents bundle rebuilds and composition renders from overlapping so a hot reload cannot remove `vexa.bundle.json` while the renderer is consuming it.
 
 A release may not publish unless every reusable-workflow matrix lane succeeds. Windows Edge Studio acceptance exercises the embedded Player play/pause/frame-step contract as part of the same real browser session, satisfying the Edge Player requirement without a second browser automation stack.
+
+V2.16.3 closed on commit `39ead3e6eb2480f141d8d202c7ea93d58a662a36` with all eight release lanes green. The packed-install lanes on Ubuntu, Windows, and macOS compile an isolated Angular consumer with `types: []`, so browser-facing declaration leaks such as `NodeJS.*` fail before publication.
+
+`release:trusted-publish-check` runs in static mode through `release:check`, validating the canonical repository URL, `release.yml`, `id-token: write`, `npm-release` environment, registry URL, and tokenless publish contract. The protected workflow reruns it with `VEXA_TRUSTED_PUBLISH_RUNTIME=1`, which additionally requires the live GitHub OIDC request variables and exact repository/workflow/environment identity. `release:publish` repeats those runtime requirements and refuses non-tag or token-backed publication. `release:ffmpeg-check` requires FFmpeg and ffprobe 6.1+ plus `drawtext`, `libx264`, and AAC; it runs across every release-acceptance OS/browser lane and again before protected publication.
 
 ### Browser package audit
 

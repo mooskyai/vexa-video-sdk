@@ -61,9 +61,9 @@ Vexa keeps those concerns behind a typed SDK:
 | Requirement | Notes |
 | --- | --- |
 | Node.js | **24.21.0+** |
-| npm | 11+ recommended |
-| FFmpeg | Available in `PATH`, or configured explicitly |
-| ffprobe | Available in `PATH`, or configured explicitly |
+| npm | 11+ for development; **11.15.0+** for trusted-publisher administration |
+| FFmpeg | **6.1+** for the first public release baseline; `drawtext`, `libx264`, and AAC required for the default acceptance surface |
+| ffprobe | **6.1+**, preferably from the same distribution/build as FFmpeg |
 | TypeScript | 5.9.x in the repository toolchain |
 
 Verify your local tools:
@@ -588,9 +588,11 @@ npm run playground             # build + visual playground
 npm run release:check          # synchronized public-package metadata
 npm run release:pack           # dry-run published package contents
 npm run release:install-check  # clean tarball install/import + Angular consumer compile
+npm run release:ffmpeg-check   # FFmpeg/ffprobe version + required capability baseline
+npm run release:trusted-publish-check # static trusted-publishing contract audit
 ```
 
-CI validates Node.js 24.21.0 on Ubuntu, Windows, and macOS, retains a Node 26 Ubuntu compatibility lane, and exercises Studio in Chrome plus Windows Edge through the existing CDP acceptance harness. Release validation also runs clean packed-package installs on the three primary operating systems before publication, including an Angular compiler consumer check against the installed `@vexa-video/angular` tarball.
+CI validates Node.js 24.21.0 on Ubuntu, Windows, and macOS, retains a Node 26 Ubuntu compatibility lane, and exercises Studio in Chrome plus Windows Edge through the existing CDP acceptance harness. Release validation also runs the FFmpeg 6.1+ capability gate and clean packed-package installs on the three primary operating systems before publication, including an Angular compiler consumer check against the installed `@vexa-video/angular` tarball. npm publication is restricted to the protected `release.yml` GitHub Actions workflow and its `npm-release` environment through tokenless OIDC trusted publishing.
 
 ## Documentation
 
@@ -600,6 +602,7 @@ CI validates Node.js 24.21.0 on Ubuntu, Windows, and macOS, retains a Node 26 Ub
 - [Plugin system](./docs/plugins.md)
 - [AI extension](./docs/ai-extension.md)
 - [Ecosystem and distribution](./docs/ecosystem-distribution.md)
+- [Release operations](./docs/release-operations.md)
 - [Hosted rendering](./docs/hosted-rendering.md)
 - [API stability and versioning](./docs/API-STABILITY.md)
 - [Changelog](./CHANGELOG.md)

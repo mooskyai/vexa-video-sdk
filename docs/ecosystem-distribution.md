@@ -52,4 +52,6 @@ React and Vue examples are intentionally source-only so the monorepo does not fo
 
 ## Public releases
 
-`npm run release:check` validates package metadata and synchronized versions. `npm run release:pack` performs dry-run packing. Publication requires the guarded release workflow/operator confirmation; normal CI never publishes packages.
+`npm run release:check` validates package metadata, synchronized versions, and the static trusted-publishing contract. `npm run release:pack` performs dry-run packing, `npm run release:install-check` installs real tarballs into an isolated consumer, and `npm run release:ffmpeg-check` validates the supported FFmpeg/ffprobe capability baseline. Publication is restricted to the protected `release.yml` workflow, the `npm-release` GitHub environment, a tag ref, and tokenless npm OIDC credentials; normal CI never publishes packages.
+
+See [release operations](./release-operations.md) for the supported platform matrix, trusted-publisher bootstrap procedure, and final release sequence.

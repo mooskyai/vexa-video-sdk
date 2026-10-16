@@ -27,9 +27,11 @@
     "example:angular-service": "npm run build && node examples/angular-render-service/dist/index.js",
     "cli": "npm run build && node packages/cli/dist/bin.js",
     "example:rest-service": "npm run build && node examples/rest-service/dist/index.js",
-    "release:check": "node scripts/check-release.mjs",
+    "release:check": "node scripts/check-release.mjs && node scripts/check-trusted-publishing.mjs",
+    "release:ffmpeg-check": "node scripts/check-ffmpeg-baseline.mjs",
     "release:pack": "node scripts/release-pack.mjs",
     "release:install-check": "node scripts/verify-packed-install.mjs",
+    "release:trusted-publish-check": "node scripts/check-trusted-publishing.mjs",
     "release:publish": "node scripts/publish-workspaces.mjs"
   },
   "devDependencies": {
