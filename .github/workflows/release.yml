@@ -51,6 +51,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Format policy
+        run: npm run format:check
+
       - name: Verify repository
         run: npm run verify
 
@@ -59,6 +62,9 @@ jobs:
 
       - name: Dry-run package contents
         run: npm run release:pack
+
+      - name: Verify clean packed-package install
+        run: npm run release:install-check
 
       - name: Publish with npm provenance
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}

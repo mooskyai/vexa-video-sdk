@@ -888,6 +888,8 @@ Testing requirements are defined in `V2_MILESTONE_TESTING.md`.
 
 ## V2.16 — Version 2 release readiness
 
+**Status:** Validation
+
 ### Goal
 
 Release the programmable-video layer without weakening the Version 1 guarantees.
@@ -904,6 +906,8 @@ Release the programmable-video layer without weakening the Version 1 guarantees.
 - no Node-only dependency leaks into browser packages;
 - documentation and examples are synchronized;
 - migration/release notes explain all Version 2 public API changes.
+
+The first V2.16 slice hardens the npm artifact boundary before any 2.0.0 version cut. A single release-package registry now drives metadata validation, dry-run packing, publication order, and packed-install acceptance for all eighteen public workspaces. `release:install-check` packs real tarballs, installs them into an isolated temporary consumer, rejects workspace symlinks, verifies shipped export/type/bin targets, and imports every shipped runtime export. The protected release workflow runs this gate before publication; cross-platform CI/browser coverage and final release-note/version work remain subsequent slices.
 
 ## Recommended implementation order
 

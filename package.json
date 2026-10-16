@@ -29,6 +29,7 @@
     "example:rest-service": "npm run build && node examples/rest-service/dist/index.js",
     "release:check": "node scripts/check-release.mjs",
     "release:pack": "node scripts/release-pack.mjs",
+    "release:install-check": "node scripts/verify-packed-install.mjs",
     "release:publish": "node scripts/publish-workspaces.mjs"
   },
   "devDependencies": {

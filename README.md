@@ -579,15 +579,18 @@ See [docs/architecture.md](./docs/architecture.md).
 ## Development
 
 ```bash
-npm run verify           # typecheck + tests + builds
-npm run typecheck        # TypeScript project references
-npm test                 # automated test suite
-npm run build            # build workspace packages/examples
-npm run dev              # watch + tests + visual playground
-npm run playground       # build + visual playground
+npm run verify                 # typecheck + tests + builds
+npm run typecheck              # TypeScript project references
+npm test                       # automated test suite
+npm run build                  # build workspace packages/examples
+npm run dev                    # watch + tests + visual playground
+npm run playground             # build + visual playground
+npm run release:check          # synchronized public-package metadata
+npm run release:pack           # dry-run published package contents
+npm run release:install-check  # clean install + import from real packed tarballs
 ```
 
-CI uses the repository's supported Node.js line and installs FFmpeg before running verification.
+CI uses the repository's supported Node.js line and installs FFmpeg before running verification. Release validation additionally packs all eighteen public packages into an isolated temporary consumer project, rejects workspace symlinks, verifies shipped export/bin files, and imports every shipped runtime export before publication.
 
 ## Documentation
 

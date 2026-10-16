@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { releasePackages } from "./release-packages.mjs";
 
 function npmInvocation(args) {
   const npmCli = process.env.npm_execpath;
@@ -44,28 +45,7 @@ if (process.env.VEXA_RELEASE_CONFIRM !== "PUBLISH") {
   throw new Error("Refusing to publish. Set VEXA_RELEASE_CONFIRM=PUBLISH from the protected release workflow/operator session.");
 }
 
-const workspaces = [
-  "@vexa-video/core",
-  "@vexa-video/ffmpeg",
-  "@vexa-video/sdk",
-  "@vexa-video/angular",
-  "@vexa-video/ai",
-  "@vexa-video/editor",
-  "@vexa-video/react",
-  "@vexa-video/player",
-  "@vexa-video/bundler",
-  "@vexa-video/renderer",
-  "@vexa-video/gif",
-  "@vexa-video/waveform",
-  "@vexa-video/sound-effects",
-  "@vexa-video/web-renderer",
-  "@vexa-video/studio",
-  "@vexa-video/cli",
-  "@vexa-video/mcp",
-  "@vexa-video/test"
-];
-
-for (const workspace of workspaces) {
+for (const { name: workspace } of releasePackages) {
   console.log(`[release:publish] ${workspace}`);
   await runNpm(
     ["publish", "--workspace", workspace, "--access", "public", "--provenance"],

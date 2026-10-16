@@ -980,9 +980,12 @@ npm run build
 npm run verify
 npm run release:check
 npm run release:pack
+npm run release:install-check
 ```
 
-Then test clean installations from packed tarballs, not workspace links.
+`release:install-check` is the clean-install gate: it packs all eighteen public workspaces into real tarballs, installs those tarballs into an isolated temporary consumer instead of using workspace links, verifies synchronized installed versions plus exported runtime/type and bin files, rejects symlinked package roots, and imports every shipped runtime export. Set `VEXA_RELEASE_KEEP_TEMP=1` only when diagnosing a failed local release check and remove the preserved temporary workspace afterward.
+
+The packed-install gate is required by the protected release workflow. Cross-platform Windows/Linux/macOS and Chromium/Edge release acceptance remains separate V2.16 work so artifact integrity failures and platform/browser failures stay independently diagnosable.
 
 ### Browser package audit
 

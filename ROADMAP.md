@@ -61,13 +61,13 @@ The runnable Angular demo remains a separate validation item; AI/provider adapte
 
 ## Ecosystem and distribution
 
-The ecosystem/distribution implementation is in place: CLI and REST surfaces, Docker worker recipe, React/Vue examples, framework-neutral timeline-editor state, hosted-render contracts, synchronized package metadata, and controlled release automation. Public registry publication and clean-install tarball verification remain operator/release validation items.
+The ecosystem/distribution implementation is in place: CLI and REST surfaces, Docker worker recipe, React/Vue examples, framework-neutral timeline-editor state, hosted-render contracts, synchronized package metadata, and controlled release automation. Public registry publication and cross-platform/browser release acceptance remain operator/release validation items.
 
 ## Package and release readiness
 
-Release preparation now includes public package metadata, explicit exports/files, package READMEs, semantic-versioning policy, npm provenance workflow, dry-run package validation, and synchronized package versions. Remaining release validation items are:
+Release preparation now includes public package metadata, explicit exports/files, package READMEs, semantic-versioning policy, npm provenance workflow, dry-run package validation, synchronized package versions, and clean installation/import verification from real packed tarballs. Remaining release validation items are:
 
-- complete clean-install tests from packed tarballs, not only workspace links;
+- run the release matrix across Windows, Linux, macOS, Chromium, and Edge;
 - verify Angular Package Format expectations in the final public publishing environment;
 - configure the protected `npm-release` environment/trusted publisher for the canonical repository;
 - document the final supported FFmpeg baseline and platform support matrix for the first public release.
@@ -95,7 +95,7 @@ The planned sequence is:
 | V2.13 | **Complete** | Hosted/serverless composition rendering; typed requests, existing job-worker execution, deterministic retry-safe artifact publication, progress/cancellation, and provider-neutral deployment boundaries all reuse the normal renderer, job, and Storage contracts |
 | V2.14 | **Complete** | Agent/MCP/CLI composition workflows; CLI, typed agent operations, official MCP protocol handling, and stdio transport all reuse the existing bundler, renderer, and hosted-render contracts |
 | V2.15 | **Complete** | Frame-level visual regression with reviewed wipe baselines, exact runtime timing parity, real Chromium Studio pixel parity, deterministic shape/image/video/audio/caption/props fixtures, and frame-derived A/V duration/sync assertions |
-| V2.16 | **Planned** | Version 2 release hardening |
+| V2.16 | **Validation** | Version 2 release hardening; packed-tarball clean-install/import acceptance is active before cross-platform/browser release validation |
 
 V2.1 through V2.7 are complete on the Version 2 branch. V2.7 bundle-backed execution resolves executable compositions and dynamic metadata, materializes still/single-frame images and bounded frame ranges, encodes exact exclusive-end MP4/WebM ranges, exposes progress/cancellation/timeouts/hardware selection, and resolves storage-backed scene assets through managed workspaces. Windows acceptance verified a 1920x1080 H.264 render at 30fps with exactly 60 frames over 2 seconds.
 
@@ -122,6 +122,8 @@ The fourth slice closes that gap for the reviewed wipe fixture. A browser-safe t
 The fifth slice expands the deterministic acceptance matrix beyond transitions. Vexa-owned FFmpeg inputs exercise shape/text timing, image and video media, composition captions, parameterized props, and an audio-bearing composition through the existing renderer and `resolvedAssets` boundary. `compareMediaDurationSync()` / `assertMediaDurationSync()` derive the expected duration from fps plus frame count and report typed duration or A/V-skew failures; real MP4 acceptance probes both streams against a 50ms duration/skew budget.
 
 The V2.15 closure audit confirms that every required fixture class is represented and each runtime is tested at the capability it actually owns: Node renderer for reviewed PNG/metadata output; Player and Studio for exact seek/timing state; browser renderer for exact frame/timestamp/duration context; and real Chromium Studio capture for browser pixels. Audio acceptance probes real video/audio streams against the frame-derived duration and bounded A/V skew. `@vexa-video/test` remains Node-only and does not create a browser dependency path. V2.15 is complete; broader browser/codec-specific pixel equivalence remains release-hardening work rather than a parallel snapshot model.
+
+V2.16 has started at the release-artifact boundary. One canonical registry now drives metadata checks, dry-run packing, publication order, and clean-install acceptance for all eighteen public packages. `release:install-check` creates real tarballs, installs them into an isolated consumer project instead of workspace links, verifies shipped export/bin files and synchronized versions, rejects symlinked package roots, and imports every shipped runtime export. The root/package version remains unchanged until the final Version 2 release cut; cross-platform and browser release matrices are the next hardening work.
 
 Detailed scope and acceptance:
 
