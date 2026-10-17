@@ -1,4 +1,5 @@
 import type {
+  CaptionDocument,
   HardwareAccelerationCapabilities,
   MediaOutputResult,
   ProbeResult,
@@ -19,8 +20,8 @@ import {
   createProjectExecutionPlan,
   detectHardwareAcceleration,
   probeMedia,
-  resolveDefaultFontFile,
   resolveMediaBinaries,
+  resolveProjectFontFiles,
   runFfmpeg,
   type MediaBinaries
 } from "@vexa-video/ffmpeg";
@@ -28,7 +29,6 @@ import {
 interface ProjectRuntime {
   binariesPromise?: Promise<MediaBinaries>;
   hardwareCapabilitiesPromise?: Promise<HardwareAccelerationCapabilities>;
-  defaultFontFilePromise?: Promise<string | null>;
 }
 
 export interface CreateVideoProjectOptions {
@@ -39,6 +39,7 @@ export interface CreateVideoProjectOptions {
   fps?: number;
   duration?: number;
   background?: string;
+  captions?: CaptionDocument;
 }
 
 export interface AddProjectTrackOptions {
@@ -56,29 +57,6 @@ export interface UpdateProjectTrackOptions {
   muted?: boolean;
   hidden?: boolean;
   locked?: boolean;
-}
-
-
-function withDefaultTextFont(project: VideoProjectAst, fontFile: string | null): VideoProjectAst {
-  if (!fontFile) return project;
-
-  let changed = false;
-  const tracks = project.tracks.map((track) => {
-    const clips = track.clips.map((clip) => {
-      if (clip.kind !== "text" || clip.enabled === false || clip.style?.fontFile) return clip;
-      changed = true;
-      return {
-        ...clip,
-        style: {
-          ...clip.style,
-          fontFile
-        }
-      };
-    });
-    return clips.some((clip, index) => clip !== track.clips[index]) ? { ...track, clips } : track;
-  });
-
-  return changed ? { ...project, tracks } : project;
 }
 
 function validateOutput(output: string): string {
@@ -228,13 +206,10 @@ export class VideoProject {
     options: ProjectRenderOptions = {}
   ): Promise<ProjectExecutionPlan> {
     const normalizedOutput = validateOutput(output);
+    const renderAst = await resolveProjectFontFiles(this.#ast);
     const probes = await this.#probeSources(options);
     this.#validateSourceBounds(probes);
-    const [fontFile, hardwareCapabilities] = await Promise.all([
-      this.#resolveDefaultFontFile(),
-      this.#hardwareCapabilities(options)
-    ]);
-    const renderAst = withDefaultTextFont(this.#ast, fontFile);
+    const hardwareCapabilities = await this.#hardwareCapabilities(options);
     return createProjectExecutionPlan(renderAst, normalizedOutput, options, probes, hardwareCapabilities);
   }
 
@@ -294,19 +269,6 @@ export class VideoProject {
     );
 
     return Object.fromEntries(entries);
-  }
-
-  async #resolveDefaultFontFile(): Promise<string | null> {
-    const hasUnresolvedText = this.#ast.tracks.some((track) =>
-      track.clips.some(
-        (clip) => clip.kind === "text" && clip.enabled !== false && !clip.style?.fontFile
-      )
-    );
-    if (!hasUnresolvedText) return null;
-
-    const fontFilePromise = this.#runtime.defaultFontFilePromise ?? resolveDefaultFontFile();
-    this.#runtime.defaultFontFilePromise = fontFilePromise;
-    return await fontFilePromise;
   }
 
   async #hardwareCapabilities(options: ProjectRenderOptions): Promise<HardwareAccelerationCapabilities | null> {

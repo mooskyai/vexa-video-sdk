@@ -1,7 +1,31 @@
+import {
+  bundleCompositions,
+  discoverBundleCompositions,
+  type VexaBundleMode,
+  type VexaBundleSourceMapMode
+} from "@vexa-video/bundler";
 import { Hardware, Streaming, Video } from "@vexa-video/sdk";
-import type { ExportOptions, HardwareAccelerationPreference, ResizeFit, StreamingPresetName, StreamingProtocol } from "@vexa-video/core";
+import type { ExportOptions, HardwareAccelerationPreference, JsonObject, ResizeFit, StreamingPresetName, StreamingProtocol } from "@vexa-video/core";
+import {
+  inspectComposition,
+  renderCompositionStill,
+  resolveCompositionProps,
+  tryRenderCompositionVideo
+} from "./composition.js";
 
-export type CliCommandName = "help" | "version" | "probe" | "plan" | "render" | "hardware" | "stream";
+export type CliCommandName =
+  | "help"
+  | "version"
+  | "probe"
+  | "plan"
+  | "render"
+  | "still"
+  | "inspect"
+  | "validate"
+  | "hardware"
+  | "stream"
+  | "compositions"
+  | "bundle";
 
 export interface CliInvocation {
   command: CliCommandName;
@@ -19,9 +43,27 @@ const HELP = `Vexa Video CLI
 Usage:
   vexa probe <input>
   vexa plan <input> <output> [options]
-  vexa render <input> <output> [options]
+  vexa render <input|composition-id> <output> [options]
+  vexa still <composition-id> <output> [--frame <number>] [options]
+  vexa inspect <composition-id> [--manifest <path>]
+  vexa validate <composition-id> [--props <json>] [--manifest <path>]
   vexa hardware
   vexa stream <input> <output-dir> [--protocol hls|dash] [--preset mobile|balanced|hd]
+  vexa compositions [entry] [--root-dir <dir>]
+  vexa bundle <entry> [--out-dir <dir>] [--root-dir <dir>] [--mode development|production]
+
+Composition options:
+  --root-dir <dir>          Project root (defaults to current directory)
+  --out-dir <dir>           Bundle output (defaults to .vexa/bundle)
+  --mode <mode>             development|production
+  --source-map <mode>       none|external|inline
+  --manifest <path>         Composition bundle manifest (defaults to .vexa/bundle/vexa.bundle.json)
+  --props <json>            JSON object merged into composition input props
+  --frame <number>          Frame for still when the composition is a video
+  --start-frame <number>    First video frame for composition render
+  --end-frame <number>      Exclusive end frame for composition render
+  --concurrency <number>    Composition frame-render concurrency
+  --timeout-ms <number>     Composition render timeout
 
 Video options:
   --width <px>              Resize width
@@ -42,7 +84,20 @@ function optionName(raw: string): string {
 
 export function parseCliArgs(argv: readonly string[]): CliInvocation {
   const first = argv[0];
-  const known = new Set<CliCommandName>(["help", "version", "probe", "plan", "render", "hardware", "stream"]);
+  const known = new Set<CliCommandName>([
+    "help",
+    "version",
+    "probe",
+    "plan",
+    "render",
+    "still",
+    "inspect",
+    "validate",
+    "hardware",
+    "stream",
+    "compositions",
+    "bundle"
+  ]);
   const command: CliCommandName = !first || first === "--help" || first === "-h"
     ? "help"
     : first === "--version" || first === "-v"
@@ -95,6 +150,21 @@ function boolOption(invocation: CliInvocation, name: string, fallback: boolean):
   return typeof value === "boolean" ? value : fallback;
 }
 
+function jsonObjectOption(invocation: CliInvocation, name: string): JsonObject | undefined {
+  const raw = stringOption(invocation, name);
+  if (raw === undefined) return undefined;
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw new Error(`--${name} must be valid JSON.`);
+  }
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`--${name} must be a JSON object.`);
+  }
+  return value as JsonObject;
+}
+
 function exportOptions(invocation: CliInvocation): ExportOptions {
   const value: ExportOptions = {
     overwrite: true,
@@ -133,9 +203,50 @@ function format(value: unknown, invocation: CliInvocation): string {
   return JSON.stringify(value, null, 2);
 }
 
+function formatError(error: unknown, invocation: CliInvocation): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (invocation.options.json !== true) return message;
+  const candidate = error !== null && typeof error === "object"
+    ? error as { readonly code?: unknown; readonly compositionId?: unknown }
+    : {};
+  return JSON.stringify({
+    error: {
+      code: typeof candidate.code === "string" ? candidate.code : "CLI_ERROR",
+      message,
+      ...(typeof candidate.compositionId === "string"
+        ? { compositionId: candidate.compositionId }
+        : {})
+    }
+  });
+}
+
 function requirePositional(invocation: CliInvocation, index: number, label: string): string {
   const value = invocation.positionals[index]?.trim();
   if (!value) throw new Error(`${label} is required.`);
+  return value;
+}
+
+const DEFAULT_COMPOSITION_ENTRY = "src/video.tsx";
+const DEFAULT_BUNDLE_OUT_DIR = ".vexa/bundle";
+
+function compositionEntry(invocation: CliInvocation): string {
+  const value = invocation.positionals[0]?.trim();
+  return value || DEFAULT_COMPOSITION_ENTRY;
+}
+
+function bundleMode(invocation: CliInvocation): VexaBundleMode {
+  const value = stringOption(invocation, "mode") ?? "development";
+  if (value !== "development" && value !== "production") {
+    throw new Error("--mode must be development or production.");
+  }
+  return value;
+}
+
+function bundleSourceMap(invocation: CliInvocation): VexaBundleSourceMapMode {
+  const value = stringOption(invocation, "source-map") ?? "external";
+  if (value !== "none" && value !== "external" && value !== "inline") {
+    throw new Error("--source-map must be none, external, or inline.");
+  }
   return value;
 }
 
@@ -164,6 +275,51 @@ export async function runCli(
       case "hardware":
         io.stdout(format(await Hardware.detect(), invocation));
         return 0;
+      case "compositions": {
+        const compositions = await discoverBundleCompositions({
+          entry: compositionEntry(invocation),
+          ...(stringOption(invocation, "root-dir")
+            ? { rootDir: stringOption(invocation, "root-dir")! }
+            : {})
+        });
+        io.stdout(format(compositions, invocation));
+        return 0;
+      }
+      case "bundle": {
+        const result = await bundleCompositions({
+          entry: requirePositional(invocation, 0, "entry"),
+          outDir: stringOption(invocation, "out-dir") ?? DEFAULT_BUNDLE_OUT_DIR,
+          ...(stringOption(invocation, "root-dir")
+            ? { rootDir: stringOption(invocation, "root-dir")! }
+            : {}),
+          mode: bundleMode(invocation),
+          sourceMap: bundleSourceMap(invocation)
+        });
+        io.stdout(format(result, invocation));
+        return 0;
+      }
+      case "inspect": {
+        const compositionId = requirePositional(invocation, 0, "composition-id");
+        const manifestPath = stringOption(invocation, "manifest");
+        const result = await inspectComposition({
+          compositionId,
+          ...(manifestPath !== undefined ? { manifestPath } : {})
+        });
+        io.stdout(format(result, invocation));
+        return 0;
+      }
+      case "validate": {
+        const compositionId = requirePositional(invocation, 0, "composition-id");
+        const manifestPath = stringOption(invocation, "manifest");
+        const inputProps = jsonObjectOption(invocation, "props");
+        const result = await resolveCompositionProps({
+          compositionId,
+          ...(manifestPath !== undefined ? { manifestPath } : {}),
+          ...(inputProps !== undefined ? { inputProps } : {})
+        });
+        io.stdout(format(result, invocation));
+        return 0;
+      }
       case "plan": {
         const input = requirePositional(invocation, 0, "input");
         const output = requirePositional(invocation, 1, "output");
@@ -174,11 +330,69 @@ export async function runCli(
       case "render": {
         const input = requirePositional(invocation, 0, "input");
         const output = requirePositional(invocation, 1, "output");
+        const inputProps = jsonObjectOption(invocation, "props");
+        const manifestPath = stringOption(invocation, "manifest");
+        const compositionResult = await tryRenderCompositionVideo({
+          compositionId: input,
+          output,
+          hardwareFallback: boolOption(invocation, "hardware-fallback", true),
+          onProgress: (progress) => io.stderr(`progress ${progress.percent.toFixed(1)}%`),
+          ...(manifestPath !== undefined ? { manifestPath } : {}),
+          ...(inputProps !== undefined ? { inputProps } : {}),
+          ...(numberOption(invocation, "start-frame") !== undefined
+            ? { startFrame: numberOption(invocation, "start-frame")! }
+            : {}),
+          ...(numberOption(invocation, "end-frame") !== undefined
+            ? { endFrameExclusive: numberOption(invocation, "end-frame")! }
+            : {}),
+          ...(numberOption(invocation, "concurrency") !== undefined
+            ? { concurrency: numberOption(invocation, "concurrency")! }
+            : {}),
+          ...(numberOption(invocation, "timeout-ms") !== undefined
+            ? { timeoutMs: numberOption(invocation, "timeout-ms")! }
+            : {}),
+          ...(stringOption(invocation, "hardware") !== undefined
+            ? { hardwareAcceleration: stringOption(invocation, "hardware") as HardwareAccelerationPreference }
+            : {})
+        });
+        if (compositionResult !== null) {
+          io.stdout(format(compositionResult, invocation));
+          return 0;
+        }
+
         const options = exportOptions(invocation);
         options.onProgress = (progress) => {
           if (progress.percent !== null) io.stderr(`progress ${progress.percent.toFixed(1)}%`);
         };
         const result = await buildVideo(invocation, input).export(output, options);
+        io.stdout(format(result, invocation));
+        return 0;
+      }
+      case "still": {
+        const compositionId = requirePositional(invocation, 0, "composition-id");
+        const output = requirePositional(invocation, 1, "output");
+        const inputProps = jsonObjectOption(invocation, "props");
+        const manifestPath = stringOption(invocation, "manifest");
+        const result = await renderCompositionStill({
+          compositionId,
+          output,
+          hardwareFallback: boolOption(invocation, "hardware-fallback", true),
+          onProgress: (progress) => io.stderr(`progress ${progress.percent.toFixed(1)}%`),
+          ...(manifestPath !== undefined ? { manifestPath } : {}),
+          ...(inputProps !== undefined ? { inputProps } : {}),
+          ...(numberOption(invocation, "frame") !== undefined
+            ? { frame: numberOption(invocation, "frame")! }
+            : {}),
+          ...(numberOption(invocation, "concurrency") !== undefined
+            ? { concurrency: numberOption(invocation, "concurrency")! }
+            : {}),
+          ...(numberOption(invocation, "timeout-ms") !== undefined
+            ? { timeoutMs: numberOption(invocation, "timeout-ms")! }
+            : {}),
+          ...(stringOption(invocation, "hardware") !== undefined
+            ? { hardwareAcceleration: stringOption(invocation, "hardware") as HardwareAccelerationPreference }
+            : {})
+        });
         io.stdout(format(result, invocation));
         return 0;
       }
@@ -198,7 +412,7 @@ export async function runCli(
       }
     }
   } catch (error) {
-    io.stderr(error instanceof Error ? error.message : String(error));
+    io.stderr(formatError(error, invocation));
     return 1;
   }
 }

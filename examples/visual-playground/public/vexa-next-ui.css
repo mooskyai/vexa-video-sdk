@@ -1,0 +1,1797 @@
+/*
+ * Vexa Creative UI
+ *
+ * Product-grade visual shell shared by the normal Video Editor and Vexa Studio.
+ * This file is intentionally loaded after the legacy Playground styles. Existing
+ * IDs and runtime wiring remain intact while the presentation is replaced by the
+ * Vexa dark creative-tool design language.
+ */
+
+:root {
+  color-scheme: dark;
+  --vexa-bg-0: #050812;
+  --vexa-bg-1: #080d18;
+  --vexa-bg-2: #0b1220;
+  --vexa-bg-3: #0f1829;
+  --vexa-panel: rgba(10, 17, 30, .96);
+  --vexa-panel-raised: rgba(14, 24, 41, .98);
+  --vexa-panel-soft: rgba(18, 29, 49, .84);
+  --vexa-border: #1b2940;
+  --vexa-border-bright: #2b4165;
+  --vexa-text: #f3f6ff;
+  --vexa-muted: #8c9ab4;
+  --vexa-subtle: #5f708d;
+  --vexa-blue: #5b8cff;
+  --vexa-blue-strong: #3772ff;
+  --vexa-violet: #795cff;
+  --vexa-violet-strong: #6548f5;
+  --vexa-cyan: #55c8ff;
+  --vexa-green: #40d9a0;
+  --vexa-danger: #ff6f85;
+  --vexa-track-blue: #3568c9;
+  --vexa-track-violet: #6847dc;
+  --vexa-track-green: #21a973;
+  --vexa-track-cyan: #268bd4;
+  --vexa-shadow: 0 18px 52px rgba(0, 0, 0, .32);
+  --vexa-radius: 10px;
+  --vexa-radius-sm: 7px;
+  --editor-rail: 78px;
+  --editor-topbar: 64px;
+}
+
+html.vexa-creative-ui,
+html.vexa-creative-ui body {
+  min-width: 0 !important;
+  background: var(--vexa-bg-0) !important;
+}
+
+html.vexa-creative-ui body {
+  color: var(--vexa-text);
+  background:
+    radial-gradient(circle at 68% -15%, rgba(83, 86, 210, .13), transparent 32%),
+    linear-gradient(180deg, #07101c 0%, #050812 100%) !important;
+}
+
+html.vexa-creative-ui body,
+html.vexa-creative-ui button,
+html.vexa-creative-ui input,
+html.vexa-creative-ui select,
+html.vexa-creative-ui textarea {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* ---------- application shell ---------- */
+
+html.vexa-creative-ui .editor-shell {
+  width: 100vw;
+  max-width: 100vw;
+  min-width: 0;
+  grid-template-columns: 78px clamp(250px, 17vw, 310px) minmax(0, 1fr) clamp(320px, 22vw, 382px);
+  grid-template-rows: 64px minmax(0, 1fr) 286px;
+  gap: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+html.vexa-creative-ui .tool-rail,
+html.vexa-creative-ui .media-panel,
+html.vexa-creative-ui .preview-workspace,
+html.vexa-creative-ui .inspector-panel,
+html.vexa-creative-ui .timeline-panel {
+  min-width: 0;
+}
+
+html.vexa-creative-ui .topbar {
+  grid-template-columns: 330px minmax(250px, 1fr) minmax(300px, 510px) auto;
+  min-width: 0;
+  gap: 16px;
+  padding: 0 16px 0 18px;
+  border-bottom: 1px solid var(--vexa-border);
+  background: rgba(6, 12, 23, .96);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .18);
+  backdrop-filter: blur(18px);
+}
+
+html.vexa-creative-ui .brand-mark {
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(129, 116, 255, .72);
+  border-radius: 9px;
+  background: linear-gradient(145deg, #6d7cff 0%, #7154fb 55%, #4936d7 100%);
+  box-shadow: 0 0 26px rgba(100, 83, 255, .28), inset 0 1px rgba(255,255,255,.22);
+}
+
+html.vexa-creative-ui .brand strong { font-size: 14px; letter-spacing: -.01em; }
+html.vexa-creative-ui .brand span { color: var(--vexa-muted); font-size: 10px; }
+
+html.vexa-creative-ui .project-title {
+  align-items: flex-start;
+  padding-left: 14px;
+  border-left: 1px solid var(--vexa-border);
+}
+html.vexa-creative-ui .project-title strong { font-size: 12px; }
+html.vexa-creative-ui .project-title span { color: var(--vexa-muted); }
+
+.vexa-command-search {
+  position: relative;
+  min-width: 0;
+}
+.vexa-command-search input {
+  width: 100%;
+  height: 36px;
+  padding: 0 70px 0 38px;
+  border: 1px solid #1d2d49;
+  border-radius: 9px;
+  outline: 0;
+  background: #0d1728;
+  color: #dce5f7;
+  font-size: 10px;
+  box-shadow: inset 0 1px rgba(255,255,255,.02);
+  transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+.vexa-command-search input:focus {
+  border-color: #5b68d9;
+  background: #101b30;
+  box-shadow: 0 0 0 3px rgba(91, 104, 217, .12);
+}
+.vexa-command-search::before {
+  content: "⌕";
+  position: absolute;
+  left: 13px;
+  top: 8px;
+  color: #8091af;
+  font-size: 16px;
+  z-index: 1;
+}
+.vexa-command-search kbd {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  padding: 3px 7px;
+  border: 1px solid #263855;
+  border-radius: 5px;
+  background: #111d30;
+  color: #71839f;
+  font: 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html.vexa-creative-ui .top-actions { gap: 7px; }
+html.vexa-creative-ui .status-dot {
+  padding: 6px 8px;
+  border: 1px solid #1d3042;
+  border-radius: 7px;
+  background: #0b1722;
+  color: #87a29a;
+}
+html.vexa-creative-ui .button,
+html.vexa-creative-ui .icon-button,
+html.vexa-creative-ui .transport-button,
+html.vexa-creative-ui .compact-select,
+html.vexa-creative-ui input:not([type="range"]),
+html.vexa-creative-ui select,
+html.vexa-creative-ui textarea {
+  border-color: #23344f;
+  background: #111c2e;
+  color: #e3ebfa;
+}
+html.vexa-creative-ui .button {
+  border-radius: 7px;
+  font-weight: 700;
+  box-shadow: inset 0 1px rgba(255,255,255,.035);
+}
+html.vexa-creative-ui .button.primary,
+html.vexa-creative-ui #topRenderButton {
+  border-color: #6878ff;
+  background: linear-gradient(135deg, #4b86ff 0%, #6b57ff 100%);
+  color: white;
+  box-shadow: 0 8px 22px rgba(83, 82, 238, .22), inset 0 1px rgba(255,255,255,.2);
+}
+html.vexa-creative-ui .button.primary:hover,
+html.vexa-creative-ui #topRenderButton:hover {
+  background: linear-gradient(135deg, #6196ff 0%, #7b68ff 100%);
+}
+
+/* ---------- tool rail ---------- */
+
+html.vexa-creative-ui .tool-rail {
+  padding: 10px 7px;
+  gap: 4px;
+  border-right: 1px solid var(--vexa-border);
+  background: rgba(6, 12, 23, .97);
+  scrollbar-width: none;
+}
+html.vexa-creative-ui .tool-rail::-webkit-scrollbar { display: none; }
+html.vexa-creative-ui .rail-button {
+  width: 64px;
+  min-height: 54px;
+  gap: 4px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #8291aa;
+  transition: transform 120ms ease, color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+html.vexa-creative-ui .rail-button span {
+  width: 27px;
+  height: 27px;
+  border: 0;
+  border-radius: 7px;
+  background: #101a2a;
+  color: #9eafd0;
+  font-size: 10px;
+}
+html.vexa-creative-ui .rail-button small { font-size: 8px; }
+html.vexa-creative-ui .rail-button:hover {
+  transform: translateY(-1px);
+  border-color: #1d2f4c;
+  background: #0d1728;
+}
+html.vexa-creative-ui .rail-button.active {
+  border-color: #2a3768;
+  background: linear-gradient(135deg, rgba(66, 84, 176, .34), rgba(94, 64, 194, .28));
+  color: white;
+}
+html.vexa-creative-ui .rail-button.active span {
+  background: linear-gradient(145deg, #466cd7, #6648d9);
+  color: white;
+  box-shadow: 0 5px 14px rgba(74, 77, 214, .24);
+}
+
+/* ---------- media library ---------- */
+
+html.vexa-creative-ui .media-panel,
+html.vexa-creative-ui .inspector-panel {
+  background: var(--vexa-panel);
+}
+html.vexa-creative-ui .media-panel {
+  padding: 13px;
+  border-right: 1px solid var(--vexa-border);
+}
+html.vexa-creative-ui .panel-title {
+  margin-bottom: 9px;
+  padding: 1px 1px 4px;
+}
+html.vexa-creative-ui .panel-title h2 { font-size: 15px; }
+html.vexa-creative-ui .kicker,
+html.vexa-creative-ui .section-label { color: #677895; }
+
+.vexa-media-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 3px;
+  margin: 4px 0 9px;
+  padding: 3px;
+  border: 1px solid var(--vexa-border);
+  border-radius: 8px;
+  background: #091321;
+}
+.vexa-media-tabs button {
+  min-width: 0;
+  padding: 6px 2px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #7888a4;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.vexa-media-tabs button.active {
+  background: linear-gradient(135deg, #263b78, #342a72);
+  color: #f5f7ff;
+}
+.vexa-media-search {
+  position: relative;
+  margin-bottom: 10px;
+}
+.vexa-media-search input {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px 0 31px;
+  border: 1px solid #21334f;
+  border-radius: 8px;
+  outline: none;
+  background: #0e192a !important;
+  font-size: 9px;
+}
+.vexa-media-search::before {
+  content: "⌕";
+  position: absolute;
+  left: 10px;
+  top: 7px;
+  color: #7486a4;
+}
+html.vexa-creative-ui .drop-zone,
+html.vexa-creative-ui .remote-import-card,
+html.vexa-creative-ui .asset-card,
+html.vexa-creative-ui .metadata-item,
+html.vexa-creative-ui .generated-item {
+  border-color: #1d2d47;
+  background: #0e1828;
+}
+html.vexa-creative-ui .drop-zone {
+  min-height: 68px;
+  border-style: solid;
+  background: linear-gradient(135deg, #0d192b, #10182a);
+}
+html.vexa-creative-ui .asset-card {
+  border-radius: 8px;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+html.vexa-creative-ui .asset-card:hover {
+  transform: translateY(-1px);
+  border-color: #405f99;
+}
+html.vexa-creative-ui .asset-card.active {
+  border-color: #6576ff;
+  background: linear-gradient(135deg, rgba(33, 57, 101, .9), rgba(43, 37, 94, .82));
+  box-shadow: inset 2px 0 #6677ff;
+}
+
+/* ---------- preview ---------- */
+
+html.vexa-creative-ui .preview-workspace {
+  border-right: 1px solid var(--vexa-border);
+  background: #060b14;
+}
+html.vexa-creative-ui .preview-toolbar {
+  height: 42px;
+  padding: 0 10px;
+  background: #0a1321;
+  border-color: var(--vexa-border);
+}
+html.vexa-creative-ui .mode-tabs { gap: 2px; }
+html.vexa-creative-ui .mode-tab {
+  padding: 6px 11px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #7a8aa6;
+}
+html.vexa-creative-ui .mode-tab.active {
+  border-color: #26395b;
+  background: #121e31;
+  color: white;
+}
+html.vexa-creative-ui .preview-info span {
+  border-color: #233650;
+  background: #0e1928;
+}
+html.vexa-creative-ui .stage-wrap {
+  padding: 12px;
+  background:
+    radial-gradient(circle at 72% 20%, rgba(76, 71, 167, .15), transparent 27%),
+    radial-gradient(circle at 48% 70%, rgba(28, 63, 117, .18), transparent 36%),
+    #050a12;
+}
+html.vexa-creative-ui .video-stage video {
+  border: 1px solid #20314d;
+  border-radius: 6px;
+  box-shadow: 0 28px 80px rgba(0,0,0,.44), 0 0 0 1px rgba(78,98,157,.08);
+}
+html.vexa-creative-ui .stage-empty-icon {
+  background: linear-gradient(145deg, #182a4d, #2b2360);
+  border-color: #3a4a7c;
+  color: #b9c4ff;
+}
+
+html.vexa-creative-ui .transport-bar,
+html.vexa-creative-ui .player-demo-transport {
+  border-color: var(--vexa-border);
+  background: #0a1320;
+}
+html.vexa-creative-ui .play-button {
+  border: 1px solid #435885;
+  background: linear-gradient(145deg, #1b2a43, #142038);
+  color: #f5f7ff;
+  box-shadow: 0 4px 14px rgba(0,0,0,.25);
+}
+html.vexa-creative-ui .seek-bar,
+html.vexa-creative-ui input[type="range"] { accent-color: var(--vexa-violet); }
+
+/* ---------- inspector ---------- */
+
+html.vexa-creative-ui .inspector-panel {
+  border-left: 0;
+  box-shadow: -12px 0 34px rgba(0,0,0,.08);
+}
+html.vexa-creative-ui .inspector-tabs {
+  height: 42px;
+  gap: 2px;
+  padding: 0 8px;
+  border-color: var(--vexa-border);
+  background: #0a1321;
+}
+html.vexa-creative-ui .inspector-tabs button {
+  border-bottom-width: 2px;
+  color: #8391aa;
+}
+html.vexa-creative-ui .inspector-tabs button.active {
+  border-color: #7160ff;
+  color: white;
+}
+html.vexa-creative-ui .inspector-section,
+html.vexa-creative-ui .project-subsection,
+html.vexa-creative-ui .payload-heading,
+html.vexa-creative-ui .plan-output,
+html.vexa-creative-ui .log-output {
+  border-color: #1d2d47;
+}
+html.vexa-creative-ui .inspector-section {
+  margin: 0;
+  padding: 13px 12px;
+  border-bottom: 1px solid #182740;
+  background: transparent;
+}
+html.vexa-creative-ui .section-row strong { font-size: 10px; }
+html.vexa-creative-ui .field-grid label { color: #8d9bb5; }
+html.vexa-creative-ui .field-grid input,
+html.vexa-creative-ui .field-grid select {
+  border-radius: 6px;
+  background: #111d30 !important;
+}
+html.vexa-creative-ui .segmented,
+html.vexa-creative-ui .quick-actions {
+  gap: 4px;
+}
+html.vexa-creative-ui .segmented button,
+html.vexa-creative-ui .quick-actions button {
+  border: 1px solid #233650;
+  background: #111d30;
+  color: #91a0b8;
+}
+html.vexa-creative-ui .segmented button.active,
+html.vexa-creative-ui .quick-actions button:hover {
+  border-color: #5265bd;
+  background: #1c2a49;
+  color: white;
+}
+
+.vexa-ai-card {
+  margin: 10px;
+  padding: 10px;
+  border: 1px solid #25365c;
+  border-radius: 9px;
+  background:
+    linear-gradient(135deg, rgba(39, 51, 100, .58), rgba(30, 25, 74, .5)),
+    #0d1728;
+  box-shadow: inset 0 1px rgba(255,255,255,.035);
+}
+.vexa-ai-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.vexa-ai-card-header strong { font-size: 9px; }
+.vexa-ai-card-header span {
+  padding: 2px 5px;
+  border: 1px solid #554cb2;
+  border-radius: 4px;
+  color: #afa8ff;
+  font-size: 7px;
+  letter-spacing: .05em;
+}
+.vexa-ai-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.vexa-ai-grid button {
+  min-height: 58px;
+  padding: 8px;
+  border: 1px solid #2a3865;
+  border-radius: 7px;
+  background: linear-gradient(145deg, rgba(46,64,127,.68), rgba(42,34,97,.64));
+  color: #e7e9ff;
+  text-align: left;
+  cursor: pointer;
+}
+.vexa-ai-grid button:hover { border-color: #6573da; }
+.vexa-ai-grid strong { display: block; font-size: 8px; }
+.vexa-ai-grid small { display: block; margin-top: 4px; color: #909dc3; font-size: 7px; line-height: 1.35; }
+
+/* ---------- timeline ---------- */
+
+html.vexa-creative-ui .timeline-panel {
+  background: #07101c;
+  border-top: 1px solid var(--vexa-border);
+}
+html.vexa-creative-ui .timeline-toolbar {
+  background: #0a1321;
+  border-color: var(--vexa-border);
+}
+html.vexa-creative-ui .timeline-body {
+  background:
+    linear-gradient(90deg, rgba(78,100,150,.055) 1px, transparent 1px),
+    #07101b;
+  background-size: 42px 100%;
+}
+html.vexa-creative-ui .track-labels {
+  border-right-color: #1c2b43;
+  background: #091321;
+}
+html.vexa-creative-ui .track-row,
+html.vexa-creative-ui .time-ruler { border-color: #17263d; }
+html.vexa-creative-ui .timeline-clip,
+html.vexa-creative-ui .project-clip {
+  border-radius: 5px;
+  box-shadow: inset 0 1px rgba(255,255,255,.08), 0 3px 9px rgba(0,0,0,.16);
+}
+html.vexa-creative-ui .video-clip,
+html.vexa-creative-ui .project-clip[data-kind="video"] {
+  background: linear-gradient(90deg, #294e9d, #335db7);
+  border-color: #5780e0;
+}
+html.vexa-creative-ui .project-clip[data-kind="text"] {
+  background: linear-gradient(90deg, #5637b8, #704ad5);
+  border-color: #8a6ce6;
+}
+html.vexa-creative-ui .audio-clip,
+html.vexa-creative-ui .project-clip[data-kind="audio"] {
+  background: linear-gradient(90deg, #147f63, #1a9a72);
+  border-color: #42c59c;
+}
+html.vexa-creative-ui .timeline-playhead {
+  background: #5bc5ff;
+  box-shadow: 0 0 12px rgba(91,197,255,.36);
+}
+
+/* ---------- Studio creative layout ---------- */
+
+html.vexa-creative-ui body.studio-workspace-active .topbar {
+  grid-template-columns: 330px minmax(220px, 1fr) minmax(300px, 510px) auto;
+}
+html.vexa-creative-ui body.studio-workspace-active .preview-toolbar {
+  background: #091321;
+}
+html.vexa-creative-ui body.studio-workspace-active .studio-workspace {
+  min-height: 100%;
+  padding: 8px;
+  gap: 7px;
+  background:
+    radial-gradient(circle at 65% 0%, rgba(79,69,166,.12), transparent 29%),
+    #050a12;
+}
+html.vexa-creative-ui .studio-heading {
+  min-height: 52px;
+  align-items: center;
+  padding: 0 4px 0 7px;
+}
+html.vexa-creative-ui .studio-heading .kicker { display: none; }
+html.vexa-creative-ui .studio-heading h1 {
+  margin: 0;
+  font-size: 14px;
+  letter-spacing: -.01em;
+}
+html.vexa-creative-ui .studio-heading p {
+  margin-top: 3px;
+  color: #7889a5;
+  font-size: 8px;
+}
+html.vexa-creative-ui .studio-status {
+  border-color: #21324f;
+  background: #0d1728;
+}
+html.vexa-creative-ui .studio-shell-grid {
+  grid-template-columns: clamp(230px, 17vw, 292px) minmax(500px, 1fr) clamp(330px, 24vw, 410px);
+  gap: 7px;
+}
+html.vexa-creative-ui .studio-panel,
+html.vexa-creative-ui .studio-preview-column {
+  border-color: #1b2b44;
+  border-radius: 9px;
+  background: rgba(8, 15, 27, .96);
+  box-shadow: var(--vexa-shadow);
+}
+html.vexa-creative-ui .studio-compositions-panel {
+  display: grid;
+  grid-template-rows: 34px minmax(138px, .74fr) auto minmax(170px, 1.05fr);
+}
+html.vexa-creative-ui .studio-panel-title,
+html.vexa-creative-ui .studio-preview-toolbar,
+html.vexa-creative-ui .studio-tabs {
+  border-color: #1a2a42;
+  background: #0b1525;
+}
+html.vexa-creative-ui .studio-composition-list {
+  height: auto;
+  min-height: 0;
+  padding: 7px;
+}
+html.vexa-creative-ui .studio-composition {
+  padding: 9px;
+  border-color: #20314e;
+  border-radius: 7px;
+  background: #0e1a2d;
+}
+html.vexa-creative-ui .studio-composition.active {
+  border-color: #6574ff;
+  background: linear-gradient(135deg, rgba(42,64,120,.92), rgba(52,40,115,.88));
+  box-shadow: inset 2px 0 #7580ff, 0 7px 18px rgba(32,32,81,.18);
+}
+html.vexa-creative-ui .studio-preview-column {
+  grid-template-rows: 42px minmax(280px, 1fr) minmax(164px, 210px);
+}
+html.vexa-creative-ui .studio-preview-stage {
+  padding: 12px;
+  background:
+    radial-gradient(circle at 70% 20%, rgba(86,69,184,.17), transparent 31%),
+    radial-gradient(circle at 37% 76%, rgba(40,87,153,.13), transparent 35%),
+    #050a12;
+}
+html.vexa-creative-ui .studio-scene-surface {
+  border-color: #263b5d;
+  border-radius: 5px;
+  box-shadow: 0 26px 80px rgba(0,0,0,.46), 0 0 0 1px rgba(96, 111, 191, .08);
+}
+html.vexa-creative-ui .studio-frame-badge {
+  border-color: #33496d;
+  background: rgba(8, 17, 31, .9);
+  color: #d7e3f8;
+}
+html.vexa-creative-ui .studio-timeline {
+  position: relative;
+  padding: 8px 9px 9px;
+  border-top: 1px solid #192a43;
+  background: #08121f;
+  overflow: hidden;
+}
+html.vexa-creative-ui .studio-timeline > input[type="range"] { margin: 6px 0 4px; }
+
+.vexa-studio-scene-panel {
+  min-height: 0;
+  border-top: 1px solid #192a43;
+  background: #091321;
+}
+.vexa-studio-scene-title {
+  height: 33px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 9px;
+  border-bottom: 1px solid #192a43;
+}
+.vexa-studio-scene-title strong { font-size: 9px; }
+.vexa-studio-scene-title span { color: #667a98; font-size: 8px; }
+.vexa-studio-scene-tree {
+  max-height: 100%;
+  overflow: auto;
+  padding: 6px;
+}
+.vexa-scene-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 27px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  color: #b5c3d9;
+  font-size: 8px;
+}
+.vexa-scene-row:hover { background: #101d31; }
+.vexa-scene-row.active {
+  background: linear-gradient(90deg, rgba(50,76,141,.66), rgba(61,46,132,.52));
+  color: white;
+}
+.vexa-scene-row i {
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #2c4265;
+  border-radius: 4px;
+  color: #8da8d5;
+  font-style: normal;
+  font-size: 7px;
+}
+.vexa-scene-row small { color: #61738f; font-size: 7px; }
+
+html.vexa-creative-ui .studio-tabs { padding: 4px; gap: 3px; }
+html.vexa-creative-ui .studio-tabs button {
+  border-radius: 5px;
+  color: #7d8daa;
+}
+html.vexa-creative-ui .studio-tabs button.active {
+  background: #1a2744;
+  color: #c5c8ff;
+  box-shadow: inset 0 -2px #7764ff;
+}
+html.vexa-creative-ui .studio-inspector-scroll { background: #08111e; }
+html.vexa-creative-ui .studio-inspector-section,
+html.vexa-creative-ui .studio-render-card {
+  border-color: #1a2a43;
+  background: transparent;
+}
+html.vexa-creative-ui #studioProps {
+  min-height: 240px;
+  border-color: #213551;
+  border-radius: 7px;
+  background: #081321 !important;
+  color: #c8d5ee;
+  font-size: 9px;
+  line-height: 1.6;
+  tab-size: 2;
+}
+html.vexa-creative-ui #studioProps:focus {
+  border-color: #635fe0;
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(99,95,224,.1);
+}
+html.vexa-creative-ui .studio-render-card {
+  margin: 9px;
+  border: 1px solid #24365b;
+  border-radius: 8px;
+  background: linear-gradient(145deg, rgba(22,34,62,.78), rgba(18,23,49,.76));
+}
+html.vexa-creative-ui .studio-render-progress progress {
+  accent-color: #6b62ff;
+}
+html.vexa-creative-ui .studio-render-output img,
+html.vexa-creative-ui .studio-render-output video {
+  border: 1px solid #2c4165;
+  border-radius: 6px;
+}
+
+.vexa-studio-track-stack {
+  position: relative;
+  min-height: 66px;
+  margin-top: 6px;
+  border: 1px solid #192a43;
+  border-radius: 6px;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(67,88,130,.09) 1px, transparent 1px),
+    #07101c;
+  background-size: 10% 100%;
+}
+.vexa-studio-track-row {
+  height: 21px;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  border-bottom: 1px solid #122139;
+}
+.vexa-studio-track-row:last-child { border-bottom: 0; }
+.vexa-studio-track-label {
+  display: flex;
+  align-items: center;
+  padding: 0 7px;
+  border-right: 1px solid #192a43;
+  background: #091421;
+  color: #8191ab;
+  font-size: 7px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vexa-studio-track-lane { position: relative; min-width: 0; }
+.vexa-studio-track-clip {
+  position: absolute;
+  inset: 3px 4px;
+  border: 1px solid #6b64d8;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(66,86,184,.78), rgba(99,67,189,.82));
+}
+.vexa-studio-track-row:nth-child(2n) .vexa-studio-track-clip {
+  border-color: #507fca;
+  background: linear-gradient(90deg, rgba(43,89,157,.75), rgba(54,73,142,.78));
+}
+.vexa-studio-track-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 72px;
+  width: 1px;
+  background: #58c5ff;
+  box-shadow: 0 0 9px rgba(88,197,255,.55);
+  pointer-events: none;
+}
+.vexa-studio-track-playhead::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: #58c5ff;
+}
+
+.vexa-ui-toast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 20000;
+  max-width: 340px;
+  padding: 10px 12px;
+  border: 1px solid #344b76;
+  border-radius: 8px;
+  background: rgba(10, 20, 36, .97);
+  color: #dfe9fb;
+  box-shadow: 0 18px 50px rgba(0,0,0,.38);
+  font-size: 9px;
+  line-height: 1.45;
+  transform: translateY(14px);
+  opacity: 0;
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+.vexa-ui-toast.visible { transform: translateY(0); opacity: 1; }
+
+/* ---------- focused workspace ownership ---------- */
+
+/* Player, Bundles and Studio already own a focused two-column shell. Keep the
+ * creative Editor skin from overriding those workspace-specific grid contracts.
+ * Without these selectors the later Editor grid wins the cascade and squeezes
+ * the focused preview into an implicit/narrow column. */
+html.vexa-creative-ui body.player-workspace-active .editor-shell,
+html.vexa-creative-ui body.bundler-workspace-active .editor-shell,
+html.vexa-creative-ui body.studio-workspace-active .editor-shell {
+  width: 100vw;
+  max-width: 100vw;
+  min-width: 0;
+  grid-template-columns: var(--editor-rail) minmax(0, 1fr);
+  grid-template-rows: var(--editor-topbar) minmax(0, 1fr);
+}
+
+html.vexa-creative-ui body.player-workspace-active .media-panel,
+html.vexa-creative-ui body.player-workspace-active .inspector-panel,
+html.vexa-creative-ui body.player-workspace-active .timeline-panel,
+html.vexa-creative-ui body.bundler-workspace-active .media-panel,
+html.vexa-creative-ui body.bundler-workspace-active .inspector-panel,
+html.vexa-creative-ui body.bundler-workspace-active .timeline-panel,
+html.vexa-creative-ui body.studio-workspace-active .media-panel,
+html.vexa-creative-ui body.studio-workspace-active .inspector-panel,
+html.vexa-creative-ui body.studio-workspace-active .timeline-panel {
+  display: none !important;
+}
+
+html.vexa-creative-ui body.player-workspace-active .preview-workspace,
+html.vexa-creative-ui body.bundler-workspace-active .preview-workspace,
+html.vexa-creative-ui body.studio-workspace-active .preview-workspace {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 1480px) {
+  html.vexa-creative-ui .editor-shell {
+    grid-template-columns: 72px clamp(220px, 18vw, 260px) minmax(0, 1fr) clamp(280px, 22vw, 320px);
+  }
+  html.vexa-creative-ui .topbar {
+    grid-template-columns: 280px minmax(190px, 1fr) minmax(230px, 380px) auto;
+  }
+  html.vexa-creative-ui .studio-shell-grid {
+    grid-template-columns: clamp(200px, 17vw, 235px) minmax(0, 1fr) clamp(280px, 23vw, 320px);
+  }
+}
+
+@media (max-width: 1180px) {
+  html.vexa-creative-ui .editor-shell {
+    grid-template-columns: 64px 210px minmax(0, 1fr) 260px;
+  }
+  html.vexa-creative-ui .vexa-command-search { display: none; }
+  html.vexa-creative-ui .topbar { grid-template-columns: 260px 1fr auto; }
+  html.vexa-creative-ui .studio-shell-grid {
+    grid-template-columns: 200px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  html.vexa-creative-ui .studio-inspector-panel {
+    grid-column: 1 / -1;
+    max-height: 330px;
+  }
+}
+
+@media (max-width: 900px) {
+  html.vexa-creative-ui .editor-shell {
+    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-rows: 58px minmax(0, 1fr) 250px;
+  }
+  html.vexa-creative-ui .topbar {
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr auto;
+    height: 58px;
+  }
+  html.vexa-creative-ui .project-title,
+  html.vexa-creative-ui .status-dot { display: none; }
+  html.vexa-creative-ui .media-panel {
+    position: fixed;
+    top: 58px;
+    bottom: 0;
+    left: 64px;
+    z-index: 500;
+    width: min(320px, calc(100vw - 64px));
+    box-shadow: 20px 0 50px rgba(0,0,0,.42);
+  }
+  html.vexa-creative-ui .preview-workspace {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  html.vexa-creative-ui .inspector-panel { display: none; }
+  html.vexa-creative-ui .timeline-panel {
+    grid-column: 2;
+    grid-row: 3;
+  }
+  html.vexa-creative-ui body.studio-workspace-active .editor-shell {
+    grid-template-columns: 64px minmax(0,1fr);
+  }
+  html.vexa-creative-ui .studio-shell-grid {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+  }
+  html.vexa-creative-ui .studio-compositions-panel { min-height: 270px; }
+  html.vexa-creative-ui .studio-preview-column { min-height: 560px; }
+  html.vexa-creative-ui .studio-inspector-panel { min-height: 420px; max-height: none; }
+}
+
+/* ========================================================================== */
+/* High-fidelity mockup alignment                                             */
+/* ========================================================================== */
+
+:root {
+  --vexa-mock-bg: #050a12;
+  --vexa-mock-panel: #08111f;
+  --vexa-mock-panel-2: #0b1525;
+  --vexa-mock-panel-3: #0f1b2f;
+  --vexa-mock-line: #182943;
+  --vexa-mock-line-2: #243a5d;
+  --vexa-mock-text: #eef4ff;
+  --vexa-mock-muted: #8fa0bc;
+  --vexa-mock-violet: #6757ff;
+  --vexa-mock-blue: #4e8cff;
+  --vexa-mock-cyan: #58c7ff;
+  --vexa-mock-green: #25b783;
+  --vexa-mock-topbar: 62px;
+  --vexa-mock-rail: 80px;
+}
+
+html.vexa-creative-ui body {
+  background: #040812 !important;
+}
+
+html.vexa-creative-ui .editor-shell {
+  grid-template-columns: var(--vexa-mock-rail) clamp(355px, 25vw, 430px) minmax(560px, 1fr) clamp(360px, 23.5vw, 420px);
+  grid-template-rows: var(--vexa-mock-topbar) minmax(0, 1fr) clamp(250px, 30vh, 306px);
+  background: #050a12;
+}
+
+html.vexa-creative-ui .topbar {
+  /* Product header: brand, workspace switcher, project title, command search,
+   * and actions. Decorative desktop window controls are intentionally omitted. */
+  grid-template-columns: minmax(205px, 230px) 176px minmax(155px, 205px) minmax(260px, 1fr) auto;
+  grid-auto-flow: column;
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 12px;
+  min-height: var(--vexa-mock-topbar);
+  padding: 0 14px 0 12px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #07111f, #060e1a);
+  border-bottom-color: #182943;
+}
+html.vexa-creative-ui .topbar > * { min-width: 0; }
+
+.vexa-window-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 2px;
+}
+.vexa-window-dots i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ff5f57;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.16);
+}
+.vexa-window-dots i:nth-child(2) { background: #ffbd2e; }
+.vexa-window-dots i:nth-child(3) { background: #28c840; }
+
+html.vexa-creative-ui .brand {
+  min-width: 214px;
+  gap: 10px;
+}
+html.vexa-creative-ui .brand-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  font-size: 16px;
+  background: linear-gradient(145deg, #7689ff 0%, #6155f5 50%, #4430d1 100%);
+}
+html.vexa-creative-ui .brand strong {
+  font-size: 15px;
+  letter-spacing: -.02em;
+}
+html.vexa-creative-ui .brand span {
+  margin-top: 2px;
+  color: #8d9db7;
+  font-size: 9px;
+}
+
+.vexa-mode-switcher {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid #1c2d49;
+  border-radius: 8px;
+  background: #091423;
+}
+.vexa-mode-switcher button {
+  min-width: 49px;
+  height: 27px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #7889a5;
+  font-size: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.vexa-mode-switcher button:hover { color: #c8d5eb; background: #101e33; }
+.vexa-mode-switcher button.active {
+  background: linear-gradient(135deg, rgba(77,112,221,.52), rgba(91,66,210,.55));
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(105,121,255,.45);
+}
+
+html.vexa-creative-ui .project-title {
+  min-width: 170px;
+  padding-left: 13px;
+  border-left-color: #172740;
+}
+html.vexa-creative-ui .project-title strong { font-size: 11px; }
+html.vexa-creative-ui .project-title span { font-size: 8px; }
+
+.vexa-command-search {
+  width: 100%;
+  min-width: 0;
+}
+.vexa-command-search input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  border-color: #1b2d4b;
+  background: #0c1728;
+  font-size: 9px;
+}
+
+html.vexa-creative-ui .top-actions {
+  justify-self: end;
+  flex-wrap: nowrap;
+  gap: 7px;
+  min-width: 0;
+}
+.vexa-top-utility-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.vexa-top-utility-actions button {
+  height: 33px;
+  min-width: 33px;
+  padding: 0 9px;
+  border: 1px solid #203450;
+  border-radius: 7px;
+  background: #0c1727;
+  color: #a9b9d2;
+  font-size: 10px;
+  cursor: pointer;
+}
+.vexa-top-utility-actions button:hover { border-color: #4967a2; color: white; }
+.vexa-top-utility-actions .vexa-share-button { min-width: 58px; font-weight: 700; }
+html.vexa-creative-ui #topUploadButton { display: none; }
+html.vexa-creative-ui #topRenderButton {
+  min-width: 130px;
+  height: 38px;
+  border-radius: 8px;
+  font-size: 10px;
+  letter-spacing: .01em;
+}
+html.vexa-creative-ui .status-dot { display: none; }
+
+/* Rail matches the mockup: compact icon, explicit label, strong active state. */
+html.vexa-creative-ui .tool-rail {
+  grid-column: 1;
+  grid-row: 2 / 4;
+  padding: 10px 7px;
+  gap: 4px;
+  background: #06101d;
+  border-right: 1px solid #182943;
+}
+html.vexa-creative-ui .rail-button {
+  width: 66px;
+  min-height: 55px;
+  border-radius: 8px;
+  color: #93a1b9;
+}
+html.vexa-creative-ui .rail-button span {
+  width: 27px;
+  height: 27px;
+  border-radius: 7px;
+  color: #a7b9d7;
+  background: #0e1a2b;
+}
+html.vexa-creative-ui .rail-button small { font-size: 8px; }
+html.vexa-creative-ui .rail-button:hover {
+  background: #0c1b30;
+  color: #fff;
+}
+html.vexa-creative-ui .rail-button.active {
+  border-color: #4d59c8;
+  background: linear-gradient(145deg, rgba(55,76,156,.82), rgba(53,39,127,.72));
+  color: white;
+  box-shadow: inset 3px 0 #766dff;
+}
+html.vexa-creative-ui .rail-button.active span {
+  background: linear-gradient(145deg, #5d6be3, #5945c6);
+  color: white;
+}
+html.vexa-creative-ui .rail-button.vexa-secondary-rail-item { display: none !important; }
+
+/* Keep workflow navigation in the same order as the approved Editor/Studio
+ * mockups, independent of the original Playground button DOM order. */
+html.vexa-creative-ui body.vexa-editor-mode .rail-button[data-section="mediaPanel"] { order: 10; }
+html.vexa-creative-ui body.vexa-editor-mode .rail-button[data-section="projectSection"] { order: 20; }
+html.vexa-creative-ui body.vexa-editor-mode .rail-button[data-section="transformSection"] { order: 30; }
+html.vexa-creative-ui body.vexa-editor-mode .rail-button[data-section="trimSection"] { order: 40; }
+html.vexa-creative-ui body.vexa-editor-mode .rail-button[data-section="captionsSection"] { order: 50; }
+html.vexa-creative-ui body.vexa-editor-mode .rail-button[data-section="audioSection"] { order: 60; }
+html.vexa-creative-ui body.vexa-editor-mode .rail-button[data-section="exportSection"] { order: 70; }
+html.vexa-creative-ui body.vexa-editor-mode .rail-button[data-section="hardwareSection"] { order: 80; }
+
+html.vexa-creative-ui body.studio-workspace-active #studioRailButton { order: 10; }
+html.vexa-creative-ui body.studio-workspace-active #bundlerRailButton { order: 20; }
+html.vexa-creative-ui body.studio-workspace-active .rail-button[data-section="mediaPanel"] { order: 30; }
+html.vexa-creative-ui body.studio-workspace-active .rail-button[data-section="transformSection"] { order: 40; }
+html.vexa-creative-ui body.studio-workspace-active .rail-button[data-section="exportSection"] { order: 50; }
+html.vexa-creative-ui body.studio-workspace-active .rail-button[data-section="hardwareSection"] { order: 60; }
+
+html.vexa-creative-ui body.bundler-workspace-active #bundlerRailButton { order: 10; }
+html.vexa-creative-ui body.bundler-workspace-active #studioRailButton { order: 20; }
+html.vexa-creative-ui body.bundler-workspace-active .rail-button[data-section="exportSection"] { order: 30; }
+html.vexa-creative-ui body.bundler-workspace-active .rail-button[data-section="hardwareSection"] { order: 40; }
+
+/* Editor layout ownership. */
+html.vexa-creative-ui body.vexa-editor-mode .media-panel {
+  grid-column: 2;
+  grid-row: 2;
+  padding: 12px;
+  overflow: hidden;
+  background: #07111f;
+  border-right: 1px solid #182943;
+}
+html.vexa-creative-ui body.vexa-editor-mode .preview-workspace {
+  grid-column: 3;
+  grid-row: 2;
+  grid-template-rows: 42px minmax(0, 1fr) 52px;
+  min-width: 0;
+  border-right: 1px solid #182943;
+  background: #050a12;
+}
+html.vexa-creative-ui body.vexa-editor-mode .inspector-panel {
+  grid-column: 4;
+  grid-row: 2;
+  display: grid;
+  grid-template-rows: 38px minmax(0, 1fr);
+  min-width: 0;
+  background: #07111f;
+}
+html.vexa-creative-ui body.vexa-editor-mode .timeline-panel {
+  grid-column: 2 / 5;
+  grid-row: 3;
+  min-width: 0;
+  min-height: 0;
+  background: #06101c;
+}
+
+/* Media library with secondary navigation column like the approved mockup. */
+html.vexa-creative-ui .media-panel .panel-title {
+  min-height: 36px;
+  margin: 0 0 8px;
+}
+html.vexa-creative-ui .media-panel .panel-title h2 { font-size: 13px; }
+html.vexa-creative-ui .media-panel .panel-title .kicker { display: none; }
+html.vexa-creative-ui #mediaUploadButton {
+  width: auto;
+  min-width: 78px;
+  height: 29px;
+  padding: 0 10px;
+  border: 1px solid #2a4064;
+  border-radius: 6px;
+  background: #112038;
+  font-size: 0;
+}
+html.vexa-creative-ui #mediaUploadButton::after {
+  content: "+  Import";
+  font-size: 9px;
+  font-weight: 700;
+}
+.vexa-media-tabs {
+  margin: 0 0 8px;
+  padding: 2px;
+  border: 1px solid #192b47;
+  border-radius: 7px;
+  background: #091524;
+}
+.vexa-media-tabs button {
+  min-height: 25px;
+  padding: 0 9px;
+  color: #8494ae;
+  font-size: 8px;
+}
+.vexa-media-tabs button.active {
+  background: linear-gradient(135deg, #244a8f, #303f91);
+  color: #fff;
+}
+.vexa-media-search { margin-bottom: 8px; }
+.vexa-media-search input {
+  height: 31px !important;
+  padding-left: 30px !important;
+  border-radius: 6px !important;
+  background: #0d192a !important;
+  font-size: 8px !important;
+}
+.vexa-media-search::before { top: 6px; }
+.vexa-media-browser {
+  height: calc(100% - 111px);
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: 9px;
+}
+.vexa-media-nav {
+  min-width: 0;
+  overflow: auto;
+  padding: 3px 5px 8px 1px;
+  scrollbar-width: thin;
+}
+.vexa-media-nav strong {
+  display: block;
+  margin: 12px 5px 4px;
+  color: #60728f;
+  font-size: 7px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.vexa-media-nav button {
+  width: 100%;
+  min-height: 27px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #a1aec2;
+  text-align: left;
+  font-size: 8px;
+  cursor: pointer;
+}
+.vexa-media-nav button:hover,
+.vexa-media-nav button.active { background: #112038; color: white; }
+.vexa-media-nav button span { color: #7d92b5; }
+.vexa-media-nav button small { color: #61728d; font-size: 7px; }
+.vexa-media-main {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+  scrollbar-width: thin;
+}
+.vexa-media-main .drop-zone {
+  min-height: 56px;
+  margin-bottom: 7px;
+  border-radius: 7px;
+  font-size: 8px;
+}
+.vexa-media-main .remote-import-card { margin-bottom: 8px; }
+.vexa-media-main .media-list,
+.vexa-media-main #assetLibrary,
+.vexa-media-main .generated-assets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+html.vexa-creative-ui .vexa-media-main .asset-card {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-content: start;
+  min-width: 0;
+  padding: 5px;
+  border-color: #1e3150;
+  border-radius: 6px;
+  background: #0b1728;
+}
+html.vexa-creative-ui .vexa-media-main .asset-card:hover,
+html.vexa-creative-ui .vexa-media-main .asset-card.active {
+  border-color: #6174e7;
+  background: #0f1d34;
+  box-shadow: 0 0 0 1px rgba(96,110,235,.18);
+}
+html.vexa-creative-ui .vexa-media-main .asset-thumb {
+  width: 100%;
+  height: 68px;
+  border-radius: 5px;
+  background: linear-gradient(135deg, #173158, #172142 55%, #332565);
+}
+html.vexa-creative-ui .vexa-media-main .asset-copy { margin-top: 5px; }
+html.vexa-creative-ui .vexa-media-main .asset-copy strong { font-size: 8px; }
+html.vexa-creative-ui .vexa-media-main .asset-copy span { font-size: 7px; }
+html.vexa-creative-ui .vexa-media-main .asset-badge { display: none; }
+html.vexa-creative-ui .vexa-media-main .empty-state { grid-column: 1 / -1; }
+html.vexa-creative-ui .vexa-media-main .media-details,
+html.vexa-creative-ui .vexa-media-main .generated-section {
+  margin-top: 10px;
+  padding-top: 9px;
+}
+
+/* Preview header and monitor. */
+html.vexa-creative-ui .preview-toolbar {
+  min-width: 0;
+  padding: 0 9px;
+  border-bottom-color: #182943;
+  background: #081321;
+}
+html.vexa-creative-ui body.vexa-editor-mode .preview-toolbar .mode-tabs { display: none; }
+.vexa-preview-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #edf4ff;
+  font-size: 9px;
+}
+.vexa-preview-heading span { color: #97aed3; }
+.vexa-preview-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.vexa-preview-tools button {
+  height: 27px;
+  padding: 0 8px;
+  border: 1px solid #223755;
+  border-radius: 6px;
+  background: #0f1c2f;
+  color: #a5b5ce;
+  font-size: 8px;
+  cursor: pointer;
+}
+.vexa-preview-tools .vexa-viewport-chip { min-width: 128px; }
+.vexa-preview-tools .vexa-fit-chip { min-width: 48px; }
+html.vexa-creative-ui body.vexa-editor-mode .preview-info { display: none; }
+html.vexa-creative-ui body.vexa-editor-mode .stage-wrap {
+  padding: 9px;
+  background: radial-gradient(circle at 55% 22%, rgba(54,74,143,.19), transparent 33%), #03070e;
+}
+html.vexa-creative-ui body.vexa-editor-mode .video-stage,
+html.vexa-creative-ui body.vexa-editor-mode .stage-empty {
+  border: 1px solid #172b48;
+  border-radius: 6px;
+  background: #02050a;
+  box-shadow: 0 18px 50px rgba(0,0,0,.4);
+}
+html.vexa-creative-ui body.vexa-editor-mode .video-stage video {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 3px;
+}
+html.vexa-creative-ui body.vexa-editor-mode .transport-bar {
+  min-height: 52px;
+  gap: 9px;
+  padding: 0 9px;
+  border-top-color: #182943;
+  background: #081321;
+}
+html.vexa-creative-ui body.vexa-editor-mode .play-button {
+  width: 32px;
+  height: 32px;
+  background: #edf4ff;
+  color: #08111e;
+}
+
+/* Inspector uses real workflow tabs and keeps the existing controls underneath. */
+.vexa-legacy-inspector-tabs { display: none !important; }
+.vexa-inspector-workflow-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: stretch;
+  border-bottom: 1px solid #182943;
+  background: #081321;
+}
+.vexa-inspector-workflow-tabs button {
+  min-width: 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #7f90aa;
+  font-size: 8px;
+  cursor: pointer;
+}
+.vexa-inspector-workflow-tabs button:hover { color: #d4def0; }
+.vexa-inspector-workflow-tabs button.active {
+  border-bottom-color: #7b66ff;
+  color: #bdb8ff;
+  background: rgba(77,61,154,.12);
+}
+html.vexa-creative-ui .inspector-content,
+html.vexa-creative-ui .payload-content {
+  background: #07111f;
+  scrollbar-width: thin;
+}
+html.vexa-creative-ui .inspector-section {
+  margin: 8px;
+  padding: 9px;
+  border: 1px solid #192b46;
+  border-radius: 7px;
+  background: #0a1627;
+}
+html.vexa-creative-ui .inspector-section .section-row strong { font-size: 9px; }
+html.vexa-creative-ui .inspector-section label { font-size: 8px; }
+html.vexa-creative-ui .inspector-section input,
+html.vexa-creative-ui .inspector-section select { height: 29px; font-size: 8px; }
+
+.vexa-ai-card {
+  margin: 8px;
+  padding: 9px;
+  border-color: #263765;
+  background: linear-gradient(145deg, rgba(34,49,104,.66), rgba(30,25,78,.62));
+}
+.vexa-ai-card-header { gap: 5px; }
+.vexa-ai-card-header strong { font-size: 9px; }
+.vexa-ai-card-header button {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: #9eb6ec;
+  font-size: 7px;
+  cursor: pointer;
+}
+.vexa-ai-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.vexa-ai-grid button {
+  min-height: 88px;
+  padding: 8px 5px;
+  text-align: center;
+  background: linear-gradient(145deg, rgba(48,70,137,.72), rgba(47,37,105,.72));
+}
+.vexa-ai-grid i {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 6px;
+  border-radius: 7px;
+  background: linear-gradient(145deg, #526ce8, #5947c4);
+  color: white;
+  font-style: normal;
+  font-size: 10px;
+}
+.vexa-ai-grid strong { font-size: 7px; }
+.vexa-ai-grid small { font-size: 6px; line-height: 1.3; }
+
+/* Timeline: broad professional multi-track surface. */
+html.vexa-creative-ui body.vexa-editor-mode .timeline-panel {
+  border-top: 1px solid #1a2b45;
+  box-shadow: inset 0 1px rgba(255,255,255,.012);
+}
+html.vexa-creative-ui .timeline-toolbar {
+  min-height: 38px;
+  background: #081321;
+  border-bottom: 1px solid #182943;
+}
+html.vexa-creative-ui .timeline-body {
+  background:
+    linear-gradient(90deg, rgba(95,119,171,.065) 1px, transparent 1px),
+    #06101c;
+  background-size: 56px 100%;
+}
+html.vexa-creative-ui .track-labels {
+  min-width: 174px;
+  background: #081321;
+}
+html.vexa-creative-ui .track-row { min-height: 31px; }
+html.vexa-creative-ui .timeline-clip,
+html.vexa-creative-ui .project-clip {
+  border-radius: 4px;
+  font-size: 8px;
+}
+html.vexa-creative-ui .timeline-playhead {
+  width: 1px;
+  background: #54c4ff;
+  box-shadow: 0 0 9px rgba(84,196,255,.48);
+}
+
+/* Studio: dedicated composition workspace, matching the approved composition mockup. */
+html.vexa-creative-ui body.studio-workspace-active .editor-shell,
+html.vexa-creative-ui body.bundler-workspace-active .editor-shell,
+html.vexa-creative-ui body.player-workspace-active .editor-shell {
+  grid-template-columns: var(--vexa-mock-rail) minmax(0, 1fr) !important;
+  grid-template-rows: var(--vexa-mock-topbar) minmax(0, 1fr) !important;
+}
+html.vexa-creative-ui body.studio-workspace-active .preview-workspace {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  border: 0;
+}
+html.vexa-creative-ui body.studio-workspace-active .preview-toolbar { display: none; }
+html.vexa-creative-ui body.studio-workspace-active .stage-wrap {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+  background: #040912;
+}
+html.vexa-creative-ui body.studio-workspace-active .studio-workspace {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 48px minmax(0, 1fr);
+  gap: 7px;
+  padding: 7px;
+  background: #040912;
+}
+html.vexa-creative-ui body.studio-workspace-active .studio-heading {
+  min-height: 48px;
+  padding: 0 4px 0 8px;
+  border: 1px solid #172943;
+  border-radius: 8px;
+  background: #081321;
+}
+html.vexa-creative-ui body.studio-workspace-active .studio-heading h1 { font-size: 12px; }
+html.vexa-creative-ui body.studio-workspace-active .studio-heading p { font-size: 7px; }
+html.vexa-creative-ui body.studio-workspace-active .studio-shell-grid {
+  min-height: 0;
+  grid-template-columns: clamp(260px, 20vw, 320px) minmax(520px, 1fr) clamp(350px, 25vw, 410px);
+  gap: 7px;
+}
+html.vexa-creative-ui .studio-panel,
+html.vexa-creative-ui .studio-preview-column {
+  border: 1px solid #192b46;
+  border-radius: 8px;
+  background: #07111f;
+  box-shadow: none;
+}
+html.vexa-creative-ui .studio-compositions-panel {
+  grid-template-rows: 34px minmax(150px, .7fr) auto minmax(190px, 1fr);
+}
+html.vexa-creative-ui .studio-panel-title,
+html.vexa-creative-ui .studio-preview-toolbar,
+html.vexa-creative-ui .studio-tabs {
+  background: #081524;
+  border-color: #192b46;
+}
+html.vexa-creative-ui .studio-composition-list { padding: 7px; }
+html.vexa-creative-ui .studio-composition {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-rows: 1fr 1fr;
+  align-items: center;
+  column-gap: 8px;
+  padding: 6px;
+  border: 1px solid #1e3150;
+  border-radius: 6px;
+  background: #0b1728;
+}
+html.vexa-creative-ui .studio-composition .vexa-composition-thumb {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  width: 64px;
+  height: 44px;
+  border-radius: 5px;
+  background: radial-gradient(circle at 70% 35%, #436ed8 0 6%, transparent 24%), linear-gradient(135deg, #07101c, #12254b 58%, #2c2363);
+  box-shadow: inset 0 0 0 1px rgba(91,119,220,.22);
+}
+html.vexa-creative-ui .studio-composition .thumb-1 { background: radial-gradient(circle at 62% 38%, #8a63ff 0 8%, transparent 24%), linear-gradient(135deg, #07101c, #251d4d 55%, #17365f); }
+html.vexa-creative-ui .studio-composition .thumb-2 { background: radial-gradient(circle at 52% 40%, #cf5cff 0 7%, transparent 20%), linear-gradient(160deg, #06101b, #1e214e 60%, #401f5f); }
+html.vexa-creative-ui .studio-composition strong { grid-column: 2; grid-row: 1; font-size: 9px; }
+html.vexa-creative-ui .studio-composition span:not(.vexa-composition-thumb) { grid-column: 2; grid-row: 2; font-size: 7px; color: #7f90aa; }
+html.vexa-creative-ui .studio-composition.active {
+  border-color: #6976ff;
+  background: linear-gradient(135deg, rgba(32,60,116,.82), rgba(54,39,121,.72));
+  box-shadow: inset 2px 0 #7c73ff;
+}
+
+.vexa-studio-scene-title { height: 34px; }
+.vexa-scene-row { min-height: 29px; font-size: 8px; }
+
+html.vexa-creative-ui .studio-preview-column {
+  grid-template-rows: 40px minmax(300px, 1fr) minmax(205px, 250px);
+}
+html.vexa-creative-ui .studio-preview-toolbar { padding: 0 9px; }
+html.vexa-creative-ui .studio-preview-stage {
+  padding: 8px;
+  background: radial-gradient(circle at 70% 16%, rgba(73,64,165,.16), transparent 33%), #03070e;
+}
+html.vexa-creative-ui .studio-scene-surface {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 4px;
+  border-color: #22395d;
+  box-shadow: 0 18px 56px rgba(0,0,0,.48);
+}
+html.vexa-creative-ui .studio-timeline {
+  min-height: 0;
+  padding: 6px 7px 7px;
+  background: #07111f;
+  border-top-color: #192b46;
+}
+html.vexa-creative-ui .studio-timeline-header,
+html.vexa-creative-ui .studio-timeline-footer { font-size: 7px; }
+.vexa-studio-track-stack {
+  min-height: 0;
+  margin-top: 4px;
+  border: 1px solid #172a45;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #06101c;
+}
+.vexa-studio-track-row {
+  min-height: 25px;
+  grid-template-columns: 104px minmax(0, 1fr);
+  border-bottom: 1px solid #13243b;
+}
+.vexa-studio-track-label {
+  border-right: 1px solid #182a45;
+  background: #081524;
+  font-size: 7px;
+}
+.vexa-studio-track-lane {
+  background: repeating-linear-gradient(90deg, transparent 0 49px, rgba(85,105,150,.08) 50px);
+}
+.vexa-studio-track-clip {
+  height: 17px;
+  margin: 4px 8px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #41557f, #4c6091);
+  border: 1px solid #6379aa;
+}
+.vexa-studio-track-row.product .vexa-studio-track-clip { background: linear-gradient(90deg, #5142c8, #6755e8); border-color: #8072ff; }
+.vexa-studio-track-row.background .vexa-studio-track-clip { background: linear-gradient(90deg, #425e84, #5477a7); }
+.vexa-studio-track-row.title .vexa-studio-track-clip,
+.vexa-studio-track-row.overlay .vexa-studio-track-clip { background: linear-gradient(90deg, #6334ba, #7948d9); border-color: #976fe8; }
+.vexa-studio-track-row.effect .vexa-studio-track-clip { background: linear-gradient(90deg, #355b82, #4b75a1); }
+.vexa-studio-track-playhead { left: 104px; background: #58c7ff; }
+
+html.vexa-creative-ui .studio-inspector-panel {
+  grid-template-rows: 38px minmax(0,1fr);
+}
+html.vexa-creative-ui .studio-tabs { padding: 3px; }
+html.vexa-creative-ui .studio-tabs button { min-height: 30px; font-size: 8px; }
+html.vexa-creative-ui .studio-inspector-scroll { background: #07111f; }
+html.vexa-creative-ui .studio-inspector-section,
+html.vexa-creative-ui .studio-render-card {
+  margin: 8px;
+  padding: 9px;
+  border: 1px solid #192b46;
+  border-radius: 7px;
+  background: #091524;
+}
+html.vexa-creative-ui #studioProps {
+  min-height: 260px;
+  background: #06101c !important;
+  font-size: 8px;
+}
+html.vexa-creative-ui .studio-render-card .button.primary {
+  min-height: 34px;
+  background: linear-gradient(135deg, #4e8cff, #6654ff);
+}
+
+/* Responsive fidelity: keep the desktop hierarchy as long as possible, then
+ * turn side panels into drawers rather than crushing the preview. */
+@media (max-width: 1500px) {
+  html.vexa-creative-ui .editor-shell {
+    grid-template-columns: 72px clamp(300px, 23vw, 350px) minmax(480px, 1fr) clamp(320px, 23vw, 360px);
+  }
+  html.vexa-creative-ui .topbar {
+    grid-template-columns: minmax(180px, 205px) 150px minmax(130px, 165px) minmax(220px, 1fr) auto;
+    gap: 9px;
+  }
+  .vexa-media-browser { grid-template-columns: 112px minmax(0,1fr); }
+  html.vexa-creative-ui body.studio-workspace-active .studio-shell-grid {
+    grid-template-columns: 230px minmax(430px, 1fr) 330px;
+  }
+  .vexa-ai-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .vexa-ai-grid button { min-height: 68px; }
+}
+
+@media (max-width: 1240px) {
+  html.vexa-creative-ui .editor-shell {
+    grid-template-columns: 68px 290px minmax(420px, 1fr) 320px;
+    grid-template-rows: 58px minmax(0, 1fr) 260px;
+  }
+  html.vexa-creative-ui .topbar {
+    grid-template-columns: minmax(180px, 230px) minmax(220px, 1fr) auto;
+    grid-auto-flow: row;
+    min-height: 58px;
+  }
+  .vexa-mode-switcher { display: none; }
+  .vexa-window-dots { display: none; }
+  html.vexa-creative-ui .brand { min-width: 180px; }
+  html.vexa-creative-ui .project-title { display: none; }
+  .vexa-media-browser { grid-template-columns: 96px minmax(0,1fr); }
+  .vexa-media-nav button small { display: none; }
+  html.vexa-creative-ui body.studio-workspace-active .studio-shell-grid {
+    grid-template-columns: 210px minmax(400px, 1fr) 300px;
+  }
+}
+
+@media (max-width: 1080px) {
+  html.vexa-creative-ui .editor-shell {
+    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-rows: 56px minmax(0, 1fr) 248px;
+  }
+  html.vexa-creative-ui .topbar {
+    grid-template-columns: minmax(150px, 1fr) auto;
+    grid-auto-flow: row;
+    min-height: 56px;
+  }
+  html.vexa-creative-ui .brand { min-width: 0; }
+  .vexa-command-search,
+  .vexa-top-utility-actions { display: none; }
+  html.vexa-creative-ui #topRenderButton { min-width: 105px; }
+  html.vexa-creative-ui body.vexa-editor-mode .media-panel,
+  html.vexa-creative-ui body.vexa-editor-mode .inspector-panel {
+    position: fixed;
+    top: 56px;
+    bottom: 0;
+    z-index: 600;
+    width: min(390px, calc(100vw - 64px));
+    display: none;
+    box-shadow: 20px 0 55px rgba(0,0,0,.48);
+  }
+  html.vexa-creative-ui body.vexa-editor-mode .media-panel { left: 64px; }
+  html.vexa-creative-ui body.vexa-editor-mode .inspector-panel { right: 0; }
+  html.vexa-creative-ui body.vexa-editor-mode.vexa-media-open .media-panel,
+  html.vexa-creative-ui body.vexa-editor-mode.vexa-inspector-open .inspector-panel { display: grid; }
+  html.vexa-creative-ui body.vexa-editor-mode .preview-workspace {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  html.vexa-creative-ui body.vexa-editor-mode .timeline-panel {
+    grid-column: 2;
+    grid-row: 3;
+  }
+  .vexa-preview-tools [data-vexa-panel] { display: inline-block; }
+  html.vexa-creative-ui body.studio-workspace-active .editor-shell { grid-template-columns: 64px minmax(0,1fr) !important; }
+  html.vexa-creative-ui body.studio-workspace-active .studio-workspace { overflow: auto; }
+  html.vexa-creative-ui body.studio-workspace-active .studio-shell-grid {
+    display: grid;
+    grid-template-columns: 200px minmax(420px, 1fr);
+    grid-template-rows: minmax(560px, 1fr) auto;
+    overflow: visible;
+  }
+  html.vexa-creative-ui body.studio-workspace-active .studio-inspector-panel {
+    grid-column: 1 / -1;
+    min-height: 420px;
+  }
+}
+
+@media (min-width: 1081px) {
+  .vexa-preview-tools [data-vexa-panel] { display: none; }
+}
+
+@media (max-width: 760px) {
+  html.vexa-creative-ui .editor-shell { grid-template-columns: 56px minmax(0,1fr); }
+  html.vexa-creative-ui .tool-rail { padding-inline: 3px; }
+  html.vexa-creative-ui .rail-button { width: 50px; min-height: 50px; }
+  html.vexa-creative-ui body.vexa-editor-mode .timeline-panel { min-height: 220px; }
+  .vexa-preview-tools .vexa-viewport-chip { display: none; }
+  html.vexa-creative-ui body.studio-workspace-active .studio-shell-grid {
+    display: flex;
+    flex-direction: column;
+  }
+  html.vexa-creative-ui body.studio-workspace-active .studio-compositions-panel { min-height: 360px; }
+  html.vexa-creative-ui body.studio-workspace-active .studio-preview-column { min-height: 620px; }
+}

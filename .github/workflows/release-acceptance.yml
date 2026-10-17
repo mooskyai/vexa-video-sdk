@@ -1,0 +1,167 @@
+name: Version 2 release acceptance
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repository:
+    name: Repository (${{ matrix.label }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: ubuntu-node-24
+            os: ubuntu-24.04
+            node_version: 24.21.0
+            packed_install: true
+          - label: windows-node-24
+            os: windows-latest
+            node_version: 24.21.0
+            packed_install: true
+          - label: macos-node-24
+            os: macos-latest
+            node_version: 24.21.0
+            packed_install: true
+          - label: ubuntu-node-26
+            os: ubuntu-24.04
+            node_version: 26.x
+            packed_install: false
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node_version }}
+          cache: npm
+
+      - name: Install FFmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version
+          ffprobe -version
+
+      - name: Install FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/install-ffmpeg-windows.ps1
+
+      - name: Install FFmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install ffmpeg-full
+          ffmpeg_full_bin="$(brew --prefix ffmpeg-full)/bin"
+          echo "$ffmpeg_full_bin" >> "$GITHUB_PATH"
+          "$ffmpeg_full_bin/ffmpeg" -version
+          "$ffmpeg_full_bin/ffmpeg" -hide_banner -filters | grep -q ' drawtext '
+          "$ffmpeg_full_bin/ffprobe" -version
+
+      - name: Verify FFmpeg baseline
+        run: npm run release:ffmpeg-check
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Format policy
+        run: npm run format:check
+
+      - name: Verify repository
+        run: npm run verify
+
+      - name: Validate release metadata
+        run: npm run release:check
+
+      - name: Verify clean packed-package install
+        if: ${{ matrix.packed_install }}
+        run: npm run release:install-check
+
+  browser:
+    name: Studio (${{ matrix.label }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: ubuntu-chrome
+            os: ubuntu-24.04
+            browser_family: chrome
+          - label: windows-chrome
+            os: windows-latest
+            browser_family: chrome
+          - label: windows-edge
+            os: windows-latest
+            browser_family: edge
+          - label: macos-chrome
+            os: macos-latest
+            browser_family: chrome
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install FFmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/install-ffmpeg-windows.ps1
+
+      - name: Install FFmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install ffmpeg-full
+          ffmpeg_full_bin="$(brew --prefix ffmpeg-full)/bin"
+          echo "$ffmpeg_full_bin" >> "$GITHUB_PATH"
+          "$ffmpeg_full_bin/ffmpeg" -hide_banner -filters | grep -q ' drawtext '
+
+      - name: Verify FFmpeg baseline
+        run: npm run release:ffmpeg-check
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Select Windows browser
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          BROWSER_FAMILY: ${{ matrix.browser_family }}
+        run: |
+          $candidates = @()
+          if ($env:BROWSER_FAMILY -eq "edge") {
+            if ($env:ProgramFiles) { $candidates += (Join-Path $env:ProgramFiles "Microsoft\Edge\Application\msedge.exe") }
+            if (${env:ProgramFiles(x86)}) { $candidates += (Join-Path ${env:ProgramFiles(x86)} "Microsoft\Edge\Application\msedge.exe") }
+            if ($env:LOCALAPPDATA) { $candidates += (Join-Path $env:LOCALAPPDATA "Microsoft\Edge\Application\msedge.exe") }
+          } elseif ($env:BROWSER_FAMILY -eq "chrome") {
+            if ($env:ProgramFiles) { $candidates += (Join-Path $env:ProgramFiles "Google\Chrome\Application\chrome.exe") }
+            if (${env:ProgramFiles(x86)}) { $candidates += (Join-Path ${env:ProgramFiles(x86)} "Google\Chrome\Application\chrome.exe") }
+            if ($env:LOCALAPPDATA) { $candidates += (Join-Path $env:LOCALAPPDATA "Google\Chrome\Application\chrome.exe") }
+          } else {
+            throw "Unsupported Windows browser family: $env:BROWSER_FAMILY"
+          }
+          $browser = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $browser) { throw "Unable to locate $env:BROWSER_FAMILY on the Windows runner." }
+          "VEXA_STUDIO_BROWSER=$browser" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Run Studio browser acceptance
+        env:
+          VEXA_STUDIO_BROWSER_FAMILY: ${{ matrix.browser_family }}
+        run: npm run verify:studio

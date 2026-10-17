@@ -47,7 +47,47 @@ The UI provides one place to exercise the public media features:
 - HLS/DASH packaging and preview sprites;
 - hardware detection and benchmark diagnostics;
 - background render jobs;
-- generated-output playback and download links.
+- generated-output playback and download links;
+- the framework-neutral programmable Player workspace, including play/pause, frame stepping, seeking, looping, playback rate, volume/mute, responsive fit modes, buffering state, fullscreen, live state, and typed player events;
+- the composition Bundles workspace, including deterministic composition discovery, development/production builds, source-map modes, emitted CSS/assets/chunks/public files, manifest inspection, and sanitized bundler failures;
+- Node render planning and execution for the selected bundled composition, including stills, single frames, bounded-concurrency image ranges, and MP4 video ranges with explicit exclusive-end frame semantics.
+- the Vexa Studio workspace, including bundle-backed composition selection, scene preview, frame-accurate playhead controls, JSON props, dynamic metadata, asset inspection, render progress/output, keyboard frame stepping, and reload-time frame preservation.
+
+## Programmable player
+
+Select **Player** from the left rail or the preview tabs in the normal playground at `http://127.0.0.1:4173/`. Player mode is part of the existing playground workspace: it hides unrelated media-editing inspector/timeline controls and gives playback, display, live-state, and event diagnostics their own focused layout. No separate demo URL is required.
+
+The visual surface is a deterministic acceptance composition driven by `@vexa-video/player`; it is not a second rendering engine. Use it to verify controller behavior and browser integration while later rendering stages connect real bundled compositions to frame/video output.
+
+## Composition bundles
+
+Select **Bundles** from the left rail or **Compositions** from the preview tabs. This workspace exercises the real Node-side `@vexa-video/bundler` against the Vexa-owned fixture under `examples/visual-playground/compositions/`.
+
+Use **Discover** to verify stable composition ordering and metadata. Use **Build bundle** to switch between development/production output and none/external/inline source maps, then inspect the schema-versioned manifest, emitted JavaScript/CSS, dynamic-import chunks, fingerprinted assets, copied public files, byte sizes, and SHA-256 metadata. The playground uses a fixed repository fixture and fixed environment allowlist; it does not accept arbitrary local source paths or expose environment values.
+
+After building, choose a render target in **Selected composition**. **Plan** shows the serializable Node-side render plan; **Render** executes the same `@vexa-video/renderer` boundary. The execution row exposes **Hardware** (CPU/Auto/NVIDIA/Intel/AMD/Apple), a render timeout, live progress, and **Cancel**; cancellation aborts the same server-side renderer signal rather than starting a second control path. Still and single-frame targets show the generated image, frame ranges show the first generated frame plus links to the deterministic frame files, and video ranges show a muted looping preview with separate **Open** and **Download** links. Generated files use the playground's existing session-backed `/media/` and `/package/` serving paths rather than exposing arbitrary filesystem locations.
+
+The Player and Compositions workspaces are responsive independently of the surrounding editor panels. Their **Full screen** action expands the complete focused preview workspace (toolbar, content, diagnostics/output, and the Player's single transport) rather than creating a second demo page or duplicate playback controls. On narrower viewports, composition panels collapse into a vertical flow and Player diagnostics stack below the canvas.
+
+## Vexa Studio
+
+Select **Studio** from the left rail or preview tabs. On first open, the Playground development host builds the Vexa-owned composition fixture and serves the emitted browser bundle from a restricted `.tmp/visual-playground/composition-bundle` route. Browser imports use `@vexa-video/studio`, `@vexa-video/player`, `@vexa-video/editor`, and the browser-safe core entry; filesystem access, bundling, FFmpeg, and rendering remain on the Node host.
+
+The Studio workspace uses the public Studio session as its source of composition/playhead state. Select a composition, scrub or step its frame, use **Space** to play/pause, and use **Left/Right** (or **Shift+Left/Right** for ten frames) while focus is outside an input. JSON props are evaluated through the executable browser bundle so dynamic metadata can update dimensions/fps/duration before preview timing is rebuilt.
+
+The scene preview is an inspection surface for the normalized programmable scene graph: backgrounds, text/solid/static visual nodes, asset declarations, current frame visibility, and deterministic wipe transitions are shown without importing Node execution code. Wipe visibility uses the browser-safe core transition progress/easing contract shared with renderer semantics; the Render card still sends the selected composition, current resolved props, target frame/range, and hardware preference through the existing `/api/compositions/render` renderer stream and shows progress plus the generated image/video artifact.
+
+Studio now watches `examples/visual-playground/compositions` through the local Node development host. Source changes are normalized and debounced, then delivered to the browser over `/api/studio/events`. Studio automatically rebuilds/reloads the executable bundle while preserving the selected composition/current frame where the updated metadata still permits it and preserving an unapplied JSON-props draft for the same composition. **Reload bundle** remains available as an explicit manual rebuild.
+
+The preview shows a blocking diagnostics overlay for invalid props, composition-evaluation failures, bundle failures, render failures, and uncaught browser errors while the **Logs** panel keeps the detailed event history. The source watcher remains connected after recoverable build errors so saving a corrected source file can repair Studio without refreshing the page.
+
+Studio is responsive and can expand the complete preview workspace with **Full screen**. It does not create a second Player transport or a second timeline state implementation.
+
+`npm run verify:studio` builds the repository, starts an isolated Playground port, launches an installed Chrome/Edge/Chromium through the DevTools protocol, switches compositions, exercises play/pause and scrubbing, touches the composition source to prove automatic reload, checks frame/dirty-props preservation, validates diagnostics recovery, renders a real current-frame output with progress, and deliberately triggers a renderer failure to verify the overlay path. The same run also selects the Vexa-owned 64×36 `visual-wipe` composition, pins the Studio surface to device scale factor 1, captures start/pre-transition/midpoint/post-transition/final-visible frames from the actual DOM preview, and compares those PNGs with the reviewed Node baselines through the existing tolerance contract. On Windows the child Playground is launched through a temporary repository junction whose path contains spaces. Set `VEXA_STUDIO_BROWSER` when the browser executable is not in a standard platform location.
+
+The Playground now uses one Vexa creative UI language for both the normal Video Editor and Studio. The editor keeps the existing SDK controls and execution wiring but presents them through the product shell used by Studio: dark navy surfaces, blue-violet accents, a compact media browser, central preview, dense multi-track timeline, inspector tooling, command search, and consistent render actions. Studio additionally exposes a composition/scene navigator and scene-track visualization without moving Node execution into the browser.
+
+The visual rewrite is presentation-only: existing media, project, Player, bundler, renderer, storage, cancellation, progress, and Studio session contracts remain the behavior source of truth.
 
 ## Media library
 

@@ -1,6 +1,6 @@
 {
   "name": "@vexa-video/sdk",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "private": false,
   "exports": {
@@ -15,8 +15,8 @@
     "dist/**/*.map"
   ],
   "dependencies": {
-    "@vexa-video/core": "1.0.0",
-    "@vexa-video/ffmpeg": "1.0.0"
+    "@vexa-video/core": "2.0.0",
+    "@vexa-video/ffmpeg": "2.0.0"
   },
   "scripts": {
     "build": "tsc -b"

@@ -10,5 +10,14 @@ export * from "./pipeline.js";
 export * from "./streaming.js";
 export * from "./storage.js";
 export * from "./plugins.js";
+export * from "./programmable-input-schema.js";
+export * from "./programmable-template.js";
+export * from "./programmable-composition.js";
+export * from "./programmable-execution.js";
+export * from "./programmable-timing.js";
+export * from "./programmable-shapes.js";
+export * from "./programmable-effects.js";
+export * from "./programmable-transitions.js";
+export * from "./programmable-scene.js";
 
 export * from "./hosted.js";

@@ -1,8 +1,8 @@
 /**
- * Browser-safe type surface shared by framework integrations.
+ * Browser-safe shared surface for framework integrations and deterministic timing.
  *
- * Keep this entry point free of Node runtime imports. It intentionally exports
- * only serializable/media-domain types needed across a browser-to-service boundary.
+ * Keep this entry point free of Node runtime imports. It exports serializable
+ * media-domain types plus pure deterministic helpers that are safe to evaluate in browsers.
  */
 export type {
   CaptionAnimation,
@@ -10,8 +10,10 @@ export type {
   CaptionDocument,
   CaptionFormat,
   CaptionPosition,
+  CaptionSpeakerStyle,
   CaptionStyle,
   CaptionTemplateName,
+  CaptionWordMode,
   CaptionWordTiming
 } from "./captions.js";
 export type {
@@ -26,6 +28,8 @@ export type {
   ProjectCanvas,
   ProjectTrack,
   ProjectTrackType,
+  RemoteFontReference,
+  RemoteFontStyle,
   TextStyle,
   TextTimelineClip,
   TimelineClip,
@@ -97,3 +101,132 @@ export type {
   HostedRenderWaitOptions,
   HostedRenderAdapter
 } from "./hosted.js";
+
+export {
+  normalizeProgrammableInputSchema,
+  validateProgrammableInput
+} from "./programmable-input-schema.js";
+export type {
+  ProgrammableInputArraySchema,
+  ProgrammableInputBooleanSchema,
+  ProgrammableInputEnumSchema,
+  ProgrammableInputNumberSchema,
+  ProgrammableInputObjectSchema,
+  ProgrammableInputPrimitive,
+  ProgrammableInputSchema,
+  ProgrammableInputSchemaVersion,
+  ProgrammableInputStringSchema,
+  ProgrammableInputValidationCode,
+  ProgrammableInputValidationIssue
+} from "./programmable-input-schema.js";
+
+export {
+  defineProgrammableTemplate,
+  getProgrammableTemplateCatalogEntry,
+  normalizeProgrammableTemplateInvocation,
+  normalizeProgrammableTemplateMetadata,
+  resolveProgrammableTemplateInvocation,
+  resolveProgrammableTemplateVariant,
+  ProgrammableTemplateCatalog,
+  ProgrammableTemplateError
+} from "./programmable-template.js";
+export type {
+  ProgrammableTemplate,
+  ProgrammableTemplateAspectRatio,
+  ProgrammableTemplateCatalogEntry,
+  ProgrammableTemplateErrorCode,
+  ProgrammableTemplateInvocation,
+  ProgrammableTemplateInvocationInput,
+  ProgrammableTemplateMetadata,
+  ProgrammableTemplateMetadataInput,
+  ProgrammableTemplateSchemaVersion,
+  ProgrammableTemplateVariant,
+  ProgrammableTemplateVariantInput,
+  ResolvedProgrammableTemplateInvocation,
+  ResolvedProgrammableTemplateVariant,
+  StillProgrammableTemplateCatalogEntry,
+  VideoProgrammableTemplateCatalogEntry
+} from "./programmable-template.js";
+
+export {
+  defineComposition,
+  defineStill,
+  getProgrammableCompositionStaticMetadata,
+  InvalidProgrammableCompositionError,
+  InvalidProgrammableCompositionPropsError,
+  ProgrammableCompositionConflictError,
+  ProgrammableCompositionMetadataError,
+  ProgrammableCompositionNotFoundError,
+  ProgrammableCompositionRegistry,
+  resolveProgrammableComposition,
+  serializeProgrammableCompositionMetadata
+} from "./programmable-composition.js";
+export type {
+  DefineProgrammableCompositionOptions,
+  DefineProgrammableStillOptions,
+  JsonObject,
+  JsonPrimitive,
+  JsonValue,
+  ProgrammableCompositionDefinition,
+  ProgrammableCompositionDimensions,
+  ProgrammableCompositionErrorCode,
+  ProgrammableCompositionKind,
+  ProgrammableCompositionMetadataCalculator,
+  ProgrammableCompositionMetadataContext,
+  ProgrammableCompositionPropsValidator,
+  ProgrammableCompositionSchemaVersion,
+  ProgrammableCompositionStaticMetadata,
+  ResolvedProgrammableComposition,
+  ResolvedProgrammableCompositionMetadata,
+  StillProgrammableCompositionDefinition,
+  StillProgrammableCompositionMetadata,
+  StillProgrammableCompositionMetadataOverride,
+  VideoProgrammableCompositionDefinition,
+  VideoProgrammableCompositionMetadata,
+  VideoProgrammableCompositionMetadataOverride,
+  VideoProgrammableCompositionTiming
+} from "./programmable-composition.js";
+
+export {
+  clampFrameToRange,
+  createFrameContext,
+  createFrameRange,
+  easeInOutQuad,
+  easeInQuad,
+  easeOutQuad,
+  frameRangeContains,
+  frameRangeLocalFrame,
+  frameToSeconds,
+  freezeFrameContext,
+  interpolate,
+  interpolateColor,
+  InvalidProgrammableTimingError,
+  linearEasing,
+  loopFrame,
+  loopFrameContext,
+  offsetFrameContext,
+  resolveSeries,
+  secondsToFrame,
+  seededRandom,
+  seriesSectionAtFrame,
+  spring
+} from "./programmable-timing.js";
+export type {
+  DeterministicRandomSeed,
+  FrameContext,
+  FrameRange,
+  FrameRoundingMode,
+  InterpolateColorOptions,
+  InterpolateOptions,
+  ResolvedSeriesSection,
+  SeriesSectionInput,
+  SpringOptions,
+  TimingEasingFunction,
+  TimingExtrapolationMode
+} from "./programmable-timing.js";
+
+export * from "./programmable-execution.js";
+export * from "./programmable-shapes.js";
+export * from "./programmable-effects.js";
+export * from "./programmable-transitions.js";
+export * from "./programmable-scene.js";

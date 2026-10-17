@@ -7,7 +7,9 @@
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
   "references": [
+    { "path": "../bundler" },
     { "path": "../core" },
+    { "path": "../renderer" },
     { "path": "../sdk" }
   ],
   "include": ["src/**/*.ts"]

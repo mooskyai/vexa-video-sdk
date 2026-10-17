@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vexa Player Browser Acceptance</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "@vexa-video/core/browser": "../../core/dist/browser.js"
+    }
+  }
+  </script>
+  <style>
+    #default-player, #custom-player { width: 640px; height: 360px; }
+  </style>
+</head>
+<body>
+  <div id="default-player"></div>
+  <div id="custom-player"></div>
+  <pre id="result">VEXA_PLAYER_BROWSER_PENDING</pre>
+  <script type="module">
+    import {
+      createVexaPlayerController,
+      mountVexaPlayer
+    } from "../dist/index.js";
+
+    const assert = (condition, message) => {
+      if (!condition) throw new Error(message);
+    };
+
+    try {
+      const container = document.querySelector("#default-player");
+      const controller = createVexaPlayerController({
+        width: 1280,
+        height: 720,
+        fps: 30,
+        durationInFrames: 120,
+        posterFrame: 12,
+        controls: "default"
+      });
+      const frames = [];
+      const host = mountVexaPlayer(container, controller, {
+        renderFrame: ({ frame }) => frames.push(frame)
+      });
+
+      assert(controller.getSnapshot().presentedFrame === 12, "poster frame mismatch");
+      controller.play();
+      controller.advanceByMilliseconds(100);
+      assert(controller.getSnapshot().frame === 3, "deterministic frame advance mismatch");
+      controller.setBuffering(true);
+      controller.advanceByMilliseconds(100);
+      assert(controller.getSnapshot().frame === 3, "buffering must block advancement");
+      controller.setBuffering(false);
+      controller.resize(640, 360);
+      assert(controller.getSnapshot().viewport.scale === 0.5, "responsive scale mismatch");
+
+      const controls = [...host.controls.querySelectorAll("button,input")];
+      assert(controls.length === 4, "default controls missing");
+      for (const control of controls) {
+        assert(control.getAttribute("aria-label"), "control missing aria-label");
+        assert(control.tabIndex >= 0, "control is not keyboard reachable");
+      }
+
+      const customController = createVexaPlayerController({
+        width: 320,
+        height: 180,
+        fps: 24,
+        durationInFrames: 48,
+        controls: "custom"
+      });
+      const customHost = mountVexaPlayer(document.querySelector("#custom-player"), customController, {
+        renderFrame: () => {}
+      });
+      assert(customHost.controls === null, "custom-controls mode injected default controls");
+
+      const result = document.querySelector("#result");
+      result.textContent = "VEXA_PLAYER_BROWSER_PASS";
+      host.dispose();
+      customHost.dispose();
+    } catch (error) {
+      document.querySelector("#result").textContent = `VEXA_PLAYER_BROWSER_FAIL ${error?.stack ?? error}`;
+    }
+  </script>
+</body>
+</html>

@@ -1,11 +1,13 @@
 import type {
+  HostedCompositionRenderPayload,
+  HostedCompositionRenderRequestOptions,
   HostedRenderAdapter,
   HostedRenderCallOptions,
   HostedRenderJob,
   HostedRenderRequest,
   HostedRenderWaitOptions
 } from "@vexa-video/core";
-import { isHostedRenderTerminal } from "@vexa-video/core";
+import { createHostedCompositionRenderRequest, isHostedRenderTerminal } from "@vexa-video/core";
 
 function positiveFinite(value: number, label: string): number {
   if (!Number.isFinite(value) || value <= 0) throw new TypeError(`${label} must be greater than 0.`);
@@ -42,6 +44,17 @@ export class HostedRenderer {
       throw new TypeError("Hosted render requests require schemaVersion 1 and a non-empty type.");
     }
     return this.#adapter.submit<TPayload, TResult>(request, options);
+  }
+
+  submitComposition<TResult = unknown>(
+    payload: HostedCompositionRenderPayload,
+    requestOptions: HostedCompositionRenderRequestOptions = {},
+    callOptions: HostedRenderCallOptions = {}
+  ): Promise<HostedRenderJob<TResult>> {
+    return this.submit<HostedCompositionRenderPayload, TResult>(
+      createHostedCompositionRenderRequest(payload, requestOptions),
+      callOptions
+    );
   }
 
   get<TResult = unknown>(jobId: string, options: HostedRenderCallOptions = {}): Promise<HostedRenderJob<TResult>> {

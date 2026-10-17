@@ -6,6 +6,7 @@ import type {
   ProjectRenderOptions,
   ProjectTrack,
   TimelineClip,
+  TimelineTransition,
   NumericProperty,
   VideoCodec,
   VideoProjectAst,
@@ -19,6 +20,7 @@ import {
   numericPropertyValue,
   projectDurationSeconds
 } from "@vexa-video/core";
+import { compileCaptionFilterGraph } from "./captions.js";
 import {
   assertAudioCodecCompatible,
   assertVideoCodecCompatible,
@@ -27,6 +29,12 @@ import {
   detectOutputContainer
 } from "./compatibility.js";
 import { appendVideoEncoderOptions, hardwareOptimizationMarkers, resolveHardwareAcceleration } from "./hardware.js";
+import {
+  compileProgrammableEffectFilters,
+  hasProgrammableCompositorEffects,
+  programmableEffectPadding,
+  type ProgrammableEffectPadding
+} from "./programmable-effects.js";
 
 const AUDIO_CODECS: Record<Exclude<AudioCodec, "copy" | "none">, string> = {
   aac: "aac",
@@ -41,6 +49,8 @@ interface IndexedClip {
   clip: TimelineClip;
   inputIndex: number | null;
 }
+
+type ProgrammableTimelineTransition = Extract<TimelineTransition, { kind: string }>;
 
 function formatNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(6)));
@@ -137,6 +147,7 @@ function fullCanvasTransitionEligible(
   canvas: VideoProjectAst["canvas"]
 ): boolean {
   const transform = clip.transform;
+  if (clip.effects?.length) return false;
   if (hasAnimatedVisualProperty(clip)) return false;
   if ((clip.blendMode ?? "normal") !== "normal") return false;
   if (numericPropertyValue(clip.opacity, 1, `clip ${clip.id}.opacity`) !== 1) return false;
@@ -150,8 +161,9 @@ function fullCanvasTransitionEligible(
   return width === canvas.width && height === canvas.height;
 }
 
-function xfadeTransitionName(type: string): string | null {
-  switch (type) {
+function xfadeTransitionName(transition: TimelineTransition): string | null {
+  if (!("type" in transition)) return null;
+  switch (transition.type) {
     case "crossfade": return "fade";
     case "wipe-left": return "wipeleft";
     case "wipe-right": return "wiperight";
@@ -159,12 +171,218 @@ function xfadeTransitionName(type: string): string | null {
   }
 }
 
-function blendModeName(mode: string): string {
-  return mode;
+function timelineTransitionDurationSeconds(
+  transition: TimelineTransition,
+  fps: number
+): number {
+  return "kind" in transition
+    ? transition.durationInFrames / fps
+    : transition.duration;
 }
 
-function transitionDuration(clip: TimelineClip, edge: "in" | "out"): number {
-  return clip.transitions?.[edge]?.duration ?? 0;
+function legacyTransitionDuration(clip: TimelineClip, edge: "in" | "out"): number {
+  const transition = clip.transitions?.[edge];
+  return transition && "type" in transition ? transition.duration : 0;
+}
+
+function programmableTransitionVisibilityExpression(
+  transition: ProgrammableTimelineTransition,
+  edge: "in" | "out",
+  clipDuration: number,
+  fps: number,
+  timeExpression: string
+): string {
+  const duration = transition.durationInFrames / fps;
+  const rawProgress = edge === "in"
+    ? `((${timeExpression})/${formatNumber(duration)})`
+    : `(((${timeExpression})-${formatNumber(clipDuration - duration)})/${formatNumber(duration)})`;
+  const progress = `min(1,max(0,${rawProgress}))`;
+  const eased = easingExpression(progress, transition.easing ?? "linear");
+  return edge === "in" ? `(${eased})` : `(1-(${eased}))`;
+}
+
+function programmableFadeAlphaExpression(
+  clip: TimelineClip,
+  canvas: VideoProjectAst["canvas"],
+  timeExpression: string
+): string | null {
+  const factors: string[] = [];
+  for (const edge of ["in", "out"] as const) {
+    const transition = clip.transitions?.[edge];
+    if (!transition || !("kind" in transition) || transition.kind !== "fade") continue;
+    factors.push(programmableTransitionVisibilityExpression(
+      transition,
+      edge,
+      clip.duration,
+      canvas.fps,
+      timeExpression
+    ));
+  }
+  return factors.length ? factors.join("*") : null;
+}
+
+function programmableWipeAlphaExpression(
+  clip: TimelineClip,
+  canvas: VideoProjectAst["canvas"],
+  timeExpression: string
+): string | null {
+  const masks: string[] = [];
+  for (const edge of ["in", "out"] as const) {
+    const transition = clip.transitions?.[edge];
+    if (!transition || !("kind" in transition) || transition.kind !== "wipe") continue;
+    const visibility = programmableTransitionVisibilityExpression(
+      transition,
+      edge,
+      clip.duration,
+      canvas.fps,
+      timeExpression
+    );
+    switch (transition.direction ?? "left") {
+      case "left":
+        masks.push(`if(lt(X,W*(${visibility})),1,0)`);
+        break;
+      case "right":
+        masks.push(`if(gte(X,W*(1-(${visibility}))),1,0)`);
+        break;
+      case "up":
+        masks.push(`if(lt(Y,H*(${visibility})),1,0)`);
+        break;
+      case "down":
+        masks.push(`if(gte(Y,H*(1-(${visibility}))),1,0)`);
+        break;
+    }
+  }
+  return masks.length ? masks.map((mask) => `(${mask})`).join("*") : null;
+}
+
+function programmableIrisAlphaExpression(
+  clip: TimelineClip,
+  canvas: VideoProjectAst["canvas"],
+  timeExpression: string
+): string | null {
+  const masks: string[] = [];
+  for (const edge of ["in", "out"] as const) {
+    const transition = clip.transitions?.[edge];
+    if (!transition || !("kind" in transition) || transition.kind !== "iris") continue;
+    const visibility = programmableTransitionVisibilityExpression(
+      transition,
+      edge,
+      clip.duration,
+      canvas.fps,
+      timeExpression
+    );
+    const distanceSquared = "(X-W/2)*(X-W/2)+(Y-H/2)*(Y-H/2)";
+    const maxRadiusSquared = "(W/2)*(W/2)+(H/2)*(H/2)";
+    masks.push(
+      `if(lt(${distanceSquared},(${maxRadiusSquared})*(${visibility})*(${visibility})),1,0)`
+    );
+  }
+  return masks.length ? masks.map((mask) => `(${mask})`).join("*") : null;
+}
+
+function programmableSlideOffsetExpression(
+  clip: TimelineClip,
+  canvas: VideoProjectAst["canvas"],
+  axis: "x" | "y",
+  timeExpression: string
+): string | null {
+  const offsets: string[] = [];
+  for (const edge of ["in", "out"] as const) {
+    const transition = clip.transitions?.[edge];
+    if (!transition || !("kind" in transition) || transition.kind !== "slide") continue;
+    const direction = transition.direction ?? "left";
+    const horizontal = direction === "left" || direction === "right";
+    if ((axis === "x") !== horizontal) continue;
+    const visibility = programmableTransitionVisibilityExpression(
+      transition,
+      edge,
+      clip.duration,
+      canvas.fps,
+      timeExpression
+    );
+    const distance = axis === "x" ? canvas.width : canvas.height;
+    const negative = direction === "left" || direction === "up";
+    offsets.push(`${negative ? "-" : ""}${formatNumber(distance)}*(1-(${visibility}))`);
+  }
+  return offsets.length ? offsets.map((offset) => `(${offset})`).join("+") : null;
+}
+
+function programmableZoomScaleExpression(
+  clip: TimelineClip,
+  canvas: VideoProjectAst["canvas"],
+  timeExpression: string
+): string | null {
+  const factors: string[] = [];
+  for (const edge of ["in", "out"] as const) {
+    const transition = clip.transitions?.[edge];
+    if (!transition || !("kind" in transition) || transition.kind !== "zoom") continue;
+    const visibility = programmableTransitionVisibilityExpression(
+      transition,
+      edge,
+      clip.duration,
+      canvas.fps,
+      timeExpression
+    );
+    factors.push(`max(0.001,(${visibility}))`);
+  }
+  return factors.length ? factors.map((factor) => `(${factor})`).join("*") : null;
+}
+
+function hasProgrammableTransitionKind(
+  clip: TimelineClip,
+  kind: ProgrammableTimelineTransition["kind"]
+): boolean {
+  return [clip.transitions?.in, clip.transitions?.out].some(
+    (transition) => transition !== undefined && "kind" in transition && transition.kind === kind
+  );
+}
+
+function hasAnimatedTransformProperty(
+  clip: Extract<TimelineClip, { kind: "video" | "image" }>
+): boolean {
+  return Boolean(
+    numericPropertyHasKeyframes(clip.transform?.x) ||
+    numericPropertyHasKeyframes(clip.transform?.y) ||
+    numericPropertyHasKeyframes(clip.transform?.width) ||
+    numericPropertyHasKeyframes(clip.transform?.height) ||
+    numericPropertyHasKeyframes(clip.transform?.rotation)
+  );
+}
+
+function programmableTransitionOptimizationMarkers(clip: TimelineClip): string[] {
+  const kinds: string[] = [];
+  for (const transition of [clip.transitions?.in, clip.transitions?.out]) {
+    if (transition && "kind" in transition) kinds.push(transition.kind);
+  }
+  if (!kinds.length) return [];
+  const markers = ["PROGRAMMABLE_TRANSITION_GRAPH"];
+  if (kinds.includes("slide")) markers.push("PROGRAMMABLE_SLIDE_TRANSITION_GRAPH");
+  if (kinds.includes("wipe")) markers.push("PROGRAMMABLE_WIPE_TRANSITION_GRAPH");
+  if (kinds.includes("zoom")) markers.push("PROGRAMMABLE_ZOOM_TRANSITION_GRAPH");
+  if (kinds.includes("iris")) markers.push("PROGRAMMABLE_IRIS_TRANSITION_GRAPH");
+  return markers;
+}
+
+function assertExecutableProgrammableTransitions(clip: TimelineClip): void {
+  for (const transition of [clip.transitions?.in, clip.transitions?.out]) {
+    if (
+      transition &&
+      "kind" in transition &&
+      transition.kind !== "fade" &&
+      transition.kind !== "slide" &&
+      transition.kind !== "wipe" &&
+      transition.kind !== "zoom" &&
+      transition.kind !== "iris"
+    ) {
+      throw new InvalidProjectError(
+        `Clip "${clip.id}" uses programmable ${transition.kind}, but only programmable fade, slide, wipe, zoom, and iris execution is wired in this layer-local transition path.`
+      );
+    }
+  }
+}
+
+function blendModeName(mode: string): string {
+  return mode;
 }
 
 function clipVisualFilters(
@@ -248,6 +466,18 @@ function clipVisualFilters(
 
   filters.push("format=rgba");
 
+  const effectPadding = programmableEffectPadding(clip.effects, clip.id);
+  const horizontalPadding = effectPadding.left + effectPadding.right;
+  const verticalPadding = effectPadding.top + effectPadding.bottom;
+  if (horizontalPadding > 0 || verticalPadding > 0) {
+    filters.push(
+      `pad=iw+${horizontalPadding}:ih+${verticalPadding}:${effectPadding.left}:${effectPadding.top}:color=black@0`
+    );
+  }
+
+  const effectFilters = compileProgrammableEffectFilters(clip.effects, clip.id);
+  if (effectFilters.length) filters.push(...effectFilters, "format=rgba");
+
   if (numericPropertyHasKeyframes(clip.opacity)) {
     const opacityExpression = numericPropertyExpression(
       clip.opacity,
@@ -263,14 +493,46 @@ function clipVisualFilters(
     if (opacity < 1) filters.push(`colorchannelmixer=aa=${formatNumber(opacity)}`);
   }
 
-  const fadeIn = transitionDuration(clip, "in");
-  if (fadeIn > 0 && clip.transitions?.in?.type === "fade") {
+  const programmableFadeAlpha = programmableFadeAlphaExpression(clip, canvas, "T");
+  if (programmableFadeAlpha) {
+    filters.push(
+      `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${programmableFadeAlpha})'`
+    );
+  }
+
+  const programmableWipeAlpha = programmableWipeAlphaExpression(clip, canvas, "T");
+  if (programmableWipeAlpha) {
+    filters.push(
+      `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${programmableWipeAlpha})'`
+    );
+  }
+
+  const programmableIrisAlpha = programmableIrisAlphaExpression(clip, canvas, "T");
+  if (programmableIrisAlpha) {
+    filters.push(
+      `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${programmableIrisAlpha})'`
+    );
+  }
+
+  const transitionIn = clip.transitions?.in;
+  const fadeIn = legacyTransitionDuration(clip, "in");
+  if (fadeIn > 0 && transitionIn && "type" in transitionIn && transitionIn.type === "fade") {
     filters.push(`fade=t=in:st=0:d=${formatNumber(fadeIn)}:alpha=1`);
   }
-  const fadeOut = transitionDuration(clip, "out");
-  if (fadeOut > 0 && clip.transitions?.out?.type === "fade") {
+  const transitionOut = clip.transitions?.out;
+  const fadeOut = legacyTransitionDuration(clip, "out");
+  if (fadeOut > 0 && transitionOut && "type" in transitionOut && transitionOut.type === "fade") {
     filters.push(
       `fade=t=out:st=${formatNumber(Math.max(0, clip.duration - fadeOut))}:d=${formatNumber(fadeOut)}:alpha=1`
+    );
+  }
+
+  const programmableZoomScale = programmableZoomScaleExpression(clip, canvas, "t");
+  if (programmableZoomScale) {
+    filters.push(
+      `scale=w=${quotedExpression(`max(1,iw*(${programmableZoomScale}))`)}:` +
+      `h=${quotedExpression(`max(1,ih*(${programmableZoomScale}))`)}:eval=frame`,
+      "format=rgba"
     );
   }
 
@@ -278,26 +540,50 @@ function clipVisualFilters(
 }
 
 function clipPosition(
-  clip: Extract<TimelineClip, { kind: "video" | "image" }>
+  clip: Extract<TimelineClip, { kind: "video" | "image" }>,
+  padding: ProgrammableEffectPadding,
+  canvas: VideoProjectAst["canvas"]
 ): { x: string; y: string } {
   const localTime = `(t-${formatNumber(clip.start)})`;
-  const x = clip.transform?.x === undefined
-    ? "(W-w)/2"
+  const authoredX = clip.transform?.x === undefined
+    ? null
     : numericPropertyExpression(
         clip.transform.x,
         0,
         localTime,
         `clip ${clip.id}.transform.x`
       );
-  const y = clip.transform?.y === undefined
-    ? "(H-h)/2"
+  const authoredY = clip.transform?.y === undefined
+    ? null
     : numericPropertyExpression(
         clip.transform.y,
         0,
         localTime,
         `clip ${clip.id}.transform.y`
       );
-  return { x, y };
+  const hasHorizontalPadding = padding.left > 0 || padding.right > 0;
+  const hasVerticalPadding = padding.top > 0 || padding.bottom > 0;
+  let x = authoredX === null
+    ? (hasHorizontalPadding ? `(W-w-${padding.left}+${padding.right})/2` : "(W-w)/2")
+    : padding.left === 0 ? authoredX : `((${authoredX})-${padding.left})`;
+  let y = authoredY === null
+    ? (hasVerticalPadding ? `(H-h-${padding.top}+${padding.bottom})/2` : "(H-h)/2")
+    : padding.top === 0 ? authoredY : `((${authoredY})-${padding.top})`;
+  const zoomScale = programmableZoomScaleExpression(clip, canvas, localTime);
+  if (zoomScale) {
+    x = authoredX === null
+      ? (hasHorizontalPadding ? `(W-${padding.left}+${padding.right})/2-w/2` : "(W-w)/2")
+      : `((${x})+(w/(2*(${zoomScale})))-w/2)`;
+    y = authoredY === null
+      ? (hasVerticalPadding ? `(H-${padding.top}+${padding.bottom})/2-h/2` : "(H-h)/2")
+      : `((${y})+(h/(2*(${zoomScale})))-h/2)`;
+  }
+  const slideX = programmableSlideOffsetExpression(clip, canvas, "x", localTime);
+  const slideY = programmableSlideOffsetExpression(clip, canvas, "y", localTime);
+  return {
+    x: slideX ? `((${x})+(${slideX}))` : x,
+    y: slideY ? `((${y})+(${slideY}))` : y
+  };
 }
 
 function buildInputArgs(
@@ -355,6 +641,65 @@ function videoClipFilter(
   return `[${item.inputIndex}:v]${filters.join(",")}[${label}]`;
 }
 
+function textHorizontalPosition(
+  clip: Extract<TimelineClip, { kind: "text" }>,
+  timeExpression: string
+): string {
+  const authoredX = clip.transform?.x === undefined
+    ? null
+    : numericPropertyExpression(
+        clip.transform.x,
+        0,
+        timeExpression,
+        `clip ${clip.id}.transform.x`
+      );
+
+  if (authoredX === null) {
+    if (clip.style?.textAlign === "left") return "0";
+    if (clip.style?.textAlign === "right") return "w-text_w";
+    return "(w-text_w)/2";
+  }
+
+  if (clip.style?.textAlign === "center") return `((${authoredX})-text_w/2)`;
+  if (clip.style?.textAlign === "right") return `((${authoredX})-text_w)`;
+  return authoredX;
+}
+
+function appendTextTypographyOptions(
+  options: string[],
+  clip: Extract<TimelineClip, { kind: "text" }>
+): void {
+  const style = clip.style ?? {};
+  if (style.remoteFont) {
+    throw new InvalidProjectError(
+      `Text clip "${clip.id}" remote font "${style.remoteFont.provider}:${style.remoteFont.family}" must be materialized to style.fontFile before FFmpeg planning.`
+    );
+  }
+  if (style.fontFile) options.push(`fontfile='${escapeFilterPath(style.fontFile)}'`);
+  if (style.lineSpacing !== undefined) {
+    options.push(`line_spacing=${formatNumber(style.lineSpacing)}`);
+  }
+  if (style.stroke !== undefined) {
+    const color = filterSafeToken(style.stroke.color, `clip ${clip.id}.style.stroke.color`);
+    options.push(
+      `borderw=${formatNumber(style.stroke.width)}`,
+      `bordercolor=${color}`
+    );
+  }
+  if (style.shadow !== undefined) {
+    const color = filterSafeToken(style.shadow.color, `clip ${clip.id}.style.shadow.color`);
+    options.push(
+      `shadowcolor=${color}`,
+      `shadowx=${formatNumber(style.shadow.offsetX)}`,
+      `shadowy=${formatNumber(style.shadow.offsetY)}`
+    );
+  }
+  if (style.boxColor) {
+    const box = filterSafeToken(style.boxColor, `clip ${clip.id}.style.boxColor`);
+    options.push("box=1", `boxcolor=${box}`, `boxborderw=${formatNumber(style.boxPadding ?? 8)}`);
+  }
+}
+
 function textFilter(
   inputLabel: string,
   outputLabel: string,
@@ -375,14 +720,7 @@ function textFilter(
     `clip ${clip.id}.opacity`
   );
   const opacity = numericPropertyValue(clip.opacity, 1, `clip ${clip.id}.opacity`);
-  const x = clip.transform?.x === undefined
-    ? "(w-text_w)/2"
-    : numericPropertyExpression(
-        clip.transform.x,
-        0,
-        localTime,
-        `clip ${clip.id}.transform.x`
-      );
+  const x = textHorizontalPosition(clip, localTime);
   const y = clip.transform?.y === undefined
     ? "(h-text_h)/2"
     : numericPropertyExpression(
@@ -405,13 +743,303 @@ function textFilter(
     `enable='between(t,${start},${end})'`
   ];
 
-  if (style.fontFile) options.push(`fontfile='${escapeFilterPath(style.fontFile)}'`);
-  if (style.boxColor) {
-    const box = filterSafeToken(style.boxColor, `clip ${clip.id}.style.boxColor`);
-    options.push("box=1", `boxcolor=${box}`, `boxborderw=${formatNumber(style.boxPadding ?? 8)}`);
-  }
+  appendTextTypographyOptions(options, clip);
 
   return `[${inputLabel}]drawtext=${options.join(":")}[${outputLabel}]`;
+}
+
+function textIsolatedClipFilter(
+  project: VideoProjectAst,
+  clip: Extract<TimelineClip, { kind: "text" }>,
+  outputLabel: string
+): string {
+  const style = clip.style ?? {};
+  const localTime = "t";
+  const fontSize = numericPropertyExpression(
+    style.fontSize,
+    48,
+    localTime,
+    `clip ${clip.id}.style.fontSize`
+  );
+  const x = textHorizontalPosition(clip, localTime);
+  const y = clip.transform?.y === undefined
+    ? "(h-text_h)/2"
+    : numericPropertyExpression(
+        clip.transform.y,
+        0,
+        localTime,
+        `clip ${clip.id}.transform.y`
+      );
+  const color = filterSafeToken(style.color ?? "white", `clip ${clip.id}.style.color`);
+  const options = [
+    `text='${escapeDrawtext(clip.text)}'`,
+    "expansion=none",
+    `fontsize=${quotedExpression(fontSize)}`,
+    `fontcolor=${color}`,
+    `x=${quotedExpression(x)}`,
+    `y=${quotedExpression(y)}`
+  ];
+
+  appendTextTypographyOptions(options, clip);
+
+  for (const transition of [clip.transitions?.in, clip.transitions?.out]) {
+    if (!transition) continue;
+    if (
+      "kind" in transition &&
+      transition.kind !== "fade" &&
+      transition.kind !== "slide" &&
+      transition.kind !== "wipe" &&
+      transition.kind !== "zoom" &&
+      transition.kind !== "iris"
+    ) {
+      throw new InvalidProjectError(
+        `Text clip "${clip.id}" cannot execute programmable ${transition.kind} yet.`
+      );
+    }
+    if ("type" in transition && transition.type !== "fade") {
+      throw new InvalidProjectError(
+        `Text clip "${clip.id}" cannot execute ${transition.type} on an isolated text layer yet.`
+      );
+    }
+  }
+
+  const filters = [
+    `color=c=black@0:s=${project.canvas.width}x${project.canvas.height}:r=${formatNumber(project.canvas.fps)}:d=${formatNumber(clip.duration)}`,
+    "format=rgba",
+    `drawtext=${options.join(":")}`
+  ];
+  const effectFilters = compileProgrammableEffectFilters(clip.effects, clip.id);
+  if (effectFilters.length) filters.push(...effectFilters, "format=rgba");
+
+  if (numericPropertyHasKeyframes(clip.opacity)) {
+    const opacityExpression = numericPropertyExpression(
+      clip.opacity,
+      1,
+      "T",
+      `clip ${clip.id}.opacity`
+    );
+    filters.push(
+      `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${opacityExpression})'`
+    );
+  } else {
+    const opacity = numericPropertyValue(clip.opacity, 1, `clip ${clip.id}.opacity`);
+    if (opacity < 1) filters.push(`colorchannelmixer=aa=${formatNumber(opacity)}`);
+  }
+
+  const programmableFadeAlpha = programmableFadeAlphaExpression(clip, project.canvas, "T");
+  if (programmableFadeAlpha) {
+    filters.push(
+      `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${programmableFadeAlpha})'`
+    );
+  }
+
+  const programmableWipeAlpha = programmableWipeAlphaExpression(clip, project.canvas, "T");
+  if (programmableWipeAlpha) {
+    filters.push(
+      `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${programmableWipeAlpha})'`
+    );
+  }
+
+  const programmableIrisAlpha = programmableIrisAlphaExpression(clip, project.canvas, "T");
+  if (programmableIrisAlpha) {
+    filters.push(
+      `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${programmableIrisAlpha})'`
+    );
+  }
+
+  const transitionIn = clip.transitions?.in;
+  const fadeIn = legacyTransitionDuration(clip, "in");
+  if (fadeIn > 0 && transitionIn && "type" in transitionIn && transitionIn.type === "fade") {
+    filters.push(`fade=t=in:st=0:d=${formatNumber(fadeIn)}:alpha=1`);
+  }
+  const transitionOut = clip.transitions?.out;
+  const fadeOut = legacyTransitionDuration(clip, "out");
+  if (fadeOut > 0 && transitionOut && "type" in transitionOut && transitionOut.type === "fade") {
+    filters.push(
+      `fade=t=out:st=${formatNumber(Math.max(0, clip.duration - fadeOut))}:d=${formatNumber(fadeOut)}:alpha=1`
+    );
+  }
+
+  const programmableZoomScale = programmableZoomScaleExpression(clip, project.canvas, "t");
+  if (programmableZoomScale) {
+    filters.push(
+      `scale=w=${quotedExpression(`max(1,iw*(${programmableZoomScale}))`)}:` +
+      `h=${quotedExpression(`max(1,ih*(${programmableZoomScale}))`)}:eval=frame`,
+      "format=rgba"
+    );
+  }
+
+  filters.push(`setpts=PTS-STARTPTS+${formatNumber(clip.start)}/TB`);
+  return `${filters.join(",")}[${outputLabel}]`;
+}
+
+function textIsolatedOverlayPosition(
+  project: VideoProjectAst,
+  clip: Extract<TimelineClip, { kind: "text" }>
+): { x: string; y: string } {
+  const localTime = `(t-${formatNumber(clip.start)})`;
+  const slideX = programmableSlideOffsetExpression(clip, project.canvas, "x", localTime);
+  const slideY = programmableSlideOffsetExpression(clip, project.canvas, "y", localTime);
+  const zoomScale = programmableZoomScaleExpression(clip, project.canvas, localTime);
+  const baseX = zoomScale ? "(W-w)/2" : "0";
+  const baseY = zoomScale ? "(H-h)/2" : "0";
+  return {
+    x: slideX ? `((${baseX})+(${slideX}))` : baseX,
+    y: slideY ? `((${baseY})+(${slideY}))` : baseY
+  };
+}
+
+function programmablePushTransitionChainForTrack(
+  track: ProjectTrack,
+  items: IndexedClip[],
+  project: VideoProjectAst,
+  filters: string[]
+): { label: string; start: number; end: number } | null {
+  const clips = items
+    .filter((item) =>
+      item.track.id === track.id &&
+      item.clip.kind === "video" &&
+      item.clip.enabled !== false
+    )
+    .sort((a, b) => a.clip.start - b.clip.start);
+
+  const hasPush = clips.some((item) =>
+    [item.clip.transitions?.in, item.clip.transitions?.out].some(
+      (transition) => transition !== undefined && "kind" in transition && transition.kind === "push"
+    )
+  );
+  if (!hasPush) return null;
+
+  if (clips.length !== 2) {
+    throw new InvalidProjectError(
+      `Track "${track.id}" programmable push currently requires exactly two enabled video clips.`
+    );
+  }
+
+  const firstItem = clips[0]!;
+  const secondItem = clips[1]!;
+  const first = firstItem.clip as Extract<TimelineClip, { kind: "video" }>;
+  const second = secondItem.clip as Extract<TimelineClip, { kind: "video" }>;
+  const transition = second.transitions?.in;
+
+  if (!transition || !("kind" in transition) || transition.kind !== "push") {
+    throw new InvalidProjectError(
+      `Track "${track.id}" programmable push must be declared on the incoming second clip.`
+    );
+  }
+
+  for (const [clipIndex, clip] of [first, second].entries()) {
+    for (const edge of ["in", "out"] as const) {
+      const candidate = clip.transitions?.[edge];
+      if (!candidate) continue;
+      const isSelectedPush = clipIndex === 1 && edge === "in" && candidate === transition;
+      if (!isSelectedPush) {
+        throw new InvalidProjectError(
+          `Track "${track.id}" programmable push cannot combine with another clip transition yet.`
+        );
+      }
+    }
+  }
+
+  if (!fullCanvasTransitionEligible(first, project.canvas) ||
+      !fullCanvasTransitionEligible(second, project.canvas)) {
+    throw new InvalidProjectError(
+      `Track "${track.id}" programmable push requires two full-canvas video clips without effects, blend modes, animated visual properties, opacity changes, or spatial offsets.`
+    );
+  }
+
+  const duration = timelineTransitionDurationSeconds(transition, project.canvas.fps);
+  if (duration >= first.duration || duration >= second.duration) {
+    throw new InvalidProjectError(
+      `Track "${track.id}" programmable push duration must be shorter than both participating clips.`
+    );
+  }
+  const expectedStart = first.start + first.duration - duration;
+  if (Math.abs(second.start - expectedStart) > 0.02) {
+    throw new InvalidProjectError(
+      `Track "${track.id}" programmable push requires the incoming clip to overlap the previous clip by exactly the transition duration.`
+    );
+  }
+  if (firstItem.inputIndex === null || secondItem.inputIndex === null) {
+    throw new InvalidProjectError(`Track "${track.id}" programmable push is missing a video input.`);
+  }
+
+  const prefix = `push_${track.id}`.replace(/[^a-zA-Z0-9_]/gu, "_");
+  const preSource = `${prefix}_pre_src`;
+  const oldSource = `${prefix}_old_src`;
+  const newSource = `${prefix}_new_src`;
+  const postSource = `${prefix}_post_src`;
+  const pre = `${prefix}_pre`;
+  const old = `${prefix}_old`;
+  const incoming = `${prefix}_new`;
+  const post = `${prefix}_post`;
+  const stage = `${prefix}_stage`;
+  const base = `${prefix}_base`;
+  const transitionLabel = `${prefix}_transition`;
+  const output = `${prefix}_out`;
+
+  const preDuration = first.duration - duration;
+  const postDuration = second.duration - duration;
+  const firstSourceStart = first.sourceStart ?? 0;
+  const secondSourceStart = second.sourceStart ?? 0;
+  const prepare = (source: string, start: number, segmentDuration: number, label: string) =>
+    `[${source}]trim=start=${formatNumber(start)}:duration=${formatNumber(segmentDuration)},` +
+    `setpts=PTS-STARTPTS,scale=${project.canvas.width}:${project.canvas.height}:force_original_aspect_ratio=increase,` +
+    `crop=${project.canvas.width}:${project.canvas.height},fps=${formatNumber(project.canvas.fps)},format=rgba[${label}]`;
+
+  filters.push(`[${firstItem.inputIndex}:v]split=2[${preSource}][${oldSource}]`);
+  filters.push(`[${secondItem.inputIndex}:v]split=2[${newSource}][${postSource}]`);
+  filters.push(prepare(preSource, firstSourceStart, preDuration, pre));
+  filters.push(prepare(oldSource, firstSourceStart + preDuration, duration, old));
+  filters.push(prepare(newSource, secondSourceStart, duration, incoming));
+  filters.push(prepare(postSource, secondSourceStart + duration, postDuration, post));
+
+  const progress = `min(1,max(0,t/${formatNumber(duration)}))`;
+  const eased = easingExpression(progress, transition.easing ?? "linear");
+  const width = formatNumber(project.canvas.width);
+  const height = formatNumber(project.canvas.height);
+  let oldX = "0";
+  let oldY = "0";
+  let newX = "0";
+  let newY = "0";
+
+  switch (transition.direction ?? "left") {
+    case "left":
+      oldX = `${width}*(${eased})`;
+      newX = `-${width}*(1-(${eased}))`;
+      break;
+    case "right":
+      oldX = `-${width}*(${eased})`;
+      newX = `${width}*(1-(${eased}))`;
+      break;
+    case "up":
+      oldY = `${height}*(${eased})`;
+      newY = `-${height}*(1-(${eased}))`;
+      break;
+    case "down":
+      oldY = `-${height}*(${eased})`;
+      newY = `${height}*(1-(${eased}))`;
+      break;
+  }
+
+  filters.push(
+    `color=c=black@0:s=${project.canvas.width}x${project.canvas.height}:r=${formatNumber(project.canvas.fps)}:d=${formatNumber(duration)},format=rgba[${stage}]`
+  );
+  filters.push(
+    `[${stage}][${old}]overlay=x=${quotedExpression(oldX)}:y=${quotedExpression(oldY)}:eval=frame:eof_action=pass:shortest=0:format=auto[${base}]`
+  );
+  filters.push(
+    `[${base}][${incoming}]overlay=x=${quotedExpression(newX)}:y=${quotedExpression(newY)}:eval=frame:eof_action=pass:shortest=0:format=auto[${transitionLabel}]`
+  );
+  filters.push(
+    `[${pre}][${transitionLabel}][${post}]concat=n=3:v=1:a=0,format=rgba[${output}]`
+  );
+
+  return {
+    label: output,
+    start: first.start,
+    end: second.start + second.duration
+  };
 }
 
 function transitionChainForTrack(
@@ -438,8 +1066,9 @@ function transitionChainForTrack(
     const previous = clips[index - 1]!.clip as Extract<TimelineClip, { kind: "video" }>;
     const current = clips[index]!.clip as Extract<TimelineClip, { kind: "video" }>;
     const transition = current.transitions?.in;
-    if (!transition || !xfadeTransitionName(transition.type)) return null;
-    const expectedStart = previous.start + previous.duration - transition.duration;
+    if (!transition || !xfadeTransitionName(transition)) return null;
+    const duration = timelineTransitionDurationSeconds(transition, project.canvas.fps);
+    const expectedStart = previous.start + previous.duration - duration;
     if (Math.abs(current.start - expectedStart) > 0.02) return null;
   }
 
@@ -467,9 +1096,12 @@ function transitionChainForTrack(
       `[${item.inputIndex}:v]trim=start=${formatNumber(clip.sourceStart ?? 0)}:duration=${formatNumber(clip.duration)},setpts=PTS-STARTPTS,scale=${project.canvas.width}:${project.canvas.height}:force_original_aspect_ratio=increase,crop=${project.canvas.width}:${project.canvas.height},fps=${formatNumber(project.canvas.fps)},format=yuv420p[${prepared}]`
     );
     const transition = clip.transitions!.in!;
+    const transitionName = xfadeTransitionName(transition);
+    if (!transitionName) return null;
+    const transitionDuration = timelineTransitionDurationSeconds(transition, project.canvas.fps);
     const nextLabel = `xfade_${track.id}_${index}`.replace(/[^a-zA-Z0-9_]/gu, "_");
     filters.push(
-      `[${currentLabel}][${prepared}]xfade=transition=${xfadeTransitionName(transition.type)}:duration=${formatNumber(transition.duration)}:offset=${formatNumber(clip.start - firstClip.start)}[${nextLabel}]`
+      `[${currentLabel}][${prepared}]xfade=transition=${transitionName}:duration=${formatNumber(transitionDuration)}:offset=${formatNumber(clip.start - firstClip.start)}[${nextLabel}]`
     );
     currentLabel = nextLabel;
   }
@@ -503,7 +1135,8 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
     if (track.hidden) continue;
 
     if (track.type === "video") {
-      const chain = transitionChainForTrack(track, indexed, project, filters);
+      const pushChain = programmablePushTransitionChainForTrack(track, indexed, project, filters);
+      const chain = pushChain ?? transitionChainForTrack(track, indexed, project, filters);
       if (chain) {
         const shifted = `xtrack${visualIndex}`;
         filters.push(
@@ -520,7 +1153,11 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
         }
         current = next;
         visualIndex += 1;
-        optimizations.push("VIDEO_XFADE_GRAPH");
+        if (pushChain) {
+          optimizations.push("PROGRAMMABLE_TRANSITION_GRAPH", "PROGRAMMABLE_PUSH_TRANSITION_GRAPH");
+        } else {
+          optimizations.push("VIDEO_XFADE_GRAPH");
+        }
       }
     }
 
@@ -531,7 +1168,38 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
 
       if (clip.kind === "text") {
         const next = `base${visualIndex + 1}`;
-        filters.push(textFilter(current, next, clip));
+        if (clip.effects?.length || clip.transitions?.in || clip.transitions?.out) {
+          assertExecutableProgrammableTransitions(clip);
+          if (
+            hasProgrammableTransitionKind(clip, "zoom") &&
+            (
+              numericPropertyHasKeyframes(clip.transform?.x) ||
+              numericPropertyHasKeyframes(clip.transform?.y) ||
+              numericPropertyHasKeyframes(clip.style?.fontSize)
+            )
+          ) {
+            throw new InvalidProjectError(
+              `Text clip "${clip.id}" cannot combine programmable zoom with animated position or font size yet.`
+            );
+          }
+          const clipLabel = `tclip${visualIndex}`;
+          filters.push(textIsolatedClipFilter(project, clip, clipLabel));
+          const start = formatNumber(clip.start);
+          const end = formatNumber(clip.start + clip.duration);
+          const position = textIsolatedOverlayPosition(project, clip);
+          const overlayX = position.x === "0" ? "0" : quotedExpression(position.x);
+          const overlayY = position.y === "0" ? "0" : quotedExpression(position.y);
+          filters.push(
+            `[${current}][${clipLabel}]overlay=x=${overlayX}:y=${overlayY}:eof_action=pass:shortest=0:format=auto:enable='between(t,${start},${end})'[${next}]`
+          );
+          if (clip.effects?.length) optimizations.push("TEXT_ISOLATED_EFFECT_GRAPH");
+          const transitionMarkers = programmableTransitionOptimizationMarkers(clip);
+          if (transitionMarkers.length) {
+            optimizations.push(...transitionMarkers, "TEXT_ISOLATED_TRANSITION_GRAPH");
+          }
+        } else {
+          filters.push(textFilter(current, next, clip));
+        }
         if (
           numericPropertyHasKeyframes(clip.transform?.x) ||
           numericPropertyHasKeyframes(clip.transform?.y) ||
@@ -544,17 +1212,39 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
         continue;
       }
 
+      assertExecutableProgrammableTransitions(clip);
+      if (hasProgrammableTransitionKind(clip, "zoom") && hasAnimatedTransformProperty(clip)) {
+        throw new InvalidProjectError(
+          `Clip "${clip.id}" cannot combine programmable zoom with animated transforms yet.`
+        );
+      }
       const advancedTransition = clip.transitions?.in;
-      if (advancedTransition && advancedTransition.type !== "fade") {
+      if (
+        clip.effects?.length &&
+        advancedTransition &&
+        "type" in advancedTransition &&
+        advancedTransition.type !== "fade"
+      ) {
+        throw new InvalidProjectError(
+          `Clip "${clip.id}" cannot combine programmable effects with ${advancedTransition.type} until the advanced transition graph preserves effect execution.`
+        );
+      }
+      if (advancedTransition && "type" in advancedTransition && advancedTransition.type !== "fade") {
         throw new InvalidProjectError(
           `Clip "${clip.id}" uses ${advancedTransition.type}, but advanced video transitions currently require a contiguous full-canvas video track with the transition on each incoming clip.`
         );
       }
-      if (clip.transitions?.out && clip.transitions.out.type !== "fade") {
+      if (
+        clip.transitions?.out &&
+        "type" in clip.transitions.out &&
+        clip.transitions.out.type !== "fade"
+      ) {
         throw new InvalidProjectError(
           `Clip "${clip.id}" uses an advanced outgoing transition. Put crossfade/wipe on the incoming clip instead.`
         );
       }
+      const transitionMarkers = programmableTransitionOptimizationMarkers(clip);
+      if (transitionMarkers.length) optimizations.push(...transitionMarkers);
 
       const clipLabel = `vclip${visualIndex}`;
       filters.push(videoClipFilter(item, project, clipLabel));
@@ -562,8 +1252,32 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
       const start = formatNumber(clip.start);
       const end = formatNumber(clip.start + clip.duration);
       const blendMode = clip.blendMode ?? "normal";
+      const effectPadding = programmableEffectPadding(clip.effects, clip.id);
+      const hasEffectPadding = effectPadding.left > 0 || effectPadding.right > 0 ||
+        effectPadding.top > 0 || effectPadding.bottom > 0;
+      const programmableSpatialTransition = [clip.transitions?.in, clip.transitions?.out].find(
+        (transition) =>
+          transition !== undefined &&
+          "kind" in transition &&
+          (transition.kind === "slide" || transition.kind === "wipe" || transition.kind === "zoom" || transition.kind === "iris")
+      );
+
+      if (
+        blendMode !== "normal" &&
+        programmableSpatialTransition &&
+        "kind" in programmableSpatialTransition
+      ) {
+        throw new InvalidProjectError(
+          `Clip "${clip.id}" cannot combine programmable ${programmableSpatialTransition.kind} with blendMode "${blendMode}" yet.`
+        );
+      }
 
       if (blendMode !== "normal") {
+        if (hasEffectPadding) {
+          throw new InvalidProjectError(
+            `Clip "${clip.id}" cannot combine spatial programmable effects with blendMode "${blendMode}" yet.`
+          );
+        }
         if (clip.transform?.x !== undefined || clip.transform?.y !== undefined) {
           throw new InvalidProjectError(
             `Clip "${clip.id}" uses blendMode "${blendMode}" with x/y positioning. Non-normal blend modes currently require full-canvas alignment.`
@@ -574,7 +1288,7 @@ function compileVisualGraph(project: VideoProjectAst, indexed: IndexedClip[]): {
         );
         optimizations.push("BLEND_MODE_GRAPH");
       } else {
-        const { x, y } = clipPosition(clip);
+        const { x, y } = clipPosition(clip, effectPadding, project.canvas);
         filters.push(
           `[${current}][${clipLabel}]overlay=x=${quotedExpression(x)}:y=${quotedExpression(y)}:eof_action=pass:shortest=0:format=auto:enable='between(t,${start},${end})'[${next}]`
         );
@@ -603,7 +1317,8 @@ function effectiveAudioFadeDuration(
   edge: "in" | "out"
 ): number {
   const transition = item.clip.transitions?.[edge];
-  if (transition) return transition.duration;
+  if (transition && "type" in transition) return transition.duration;
+  if (transition) return 0;
   if (edge !== "out") return 0;
 
   const siblings = indexed
@@ -616,10 +1331,11 @@ function effectiveAudioFadeDuration(
   const position = siblings.findIndex((candidate) => candidate.clip.id === item.clip.id);
   const next = position >= 0 ? siblings[position + 1] : undefined;
   const incoming = next?.clip.transitions?.in;
-  if (!incoming || incoming.type === "fade") return 0;
-  const expected = item.clip.start + item.clip.duration - incoming.duration;
+  if (!incoming || !("type" in incoming) || incoming.type === "fade") return 0;
+  const duration = incoming.duration;
+  const expected = item.clip.start + item.clip.duration - duration;
   return Math.abs((next?.clip.start ?? Number.NaN) - expected) <= 0.02
-    ? incoming.duration
+    ? duration
     : 0;
 }
 
@@ -726,7 +1442,14 @@ export function createProjectExecutionPlan(
   const inputArgs = buildInputArgs(project, indexed, inputs);
   const visual = compileVisualGraph(project, indexed);
   const audio = compileAudioGraph(project, indexed, probeMap);
-  const filterComplex = [...visual.filters, ...audio.filters].join(";");
+  const captions = project.captions?.cues.length
+    ? compileCaptionFilterGraph(project.captions)
+    : null;
+  const videoOutputLabel = captions ? "captionout" : visual.outputLabel;
+  const captionFilters = captions
+    ? [`[${visual.outputLabel}]${captions.expression}[${videoOutputLabel}]`]
+    : [];
+  const filterComplex = [...visual.filters, ...captionFilters, ...audio.filters].join(";");
   const container = detectOutputContainer(output);
   if ((options.videoCodec as string | undefined) === "copy") {
     throw new InvalidProjectError('Project composition cannot use videoCodec "copy" because timeline rendering requires a composed video stream.');
@@ -755,7 +1478,7 @@ export function createProjectExecutionPlan(
   const args: string[] = [];
   args.push(options.overwrite === false ? "-n" : "-y");
   args.push(...inputArgs);
-  args.push("-filter_complex", filterComplex, "-map", `[${visual.outputLabel}]`);
+  args.push("-filter_complex", filterComplex, "-map", `[${videoOutputLabel}]`);
   if (audio.outputLabel && audioCodec !== "none") args.push("-map", `[${audio.outputLabel}]`);
   appendVideoEncoderOptions(args, hardware, {
     ...(options.crf !== undefined ? { crf: options.crf } : {}),
@@ -778,6 +1501,7 @@ export function createProjectExecutionPlan(
     ...visual.optimizations,
     ...hardwareOptimizationMarkers(hardware)
   ];
+  if (captions) optimizations.push(...captions.optimizations);
   if (audio.outputLabel && audioCodec !== "none") optimizations.push("AUDIO_MIX_GRAPH");
   if (project.tracks.some((track) =>
     track.clips.some((clip) =>
@@ -786,6 +1510,20 @@ export function createProjectExecutionPlan(
     )
   )) {
     optimizations.push("AUDIO_KEYFRAME_EXPRESSION_GRAPH");
+  }
+  if (project.tracks.some((track) => track.clips.some((clip) =>
+    (clip.kind === "video" || clip.kind === "image" || clip.kind === "text") &&
+    clip.enabled !== false &&
+    Boolean(clip.effects?.length)
+  ))) {
+    optimizations.push("PROGRAMMABLE_EFFECT_GRAPH");
+  }
+  if (project.tracks.some((track) => track.clips.some((clip) =>
+    (clip.kind === "video" || clip.kind === "image" || clip.kind === "text") &&
+    clip.enabled !== false &&
+    hasProgrammableCompositorEffects(clip.effects)
+  ))) {
+    optimizations.push("PROGRAMMABLE_EFFECT_COMPOSITOR_GRAPH");
   }
   if (project.tracks.some((track) => track.clips.some((clip) => clip.kind === "text" && clip.enabled !== false))) {
     optimizations.push("TEXT_IN_FILTER_GRAPH");
@@ -803,10 +1541,277 @@ export function createProjectExecutionPlan(
     durationSeconds: duration,
     inputs,
     filterComplex,
-    videoMap: visual.outputLabel,
+    videoMap: videoOutputLabel,
     audioMap: audio.outputLabel,
     args,
     optimizations: [...new Set(optimizations)],
     hardware
   };
+}
+
+export type ProjectFrameFormat = "png" | "jpeg" | "webp";
+
+export interface ProjectFrameRenderOptions {
+  readonly overwrite?: boolean;
+}
+
+export interface ProjectFrameExecutionPlan {
+  readonly schemaVersion: 1;
+  readonly backend: "ffmpeg";
+  readonly task: "project-frame-render";
+  readonly projectId: string;
+  readonly output: string;
+  readonly width: number;
+  readonly height: number;
+  readonly fps: number;
+  readonly frame: number;
+  readonly format: ProjectFrameFormat;
+  readonly inputs: readonly ProjectInputDescriptor[];
+  readonly filterComplex: string;
+  readonly videoMap: "frameout";
+  readonly args: readonly string[];
+}
+
+function detectProjectFrameFormat(output: string): ProjectFrameFormat {
+  const normalized = output.trim().toLowerCase();
+  if (!normalized) throw new InvalidProjectError("Project frame output path cannot be empty.");
+  if (normalized.endsWith(".png")) return "png";
+  if (normalized.endsWith(".jpg") || normalized.endsWith(".jpeg")) return "jpeg";
+  if (normalized.endsWith(".webp")) return "webp";
+  throw new InvalidProjectError("Project frame output must use png, jpeg, or webp.");
+}
+
+function withoutProjectAudio(project: VideoProjectAst): VideoProjectAst {
+  return {
+    ...project,
+    tracks: project.tracks
+      .filter((track) => track.type !== "audio")
+      .map((track) => ({
+        ...track,
+        clips: track.clips
+          .filter((clip) => clip.kind !== "audio")
+          .map((clip) => clip.kind === "video" ? { ...clip, includeAudio: false } : clip)
+      }))
+  };
+}
+
+function projectFrameInputArgs(plan: ProjectExecutionPlan): string[] {
+  const args: string[] = [];
+  for (const input of plan.inputs) {
+    if (input.kind === "image") {
+      args.push("-loop", "1", "-framerate", formatNumber(plan.fps), "-i", input.source);
+    } else {
+      args.push("-i", input.source);
+    }
+  }
+  return args;
+}
+
+function appendProjectFrameCodec(args: string[], format: ProjectFrameFormat): void {
+  if (format === "png") {
+    args.push("-c:v", "png");
+    return;
+  }
+  if (format === "jpeg") {
+    args.push("-c:v", "mjpeg", "-q:v", "2");
+    return;
+  }
+  args.push("-c:v", "libwebp", "-lossless", "1");
+}
+
+export function createProjectFrameExecutionPlan(
+  inputProject: VideoProjectAst,
+  output: string,
+  frame: number,
+  options: ProjectFrameRenderOptions = {}
+): ProjectFrameExecutionPlan {
+  const project = normalizeVideoProject(inputProject);
+  const durationSeconds = projectDurationSeconds(project);
+  const frameCount = Math.max(1, Math.round(durationSeconds * project.canvas.fps));
+  if (!Number.isSafeInteger(frame) || frame < 0 || frame >= frameCount) {
+    throw new InvalidProjectError(
+      `Frame ${frame} is outside project "${project.id}" (duration ${frameCount} frames).`
+    );
+  }
+
+  const format = detectProjectFrameFormat(output);
+  const visualProject = withoutProjectAudio(project);
+  const visualPlan = createProjectExecutionPlan(
+    visualProject,
+    "__vexa_project_frame__.mp4",
+    {
+      ...(options.overwrite !== undefined ? { overwrite: options.overwrite } : {}),
+      videoCodec: "h264",
+      audioCodec: "none",
+      hardwareAcceleration: "cpu"
+    },
+    {},
+    null
+  );
+  const filterComplex = `${visualPlan.filterComplex};[${visualPlan.videoMap}]trim=start_frame=${frame}:end_frame=${frame + 1},setpts=PTS-STARTPTS[frameout]`;
+  const args: string[] = [options.overwrite === false ? "-n" : "-y"];
+  args.push(...projectFrameInputArgs(visualPlan));
+  args.push(
+    "-filter_complex",
+    filterComplex,
+    "-map",
+    "[frameout]",
+    "-frames:v",
+    "1"
+  );
+  appendProjectFrameCodec(args, format);
+  args.push("-an", output);
+
+  return {
+    schemaVersion: 1,
+    backend: "ffmpeg",
+    task: "project-frame-render",
+    projectId: project.id,
+    output,
+    width: project.canvas.width,
+    height: project.canvas.height,
+    fps: project.canvas.fps,
+    frame,
+    format,
+    inputs: visualPlan.inputs,
+    filterComplex,
+    videoMap: "frameout",
+    args
+  };
+}
+
+export type ProjectRangeExecutionPlan = ProjectExecutionPlan & {
+  readonly startFrame: number;
+  readonly endFrameExclusive: number;
+  readonly frameCount: number;
+};
+
+function projectFrameCount(project: VideoProjectAst): number {
+  return Math.max(
+    1,
+    Math.round(projectDurationSeconds(project) * project.canvas.fps)
+  );
+}
+
+function assertProjectFrameRange(
+  project: VideoProjectAst,
+  startFrame: number,
+  endFrameExclusive: number
+): void {
+  const durationInFrames = projectFrameCount(project);
+  if (
+    !Number.isSafeInteger(startFrame) ||
+    !Number.isSafeInteger(endFrameExclusive) ||
+    startFrame < 0 ||
+    endFrameExclusive <= startFrame ||
+    endFrameExclusive > durationInFrames
+  ) {
+    throw new InvalidProjectError(
+      `Frame range [${startFrame}, ${endFrameExclusive}) must stay inside project "${project.id}" duration ${durationInFrames}.`
+    );
+  }
+}
+
+function replaceProjectRangeArgs(
+  inputArgs: readonly string[],
+  filterComplex: string,
+  videoMap: string,
+  previousVideoMap: string,
+  audioMap: string | null,
+  previousAudioMap: string | null,
+  durationSeconds: number
+): readonly string[] {
+  const args = [...inputArgs];
+  const filterIndex = args.indexOf("-filter_complex");
+  if (filterIndex < 0 || filterIndex + 1 >= args.length) {
+    throw new InvalidProjectError("Project execution plan is missing filter_complex.");
+  }
+  args[filterIndex + 1] = filterComplex;
+
+  const previousVideoToken = `[${previousVideoMap}]`;
+  const nextVideoToken = `[${videoMap}]`;
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === previousVideoToken) args[index] = nextVideoToken;
+  }
+
+  if (previousAudioMap && audioMap) {
+    const previousAudioToken = `[${previousAudioMap}]`;
+    const nextAudioToken = `[${audioMap}]`;
+    for (let index = 0; index < args.length; index += 1) {
+      if (args[index] === previousAudioToken) args[index] = nextAudioToken;
+    }
+  }
+
+  const durationIndex = args.lastIndexOf("-t");
+  if (durationIndex < 0 || durationIndex + 1 >= args.length) {
+    throw new InvalidProjectError("Project execution plan is missing output duration.");
+  }
+  args[durationIndex + 1] = formatNumber(durationSeconds);
+  return Object.freeze(args);
+}
+
+/**
+ * Compile an exact frame-bounded project render without changing the source
+ * project timeline. The composed video stream is trimmed by frame number after
+ * the shared project graph, while audio is trimmed by the equivalent seconds.
+ * The end frame is exclusive.
+ */
+export function createProjectRangeExecutionPlan(
+  inputProject: VideoProjectAst,
+  output: string,
+  startFrame: number,
+  endFrameExclusive: number,
+  options: ProjectRenderOptions = {},
+  probeMap: ProjectProbeMap = {},
+  hardwareCapabilities: HardwareAccelerationCapabilities | null = null
+): ProjectRangeExecutionPlan {
+  const project = normalizeVideoProject(inputProject);
+  assertProjectFrameRange(project, startFrame, endFrameExclusive);
+
+  const base = createProjectExecutionPlan(
+    project,
+    output,
+    options,
+    probeMap,
+    hardwareCapabilities
+  );
+  const frameCount = endFrameExclusive - startFrame;
+  const startSeconds = startFrame / project.canvas.fps;
+  const endSeconds = endFrameExclusive / project.canvas.fps;
+  const durationSeconds = frameCount / project.canvas.fps;
+  const videoMap = "vexa_range_v";
+  const hasMappedAudio = base.audioMap !== null && base.args.includes(`[${base.audioMap}]`);
+  const audioMap = hasMappedAudio ? "vexa_range_a" : null;
+  const filters = [
+    base.filterComplex,
+    `[${base.videoMap}]trim=start_frame=${startFrame}:end_frame=${endFrameExclusive},setpts=PTS-STARTPTS[${videoMap}]`
+  ];
+  if (base.audioMap && audioMap) {
+    filters.push(
+      `[${base.audioMap}]atrim=start=${formatNumber(startSeconds)}:end=${formatNumber(endSeconds)},asetpts=PTS-STARTPTS[${audioMap}]`
+    );
+  }
+  const filterComplex = filters.join(";");
+  const args = replaceProjectRangeArgs(
+    base.args,
+    filterComplex,
+    videoMap,
+    base.videoMap,
+    audioMap,
+    base.audioMap,
+    durationSeconds
+  );
+
+  return Object.freeze({
+    ...base,
+    durationSeconds,
+    filterComplex,
+    videoMap,
+    audioMap,
+    args,
+    optimizations: Object.freeze([...base.optimizations, "FRAME_RANGE_TRIM"]),
+    startFrame,
+    endFrameExclusive,
+    frameCount
+  });
 }

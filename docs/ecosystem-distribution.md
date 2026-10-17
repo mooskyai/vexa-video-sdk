@@ -7,6 +7,10 @@ This repository contains the distribution surfaces around the media SDK:
 - `deploy/docker-worker` as a containerized render-service/worker recipe with FFmpeg;
 - `examples/react-client` and `examples/vue-client` as source-only browser integration examples;
 - `@vexa-video/editor` as framework-neutral timeline state/history/snap foundations;
+- `@vexa-video/gif` as an optional Node-side frame-aware GIF surface integration that keeps source paths and decoding outside core/browser packages;
+- `@vexa-video/waveform` as an optional Node-side static audio-waveform surface integration that keeps media paths and FFmpeg rasterization outside core/browser packages;
+- `@vexa-video/sound-effects` as a browser-safe logical sound catalog that emits existing programmable audio assets/nodes instead of adding another execution path;
+- `@vexa-video/web-renderer` as a browser-safe WebCodecs capability and render-planning boundary with deterministic typed fallback to backend rendering;
 - `HostedRenderer` and `HostedRenderAdapter` for provider-neutral hosted rendering;
 - `.github/workflows/release.yml` plus release validation scripts for controlled npm publication.
 
@@ -48,4 +52,6 @@ React and Vue examples are intentionally source-only so the monorepo does not fo
 
 ## Public releases
 
-`npm run release:check` validates package metadata and synchronized versions. `npm run release:pack` performs dry-run packing. Publication requires the guarded release workflow/operator confirmation; normal CI never publishes packages.
+`npm run release:check` validates package metadata, synchronized versions, and the static trusted-publishing contract. `npm run release:pack` performs dry-run packing, `npm run release:install-check` installs real tarballs into an isolated consumer, and `npm run release:ffmpeg-check` validates the supported FFmpeg/ffprobe capability baseline. Publication is restricted to the protected `release.yml` workflow, the `npm-release` GitHub environment, a tag ref, and tokenless npm OIDC credentials; normal CI never publishes packages.
+
+See [release operations](./release-operations.md) for the supported platform matrix, trusted-publisher bootstrap procedure, and final release sequence.

@@ -6,13 +6,38 @@ import { pipeline } from "node:stream/promises";
 import { Transform } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
+import { handleBundlerPlaygroundRequest } from "./bundler-playground.mjs";
+import { createStudioEventHub, createStudioSourceWatcher } from "./studio-dev-host.mjs";
 import { Audio, Captions, Hardware, JobQueue, Storage, Streaming, Video, VideoProject, VideoSdkError } from "../../packages/sdk/dist/index.js";
 
 const host = "127.0.0.1";
 const port = Number(process.env.VEXA_PLAYGROUND_PORT ?? "4173");
 const exampleDir = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = resolve(exampleDir, "public");
+const repositoryRoot = resolve(exampleDir, "../..");
 const workspaceRoot = resolve(exampleDir, "../../.tmp/visual-playground");
+const compositionBundleRoot = resolve(workspaceRoot, "composition-bundle");
+const compositionSourceRoot = resolve(exampleDir, "compositions");
+const browserPackageRoots = new Map([
+  ["core", resolve(repositoryRoot, "packages/core/dist")],
+  ["editor", resolve(repositoryRoot, "packages/editor/dist")],
+  ["player", resolve(repositoryRoot, "packages/player/dist")],
+  ["studio", resolve(repositoryRoot, "packages/studio/dist")]
+]);
+const studioEvents = createStudioEventHub();
+let studioRevision = 0;
+const studioWatcher = createStudioSourceWatcher({
+  root: compositionSourceRoot,
+  onChange(change) {
+    studioRevision += 1;
+    studioEvents.broadcast({ type: "source-change", revision: studioRevision, ...change });
+  },
+  onError(error) {
+    const message = messageOf(error);
+    console.error("[playground:studio-watch]", message);
+    studioEvents.broadcast({ type: "watch-error", revision: studioRevision, error: message });
+  }
+});
 const maxUploadBytes = 2 * 1024 * 1024 * 1024;
 const remoteStorage = new Storage({
   workspaceRoot,
@@ -984,6 +1009,7 @@ function contentType(path) {
     case ".jpg":
     case ".jpeg": return "image/jpeg";
     case ".png": return "image/png";
+    case ".svg": return "image/svg+xml";
     case ".webp": return "image/webp";
     case ".gif": return "image/gif";
     case ".wav": return "audio/wav";
@@ -1088,8 +1114,83 @@ async function servePublic(res, requestPath, method) {
   }
 }
 
+async function serveBrowserPackage(res, requestPath, method) {
+  const match = /^\/vexa-packages\/(core|editor|player|studio)\/([a-z0-9._/-]+)$/iu.exec(requestPath);
+  if (!match || match[2].includes("..")) {
+    json(res, 400, { error: "Invalid browser package path." });
+    return;
+  }
+
+  const packageRoot = browserPackageRoots.get(match[1]);
+  if (!packageRoot) {
+    json(res, 404, { error: "Browser package was not found." });
+    return;
+  }
+
+  const path = resolve(packageRoot, match[2]);
+  if (!path.startsWith(`${packageRoot}${sep}`)) {
+    json(res, 403, { error: "Path is outside the browser package directory." });
+    return;
+  }
+
+  try {
+    await serveFile(res, path, undefined, method);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+    json(res, 404, { error: "Browser package file not found. Run the TypeScript build first." });
+  }
+}
+
+async function serveCompositionBundle(res, requestPath, method) {
+  const prefix = "/composition-bundle/";
+  const encoded = requestPath.slice(prefix.length);
+  const parts = encoded.split("/").map((part) => decodeURIComponent(part));
+  if (
+    parts.length === 0 ||
+    parts.some((part) => !part || part === "." || part === ".." || !/^[a-z0-9._-]+$/iu.test(part))
+  ) {
+    json(res, 400, { error: "Invalid composition bundle path." });
+    return;
+  }
+
+  const path = resolve(compositionBundleRoot, ...parts);
+  if (!path.startsWith(`${compositionBundleRoot}${sep}`)) {
+    json(res, 403, { error: "Path is outside the composition bundle directory." });
+    return;
+  }
+
+  try {
+    await serveFile(res, path, undefined, method);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+    json(res, 404, { error: "Composition bundle file not found. Build the development bundle first." });
+  }
+}
+
+function handleStudioEvents(_req, res) {
+  const cleanup = studioEvents.add(res, { type: "ready", revision: studioRevision });
+  res.once("close", cleanup);
+}
+
 async function route(req, res) {
   const url = new URL(req.url ?? "/", `http://${host}:${port}`);
+
+  if (req.method === "GET" && url.pathname === "/api/studio/events") {
+    handleStudioEvents(req, res);
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/compositions/")) {
+    const handled = await handleBundlerPlaygroundRequest(req, res, {
+      repositoryRoot,
+      workspaceRoot,
+      url,
+      createOutputSession: createProjectSession,
+      mediaUrl,
+      packageUrl
+    });
+    if (handled) return;
+  }
 
   if (req.method === "POST" && url.pathname === "/api/jobs/render") {
     await handleJobSubmit(req, res);
@@ -1196,6 +1297,16 @@ async function route(req, res) {
     return;
   }
 
+  if ((req.method === "GET" || req.method === "HEAD") && url.pathname.startsWith("/composition-bundle/")) {
+    await serveCompositionBundle(res, url.pathname, req.method);
+    return;
+  }
+
+  if ((req.method === "GET" || req.method === "HEAD") && url.pathname.startsWith("/vexa-packages/")) {
+    await serveBrowserPackage(res, url.pathname, req.method);
+    return;
+  }
+
   if ((req.method === "GET" || req.method === "HEAD") && url.pathname.startsWith("/package/")) {
     const parts = url.pathname.split("/").slice(2).map((part) => decodeURIComponent(part));
     const [id, directoryName, ...fileParts] = parts;
@@ -1246,6 +1357,8 @@ server.listen(port, host, () => {
 });
 
 function shutdown() {
+  studioWatcher.close();
+  studioEvents.close();
   server.close(() => process.exit(0));
 }
 

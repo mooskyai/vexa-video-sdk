@@ -1,20 +1,12 @@
 import { readFile } from "node:fs/promises";
-
-const releasePackages = [
-  "packages/core",
-  "packages/ffmpeg",
-  "packages/sdk",
-  "packages/angular",
-  "packages/ai",
-  "packages/editor",
-  "packages/cli"
-];
+import { releasePackages } from "./release-packages.mjs";
 
 const root = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 const failures = [];
 
-for (const directory of releasePackages) {
+for (const { name: expectedName, directory } of releasePackages) {
   const manifest = JSON.parse(await readFile(new URL(`../${directory}/package.json`, import.meta.url), "utf8"));
+  if (manifest.name !== expectedName) failures.push(`${directory}: package name ${manifest.name} must match release registry ${expectedName}`);
   if (manifest.private === true) failures.push(`${manifest.name}: private must be false for a release package`);
   if (manifest.version !== root.version) failures.push(`${manifest.name}: version ${manifest.version} must match root ${root.version}`);
   if (!manifest.exports) failures.push(`${manifest.name}: exports is required`);
@@ -23,6 +15,13 @@ for (const directory of releasePackages) {
   }
   if (manifest.files?.some((entry) => entry === "dist")) {
     failures.push(`${manifest.name}: files must not publish the entire dist directory because .tsbuildinfo is internal`);
+  }
+  for (const field of ["dependencies", "peerDependencies", "optionalDependencies"]) {
+    for (const [dependency, version] of Object.entries(manifest[field] ?? {})) {
+      if (dependency.startsWith("@vexa-video/") && version !== root.version) {
+        failures.push(`${manifest.name}: ${field}.${dependency} ${version} must match root ${root.version}`);
+      }
+    }
   }
   if (manifest.license !== "MIT") failures.push(`${manifest.name}: license must be MIT`);
   if (manifest.repository?.url !== "https://github.com/mooskyai/vexa-video-sdk.git") failures.push(`${manifest.name}: canonical repository metadata is missing`);

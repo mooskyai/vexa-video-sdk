@@ -1,3 +1,3 @@
 # @vexa-video/editor
 
-Framework-neutral browser timeline-editor foundations for Vexa Video SDK: immutable project state, selection, playhead, snapping, clip move/trim operations, viewport state, and undo/redo history.
+Framework-neutral browser timeline-editor foundations for Vexa Video SDK: immutable project state, selection, playhead, snapping, clip move/trim operations, viewport state, and undo/redo history. `TimelineHistory.sync()` lets Player/Studio update transient playhead or viewport state without polluting undo history.

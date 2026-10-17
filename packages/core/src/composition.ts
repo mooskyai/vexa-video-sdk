@@ -1,4 +1,5 @@
-import { InvalidProjectError } from "./errors.js";
+import { normalizeCaptionDocument, type CaptionDocument } from "./captions.js";
+import { InvalidCaptionError, InvalidProjectError } from "./errors.js";
 import type {
   AudioCodec,
   EncoderPreset,
@@ -8,6 +9,16 @@ import type {
   VideoCodec
 } from "./editing.js";
 import type { HardwareAccelerationDecision, HardwareAccelerationOptions } from "./hardware.js";
+import {
+  InvalidProgrammableEffectError,
+  normalizeProgrammableEffects,
+  type ProgrammableEffect
+} from "./programmable-effects.js";
+import {
+  InvalidProgrammableTransitionError,
+  normalizeProgrammableTransition,
+  type ProgrammableTransition
+} from "./programmable-transitions.js";
 
 export type ProjectTrackType = "video" | "audio" | "image" | "text";
 export type ClipKind = ProjectTrackType;
@@ -48,15 +59,16 @@ export interface ClipTransform {
   fit?: ResizeFit;
 }
 
+export interface LegacyClipTransition {
+  type: TransitionType;
+  duration: number;
+}
+
+export type TimelineTransition = LegacyClipTransition | ProgrammableTransition;
+
 export interface ClipTransitions {
-  in?: {
-    type: TransitionType;
-    duration: number;
-  };
-  out?: {
-    type: TransitionType;
-    duration: number;
-  };
+  in?: TimelineTransition;
+  out?: TimelineTransition;
 }
 
 export interface TimelineClipBase {
@@ -76,6 +88,7 @@ export interface VideoTimelineClip extends TimelineClipBase {
   sourceStart?: number;
   includeAudio?: boolean;
   volume?: NumericProperty;
+  effects?: readonly ProgrammableEffect[];
 }
 
 export interface AudioTimelineClip extends Omit<TimelineClipBase, "transform" | "blendMode"> {
@@ -88,12 +101,40 @@ export interface AudioTimelineClip extends Omit<TimelineClipBase, "transform" | 
 export interface ImageTimelineClip extends TimelineClipBase {
   kind: "image";
   source: string;
+  effects?: readonly ProgrammableEffect[];
+}
+
+export type TextAlignment = "left" | "center" | "right";
+
+export interface TextStrokeStyle {
+  color: string;
+  width: number;
+}
+
+export interface TextShadowStyle {
+  color: string;
+  offsetX: number;
+  offsetY: number;
+}
+
+export type RemoteFontStyle = "normal" | "italic";
+
+export interface RemoteFontReference {
+  provider: string;
+  family: string;
+  weight?: number;
+  style?: RemoteFontStyle;
 }
 
 export interface TextStyle {
   fontSize?: NumericProperty;
   color?: string;
   fontFile?: string;
+  remoteFont?: RemoteFontReference;
+  textAlign?: TextAlignment;
+  lineSpacing?: number;
+  stroke?: TextStrokeStyle;
+  shadow?: TextShadowStyle;
   boxColor?: string;
   boxPadding?: number;
 }
@@ -102,6 +143,7 @@ export interface TextTimelineClip extends Omit<TimelineClipBase, "blendMode"> {
   kind: "text";
   text: string;
   style?: TextStyle;
+  effects?: readonly ProgrammableEffect[];
 }
 
 export type TimelineClip =
@@ -133,6 +175,7 @@ export interface VideoProjectAst {
   id: string;
   name?: string;
   canvas: ProjectCanvas;
+  captions?: CaptionDocument;
   tracks: readonly ProjectTrack[];
 }
 
@@ -297,9 +340,28 @@ export function numericPropertyValueAt(
 function normalizeTransition(
   transition: ClipTransitions["in"] | undefined,
   label: string,
-  clipDuration: number
+  clipDuration: number,
+  fps: number
 ): ClipTransitions["in"] | undefined {
   if (!transition) return undefined;
+
+  if ("kind" in transition) {
+    try {
+      const normalized = normalizeProgrammableTransition(transition);
+      if ((normalized.durationInFrames / fps) > clipDuration + 1e-9) {
+        throw new InvalidProgrammableTransitionError(
+          `${label}.durationInFrames cannot exceed the clip duration.`
+        );
+      }
+      return normalized;
+    } catch (error) {
+      if (error instanceof InvalidProgrammableTransitionError) {
+        throw new InvalidProjectError(`${label} is invalid: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
   if (!["fade", "crossfade", "wipe-left", "wipe-right"].includes(transition.type)) {
     throw new InvalidProjectError(`${label}.type is not supported.`);
   }
@@ -310,7 +372,155 @@ function normalizeTransition(
   return { type: transition.type, duration: transition.duration };
 }
 
-function normalizeClip(clip: TimelineClip, track: ProjectTrack): TimelineClip {
+function normalizeTextStyle(
+  style: TextStyle | undefined,
+  clipId: string,
+  clipDuration: number
+): TextStyle | undefined {
+  if (!style) return undefined;
+
+  const allowed = new Set<keyof TextStyle>([
+    "fontSize",
+    "color",
+    "fontFile",
+    "remoteFont",
+    "textAlign",
+    "lineSpacing",
+    "stroke",
+    "shadow",
+    "boxColor",
+    "boxPadding"
+  ]);
+  for (const key of Object.keys(style)) {
+    if (!allowed.has(key as keyof TextStyle)) {
+      throw new InvalidProjectError(`clip ${clipId}.style.${key} is not supported.`);
+    }
+  }
+
+  let fontSize: NumericProperty | undefined;
+  if (style.fontSize !== undefined) {
+    fontSize = normalizedNumericProperty(
+      style.fontSize,
+      48,
+      `clip ${clipId}.style.fontSize`,
+      clipDuration
+    );
+    const values = typeof fontSize === "number"
+      ? [fontSize]
+      : [fontSize.value, ...(fontSize.keyframes ?? []).map((keyframe) => keyframe.value)];
+    if (values.some((value) => !Number.isFinite(value) || value <= 0)) {
+      throw new InvalidProjectError(`clip ${clipId}.style.fontSize must stay greater than 0.`);
+    }
+  }
+
+  if (style.color !== undefined && !style.color.trim()) {
+    throw new InvalidProjectError(`clip ${clipId}.style.color cannot be empty.`);
+  }
+  if (style.fontFile !== undefined && !style.fontFile.trim()) {
+    throw new InvalidProjectError(`clip ${clipId}.style.fontFile cannot be empty.`);
+  }
+  if (style.fontFile !== undefined && style.remoteFont !== undefined) {
+    throw new InvalidProjectError(`clip ${clipId}.style cannot combine fontFile with remoteFont.`);
+  }
+  if (style.boxColor !== undefined && !style.boxColor.trim()) {
+    throw new InvalidProjectError(`clip ${clipId}.style.boxColor cannot be empty.`);
+  }
+  if (
+    style.textAlign !== undefined &&
+    style.textAlign !== "left" &&
+    style.textAlign !== "center" &&
+    style.textAlign !== "right"
+  ) {
+    throw new InvalidProjectError(`clip ${clipId}.style.textAlign is not supported.`);
+  }
+
+  if (style.lineSpacing !== undefined) {
+    assertFiniteNonNegative(style.lineSpacing, `clip ${clipId}.style.lineSpacing`);
+    if (!Number.isInteger(style.lineSpacing)) {
+      throw new InvalidProjectError(`clip ${clipId}.style.lineSpacing must be an integer.`);
+    }
+  }
+
+  let stroke: TextStrokeStyle | undefined;
+  if (style.stroke !== undefined) {
+    if (!style.stroke.color.trim()) {
+      throw new InvalidProjectError(`clip ${clipId}.style.stroke.color cannot be empty.`);
+    }
+    assertFiniteNonNegative(style.stroke.width, `clip ${clipId}.style.stroke.width`);
+    if (!Number.isInteger(style.stroke.width)) {
+      throw new InvalidProjectError(`clip ${clipId}.style.stroke.width must be an integer.`);
+    }
+    stroke = { color: style.stroke.color, width: style.stroke.width };
+  }
+
+  let shadow: TextShadowStyle | undefined;
+  if (style.shadow !== undefined) {
+    if (!style.shadow.color.trim()) {
+      throw new InvalidProjectError(`clip ${clipId}.style.shadow.color cannot be empty.`);
+    }
+    if (!Number.isInteger(style.shadow.offsetX) || !Number.isInteger(style.shadow.offsetY)) {
+      throw new InvalidProjectError(`clip ${clipId}.style.shadow offsets must be integers.`);
+    }
+    shadow = {
+      color: style.shadow.color,
+      offsetX: style.shadow.offsetX,
+      offsetY: style.shadow.offsetY
+    };
+  }
+
+  let remoteFont: RemoteFontReference | undefined;
+  if (style.remoteFont !== undefined) {
+    const provider = style.remoteFont.provider.trim();
+    const family = style.remoteFont.family.trim();
+    if (!provider) {
+      throw new InvalidProjectError(`clip ${clipId}.style.remoteFont.provider cannot be empty.`);
+    }
+    if (!family) {
+      throw new InvalidProjectError(`clip ${clipId}.style.remoteFont.family cannot be empty.`);
+    }
+    if (
+      style.remoteFont.weight !== undefined &&
+      (!Number.isInteger(style.remoteFont.weight) || style.remoteFont.weight < 1 || style.remoteFont.weight > 1000)
+    ) {
+      throw new InvalidProjectError(
+        `clip ${clipId}.style.remoteFont.weight must be an integer between 1 and 1000.`
+      );
+    }
+    if (
+      style.remoteFont.style !== undefined &&
+      style.remoteFont.style !== "normal" &&
+      style.remoteFont.style !== "italic"
+    ) {
+      throw new InvalidProjectError(`clip ${clipId}.style.remoteFont.style is not supported.`);
+    }
+    remoteFont = {
+      provider,
+      family,
+      ...(style.remoteFont.weight !== undefined ? { weight: style.remoteFont.weight } : {}),
+      ...(style.remoteFont.style !== undefined ? { style: style.remoteFont.style } : {})
+    };
+  }
+
+  if (style.boxPadding !== undefined) {
+    assertFiniteNonNegative(style.boxPadding, `clip ${clipId}.style.boxPadding`);
+  }
+
+  const normalized: TextStyle = {
+    ...(fontSize !== undefined ? { fontSize } : {}),
+    ...(style.color !== undefined ? { color: style.color } : {}),
+    ...(style.fontFile !== undefined ? { fontFile: style.fontFile } : {}),
+    ...(remoteFont !== undefined ? { remoteFont } : {}),
+    ...(style.textAlign !== undefined ? { textAlign: style.textAlign } : {}),
+    ...(style.lineSpacing !== undefined ? { lineSpacing: style.lineSpacing } : {}),
+    ...(stroke !== undefined ? { stroke } : {}),
+    ...(shadow !== undefined ? { shadow } : {}),
+    ...(style.boxColor !== undefined ? { boxColor: style.boxColor } : {}),
+    ...(style.boxPadding !== undefined ? { boxPadding: style.boxPadding } : {})
+  };
+  return Object.keys(normalized).length ? normalized : undefined;
+}
+
+function normalizeClip(clip: TimelineClip, track: ProjectTrack, fps: number): TimelineClip {
   if (!clip.id.trim()) throw new InvalidProjectError("Every clip requires a non-empty id.");
   if (clip.kind !== track.type) {
     throw new InvalidProjectError(
@@ -376,22 +586,54 @@ function normalizeClip(clip: TimelineClip, track: ProjectTrack): TimelineClip {
   const transitionIn = normalizeTransition(
     clip.transitions?.in,
     `clip ${clip.id}.transitions.in`,
-    clip.duration
+    clip.duration,
+    fps
   );
   const transitionOut = normalizeTransition(
     clip.transitions?.out,
     `clip ${clip.id}.transitions.out`,
-    clip.duration
+    clip.duration,
+    fps
   );
   const transitions = transitionIn || transitionOut
     ? { ...(transitionIn ? { in: transitionIn } : {}), ...(transitionOut ? { out: transitionOut } : {}) }
     : undefined;
+
+  if (clip.kind === "audio" && [transitionIn, transitionOut].some(
+    (transition) => transition !== undefined && "kind" in transition
+  )) {
+    throw new InvalidProjectError(
+      `clip ${clip.id} cannot use programmable visual transitions on an audio track.`
+    );
+  }
+
+  let effects: readonly ProgrammableEffect[] | undefined;
+  if (clip.kind === "video" || clip.kind === "image" || clip.kind === "text") {
+    if (clip.effects !== undefined) {
+      if (!Array.isArray(clip.effects)) {
+        throw new InvalidProjectError(`clip ${clip.id}.effects must be an array.`);
+      }
+      try {
+        effects = normalizeProgrammableEffects(clip.effects);
+      } catch (error) {
+        if (error instanceof InvalidProgrammableEffectError) {
+          throw new InvalidProjectError(`clip ${clip.id}.effects is invalid: ${error.message}`);
+        }
+        throw error;
+      }
+    }
+  } else if ("effects" in clip && clip.effects !== undefined) {
+    throw new InvalidProjectError(
+      `clip ${clip.id} (${clip.kind}) does not support programmable effects.`
+    );
+  }
 
   const base = {
     ...clip,
     enabled,
     opacity,
     ...(transform ? { transform } : {}),
+    ...(effects !== undefined ? { effects } : {}),
     ...(transitions && (transitions.in || transitions.out) ? { transitions } : {})
   } as TimelineClip;
 
@@ -420,22 +662,8 @@ function normalizeClip(clip: TimelineClip, track: ProjectTrack): TimelineClip {
   }
 
   if (!base.text.trim()) throw new InvalidProjectError(`Text clip "${base.id}" requires text.`);
-  if (base.style?.fontSize !== undefined) {
-    const fontSize = normalizedNumericProperty(
-      base.style.fontSize,
-      48,
-      `clip ${base.id}.style.fontSize`,
-      base.duration
-    );
-    const values = typeof fontSize === "number"
-      ? [fontSize]
-      : [fontSize.value, ...(fontSize.keyframes ?? []).map((keyframe) => keyframe.value)];
-    if (values.some((value) => !Number.isFinite(value) || value <= 0)) {
-      throw new InvalidProjectError(`clip ${base.id}.style.fontSize must stay greater than 0.`);
-    }
-    return { ...base, style: { ...base.style, fontSize } };
-  }
-  return base;
+  const style = normalizeTextStyle(base.style, base.id, base.duration);
+  return style ? { ...base, style } : base;
 }
 
 export function normalizeVideoProject(project: VideoProjectAst): VideoProjectAst {
@@ -450,6 +678,18 @@ export function normalizeVideoProject(project: VideoProjectAst): VideoProjectAst
     assertFinitePositive(project.canvas.duration, "project.canvas.duration");
   }
 
+  let captions: CaptionDocument | undefined;
+  if (project.captions !== undefined) {
+    try {
+      captions = normalizeCaptionDocument(project.captions);
+    } catch (error) {
+      if (error instanceof InvalidCaptionError) {
+        throw new InvalidProjectError(`project.captions is invalid: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
   const trackIds = new Set<string>();
   const clipIds = new Set<string>();
   const tracks = project.tracks.map((track) => {
@@ -460,7 +700,7 @@ export function normalizeVideoProject(project: VideoProjectAst): VideoProjectAst
     const clips = track.clips.map((clip) => {
       if (clipIds.has(clip.id)) throw new InvalidProjectError(`Duplicate clip id: ${clip.id}.`);
       clipIds.add(clip.id);
-      return normalizeClip(clip, track);
+      return normalizeClip(clip, track, project.canvas.fps);
     });
 
     return {
@@ -483,6 +723,7 @@ export function normalizeVideoProject(project: VideoProjectAst): VideoProjectAst
       ...(project.canvas.duration !== undefined ? { duration: project.canvas.duration } : {}),
       background: project.canvas.background ?? "black"
     },
+    ...(captions !== undefined ? { captions } : {}),
     tracks
   };
 
@@ -497,6 +738,13 @@ export function normalizeVideoProject(project: VideoProjectAst): VideoProjectAst
         }
       }
     }
+    for (const cue of normalized.captions?.cues ?? []) {
+      if (cue.end > normalized.canvas.duration + 1e-6) {
+        throw new InvalidProjectError(
+          `Caption cue "${cue.id}" ends after the explicit project duration of ${normalized.canvas.duration}s.`
+        );
+      }
+    }
   }
 
   return normalized;
@@ -505,6 +753,9 @@ export function normalizeVideoProject(project: VideoProjectAst): VideoProjectAst
 export function projectDurationSeconds(project: VideoProjectAst): number {
   if (project.canvas.duration !== undefined) return project.canvas.duration;
   let duration = 0;
+  for (const cue of project.captions?.cues ?? []) {
+    duration = Math.max(duration, cue.end);
+  }
   for (const track of project.tracks) {
     if (track.hidden && track.type !== "audio") continue;
     if (track.muted && track.type === "audio") continue;
@@ -524,6 +775,7 @@ export function createVideoProjectAst(options: {
   fps?: number;
   duration?: number;
   background?: string;
+  captions?: CaptionDocument;
 }): VideoProjectAst {
   return normalizeVideoProject({
     schemaVersion: 1,
@@ -536,6 +788,7 @@ export function createVideoProjectAst(options: {
       ...(options.duration !== undefined ? { duration: options.duration } : {}),
       ...(options.background ? { background: options.background } : {})
     },
+    ...(options.captions !== undefined ? { captions: options.captions } : {}),
     tracks: []
   });
 }

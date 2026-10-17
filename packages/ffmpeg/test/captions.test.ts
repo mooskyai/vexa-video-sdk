@@ -25,6 +25,68 @@ test("caption compiler emits explicit-font drawtext and animation markers", () =
   assert.ok(graph.optimizations.includes("ANIMATED_CAPTION_PRIMITIVES"));
 });
 
+test("active-word caption mode emits one precisely timed highlighted drawtext per word", () => {
+  const active: CaptionDocument = {
+    schemaVersion: 1,
+    format: "vtt",
+    cues: [{
+      id: "active",
+      start: 0,
+      end: 1,
+      text: "Hello Vexa",
+      words: [
+        { text: "Hello", start: 0, end: 0.4 },
+        { text: "Vexa", start: 0.4, end: 1 }
+      ],
+      style: {
+        fontSize: 40,
+        wordMode: "active-word",
+        activeWordColor: "#facc15"
+      }
+    }]
+  };
+  const graph = compileCaptionFilterGraph(active, "/tmp/font.ttf");
+  assert.equal(graph.filters.length, 2);
+  assert.match(graph.expression, /drawtext=text='Hello'.*fontcolor=#facc15.*between\(t,0,0\.4\)/u);
+  assert.match(graph.expression, /drawtext=text='Vexa'.*fontcolor=#facc15.*between\(t,0\.4,1\)/u);
+  assert.doesNotMatch(graph.expression, /Hello Vexa/u);
+  assert.ok(graph.optimizations.includes("WORD_LEVEL_TIMING_MODEL"));
+  assert.ok(graph.optimizations.includes("ACTIVE_WORD_CAPTION_GRAPH"));
+});
+
+test("speaker-aware caption styles override cue visual defaults", () => {
+  const speakerAware: CaptionDocument = {
+    schemaVersion: 1,
+    format: "vtt",
+    speakerStyles: {
+      Host: { color: "#38bdf8", activeWordColor: "#0ea5e9", backgroundColor: "black@0.55" }
+    },
+    cues: [{
+      id: "host",
+      start: 0,
+      end: 1,
+      text: "Hello Vexa",
+      speaker: "Host",
+      words: [
+        { text: "Hello", start: 0, end: 0.5 },
+        { text: "Vexa", start: 0.5, end: 1 }
+      ],
+      style: { color: "white", wordMode: "active-word", activeWordColor: "#facc15" }
+    }]
+  };
+  const graph = compileCaptionFilterGraph(speakerAware, "/tmp/font.ttf");
+  assert.match(graph.expression, /fontcolor=#0ea5e9/u);
+  assert.match(graph.expression, /boxcolor=black@0\.55/u);
+  assert.ok(graph.optimizations.includes("SPEAKER_AWARE_CAPTION_GRAPH"));
+  assert.ok(graph.optimizations.includes("ACTIVE_WORD_CAPTION_GRAPH"));
+
+  const unmapped = compileCaptionFilterGraph({
+    ...speakerAware,
+    cues: [{ id: "guest", start: 0, end: 1, text: "Guest", speaker: "Guest" }]
+  }, "/tmp/font.ttf");
+  assert.equal(unmapped.optimizations.includes("SPEAKER_AWARE_CAPTION_GRAPH"), false);
+});
+
 test("caption execution plan forces video encode and preserves audio planning", () => {
   const plan = createCaptionExecutionPlan("input.mp4",[],document,"output.mp4",{},probe,"/tmp/font.ttf");
   assert.equal(plan.video?.mode,"encode");

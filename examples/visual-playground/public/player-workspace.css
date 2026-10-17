@@ -1,0 +1,324 @@
+/* Compact first-class Player workspace overrides.
+ * Loaded after styles.css so the Player follows the playground density system
+ * without duplicating or weakening the shared editor styles. */
+
+body.player-workspace-active .editor-shell {
+  grid-template-columns: var(--editor-rail) minmax(680px, 1fr);
+  grid-template-rows: var(--editor-topbar) minmax(0, 1fr);
+}
+
+body.player-workspace-active .preview-workspace {
+  grid-column: 2;
+  grid-row: 2;
+  grid-template-rows: 36px minmax(0, 1fr) 46px;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 0;
+}
+
+body.player-workspace-active .preview-toolbar {
+  min-height: 0;
+  padding-inline: 9px;
+}
+
+body.player-workspace-active .mode-tab {
+  padding: 4px 8px;
+  font-size: 9px;
+}
+
+body.player-workspace-active .preview-info {
+  gap: 5px;
+  font-size: 8px;
+}
+
+body.player-workspace-active .preview-info span {
+  padding: 3px 5px;
+}
+
+body.player-workspace-active .stage-wrap {
+  display: block;
+  min-height: 0;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #2b3d55 transparent;
+  background: #060b12;
+}
+
+body.player-workspace-active .stage-wrap::-webkit-scrollbar {
+  width: 7px;
+}
+
+body.player-workspace-active .stage-wrap::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #2b3d55;
+}
+
+body.player-workspace-active .player-demo-stage {
+  width: 100%;
+  height: auto;
+  min-height: 100%;
+  display: grid;
+  grid-template-rows: auto auto;
+  align-content: start;
+  gap: 7px;
+  padding: 8px 9px 9px;
+  overflow: visible;
+  background: linear-gradient(180deg, #080f19, #060b12);
+}
+
+body.player-workspace-active .player-workspace-heading {
+  align-items: center;
+  gap: 9px;
+}
+
+body.player-workspace-active .player-workspace-heading > div:first-child {
+  min-width: 0;
+}
+
+body.player-workspace-active .player-workspace-heading .kicker {
+  font-size: 7px;
+}
+
+body.player-workspace-active .player-workspace-heading h1 {
+  margin: 1px 0 1px;
+  font-size: 15px;
+  line-height: 1.15;
+  letter-spacing: -.015em;
+}
+
+body.player-workspace-active .player-workspace-heading p {
+  max-width: 650px;
+  margin: 0;
+  color: #8799b0;
+  font-size: 8px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+body.player-workspace-active .player-status-card {
+  flex: 0 0 auto;
+  min-width: 86px;
+  padding: 4px 7px;
+  border-radius: 6px;
+}
+
+body.player-workspace-active .player-status-card span {
+  font-size: 6px;
+}
+
+body.player-workspace-active .player-status-card strong {
+  margin-top: 1px;
+  font-size: 9px;
+}
+
+body.player-workspace-active .player-demo-layout {
+  min-height: 0;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 7px;
+}
+
+body.player-workspace-active .player-canvas-panel {
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+  grid-template-rows: 28px minmax(0, 1fr);
+  border-radius: 7px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .22);
+}
+
+body.player-workspace-active .player-canvas-toolbar {
+  gap: 6px;
+  padding: 0 8px;
+  font-size: 7px;
+}
+
+body.player-workspace-active .player-demo-copy {
+  gap: 4px;
+}
+
+body.player-workspace-active .player-demo-copy span {
+  font-size: 10px;
+}
+
+body.player-workspace-active .player-demo-copy strong {
+  font-size: clamp(34px, 3.7vw, 50px);
+}
+
+body.player-workspace-active .player-demo-copy p {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+body.player-workspace-active .player-demo-frame-chip {
+  padding: 5px 8px;
+  font-size: 11px;
+}
+
+body.player-workspace-active .player-demo-diagnostics {
+  min-height: 0;
+  gap: 5px;
+}
+
+body.player-workspace-active .player-control-section {
+  gap: 5px;
+  padding: 7px;
+  border-radius: 6px;
+}
+
+body.player-workspace-active .player-section-title {
+  gap: 5px;
+}
+
+body.player-workspace-active .player-section-title span {
+  font-size: 9px;
+}
+
+body.player-workspace-active .player-section-title small {
+  font-size: 7px;
+}
+
+body.player-workspace-active .player-metrics-grid {
+  gap: 4px;
+}
+
+body.player-workspace-active .player-demo-metric {
+  gap: 1px;
+  padding: 5px;
+}
+
+body.player-workspace-active .player-demo-metric span {
+  font-size: 7px;
+}
+
+body.player-workspace-active .player-demo-metric strong {
+  font-size: 9px;
+}
+
+body.player-workspace-active .player-field {
+  grid-template-columns: minmax(0, 1fr) 104px;
+  gap: 7px;
+  font-size: 8px;
+}
+
+body.player-workspace-active .player-field .compact-select {
+  height: 26px;
+  font-size: 8px;
+}
+
+body.player-workspace-active .player-toggle-row {
+  gap: 5px;
+}
+
+body.player-workspace-active .player-demo-toggle {
+  min-height: 25px;
+  gap: 5px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-size: 8px;
+}
+
+body.player-workspace-active .player-events-section {
+  min-height: 112px;
+}
+
+body.player-workspace-active .player-demo-events {
+  min-height: 76px;
+  max-height: 130px;
+  padding: 6px;
+  font-size: 8px;
+  line-height: 1.35;
+}
+
+body.player-workspace-active .player-reset-button {
+  min-height: 26px;
+  margin-top: 0;
+  padding-block: 4px;
+}
+
+body.player-workspace-active .player-demo-transport {
+  min-height: 0;
+  padding: 0 9px;
+}
+
+body.player-workspace-active .player-demo-primary-controls {
+  grid-template-columns: auto auto auto minmax(140px, 1fr) auto auto auto;
+  gap: 5px;
+}
+
+body.player-workspace-active .player-demo-primary-controls .transport-button {
+  height: 27px;
+  min-width: 34px;
+  padding-inline: 6px;
+  font-size: 9px;
+}
+
+body.player-workspace-active .player-demo-primary-controls .play-button {
+  width: 31px;
+  height: 31px;
+}
+
+body.player-workspace-active .player-transport-hint {
+  font-size: 8px;
+}
+
+@media (max-width: 1280px) {
+  body.player-workspace-active .editor-shell {
+    grid-template-columns: var(--editor-rail) minmax(620px, 1fr);
+  }
+
+  body.player-workspace-active .player-demo-layout {
+    grid-template-columns: minmax(0, 1fr) 232px;
+  }
+
+  body.player-workspace-active .player-workspace-heading p {
+    max-width: 500px;
+  }
+}
+
+@media (max-height: 820px) {
+  body.player-workspace-active .preview-workspace {
+    grid-template-rows: 34px minmax(0, 1fr) 44px;
+  }
+
+  body.player-workspace-active .player-demo-stage {
+    gap: 6px;
+    padding: 6px 8px 8px;
+  }
+
+  body.player-workspace-active .player-workspace-heading p {
+    display: none;
+  }
+
+  body.player-workspace-active .player-control-section {
+    gap: 4px;
+    padding: 6px;
+  }
+
+  body.player-workspace-active .player-demo-events {
+    min-height: 68px;
+    max-height: 105px;
+  }
+}
+
+/* Playground Player uses exactly one playback surface: the outer transport. */
+body.player-workspace-active .player-demo-progress,
+body.player-workspace-active .player-demo-mount [data-vexa-player-controls="default"] {
+  display: none !important;
+}
+
+/* The Playground owns playback controls; package-level control variants stay
+ * covered by automated tests rather than duplicating the visible workspace UI. */
+body.player-workspace-active .player-field:has(#playerDemoControls) {
+  display: none !important;
+}
+
+/* Keep the Playground transport visible even if an older local player script
+ * marked it hidden based on the package control mode. */
+body.player-workspace-active #playerDemoTransport.hidden {
+  display: grid !important;
+}

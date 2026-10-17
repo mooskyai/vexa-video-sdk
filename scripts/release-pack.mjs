@@ -1,6 +1,7 @@
 import { access, readFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
+import { releasePackages } from "./release-packages.mjs";
 
 function npmInvocation(args) {
   const npmCli = process.env.npm_execpath;
@@ -42,17 +43,7 @@ function runNpm(args, failureMessage) {
   });
 }
 
-const workspaces = [
-  ["@vexa-video/core", "packages/core"],
-  ["@vexa-video/ffmpeg", "packages/ffmpeg"],
-  ["@vexa-video/sdk", "packages/sdk"],
-  ["@vexa-video/angular", "packages/angular"],
-  ["@vexa-video/ai", "packages/ai"],
-  ["@vexa-video/editor", "packages/editor"],
-  ["@vexa-video/cli", "packages/cli"]
-];
-
-for (const [workspace, directory] of workspaces) {
+for (const { name: workspace, directory } of releasePackages) {
   const manifest = JSON.parse(await readFile(resolve(directory, "package.json"), "utf8"));
   const rootExport = manifest.exports?.["."] ?? manifest.exports;
   const runtimePath = typeof rootExport === "string" ? rootExport : rootExport?.import;

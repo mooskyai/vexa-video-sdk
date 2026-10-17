@@ -1,10 +1,34 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { InvalidProjectError } from "@vexa-video/core";
-import { resolveDefaultFontFile } from "../src/fonts.js";
+import { InvalidProjectError, type VideoProjectAst } from "@vexa-video/core";
+import {
+  ProjectFontResolutionError,
+  resolveDefaultFontFile,
+  resolveProjectFontFiles
+} from "../src/fonts.js";
+
+function textProject(fontFile?: string): VideoProjectAst {
+  return {
+    schemaVersion: 1,
+    id: "fonts",
+    canvas: { width: 320, height: 180, fps: 30, duration: 1 },
+    tracks: [{
+      id: "titles",
+      type: "text",
+      clips: [{
+        id: "title",
+        kind: "text",
+        text: "Vexa",
+        start: 0,
+        duration: 1,
+        ...(fontFile ? { style: { fontFile } } : {})
+      }]
+    }]
+  };
+}
 
 test("resolveDefaultFontFile honors VEXA_VIDEO_FONT_FILE", async () => {
   const directory = await mkdtemp(join(tmpdir(), "vexa-font-"));
@@ -26,4 +50,200 @@ test("resolveDefaultFontFile rejects an unreadable explicit override", async () 
     () => resolveDefaultFontFile({ env: { VEXA_VIDEO_FONT_FILE: "/definitely/missing/font.ttf" } }),
     InvalidProjectError
   );
+});
+
+test("resolveProjectFontFiles waits for relative local fonts and leaves the input immutable", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "vexa-project-font-"));
+  const fonts = join(directory, "fonts");
+  const font = join(fonts, "local.ttf");
+  const project = textProject(join("fonts", "local.ttf"));
+
+  try {
+    await mkdir(fonts, { recursive: true });
+    await writeFile(font, "font-placeholder");
+    const resolved = await resolveProjectFontFiles(project, { baseDirectory: directory });
+    const clip = resolved.tracks[0]?.clips[0];
+    assert.equal(clip?.kind, "text");
+    assert.equal(clip?.kind === "text" ? clip.style?.fontFile : undefined, font);
+    const original = project.tracks[0]?.clips[0];
+    assert.equal(
+      original?.kind === "text" ? original.style?.fontFile : undefined,
+      join("fonts", "local.ttf")
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("resolveProjectFontFiles injects an explicit default and fails closed when fonts are unavailable", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "vexa-project-font-default-"));
+  const defaultFont = join(directory, "default.ttf");
+
+  try {
+    await writeFile(defaultFont, "font-placeholder");
+    const resolved = await resolveProjectFontFiles(textProject(), {
+      baseDirectory: directory,
+      defaultFontFile: "default.ttf"
+    });
+    const clip = resolved.tracks[0]?.clips[0];
+    assert.equal(clip?.kind, "text");
+    assert.equal(clip?.kind === "text" ? clip.style?.fontFile : undefined, defaultFont);
+
+    await assert.rejects(
+      () => resolveProjectFontFiles(textProject("missing.ttf"), {
+        baseDirectory: directory,
+        defaultFontFile: null
+      }),
+      (error: unknown) =>
+        error instanceof ProjectFontResolutionError &&
+        error.clipId === "title" &&
+        error.fontFile === join(directory, "missing.ttf")
+    );
+    await assert.rejects(
+      () => resolveProjectFontFiles(textProject(), {
+        baseDirectory: directory,
+        defaultFontFile: null
+      }),
+      (error: unknown) =>
+        error instanceof ProjectFontResolutionError &&
+        error.clipId === "title" &&
+        /no platform default was found/u.test(error.message)
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+
+test("resolveProjectFontFiles ignores hidden and disabled text while wrapping invalid default overrides", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "vexa-project-font-skip-"));
+  const missingOverride = join(directory, "missing-default.ttf");
+  const skipped: VideoProjectAst = {
+    schemaVersion: 1,
+    id: "font-skips",
+    canvas: { width: 320, height: 180, fps: 30, duration: 1 },
+    tracks: [
+      {
+        id: "hidden",
+        type: "text",
+        hidden: true,
+        clips: [{
+          id: "hidden-title",
+          kind: "text",
+          text: "Hidden",
+          start: 0,
+          duration: 1,
+          style: { fontFile: "missing-hidden.ttf" }
+        }]
+      },
+      {
+        id: "disabled",
+        type: "text",
+        clips: [{
+          id: "disabled-title",
+          kind: "text",
+          text: "Disabled",
+          start: 0,
+          duration: 1,
+          enabled: false,
+          style: { fontFile: "missing-disabled.ttf" }
+        }]
+      }
+    ]
+  };
+
+  try {
+    assert.equal(await resolveProjectFontFiles(skipped, { baseDirectory: directory }), skipped);
+    await assert.rejects(
+      () => resolveProjectFontFiles(textProject(), {
+        env: { VEXA_VIDEO_FONT_FILE: missingOverride }
+      }),
+      (error: unknown) =>
+        error instanceof ProjectFontResolutionError &&
+        error.clipId === "title" &&
+        /could not resolve the default font/u.test(error.message)
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+
+test("resolveProjectFontFiles fails closed on unresolved remote font references", async () => {
+  const project = textProject();
+  const track = project.tracks[0]!;
+  const clip = track.clips[0]!;
+  const remote: VideoProjectAst = {
+    ...project,
+    tracks: [{
+      ...track,
+      clips: [{
+        ...clip,
+        kind: "text",
+        style: {
+          remoteFont: {
+            provider: "fixture",
+            family: "Fixture Sans",
+            weight: 700
+          }
+        }
+      }]
+    }]
+  };
+
+  await assert.rejects(
+    () => resolveProjectFontFiles(remote, { defaultFontFile: null }),
+    (error: unknown) =>
+      error instanceof ProjectFontResolutionError &&
+      error.clipId === "title" &&
+      /must be materialized by a renderer font adapter/u.test(error.message)
+  );
+});
+
+test("resolveProjectFontFiles prepares composition caption fonts without mutating input", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "vexa-caption-font-"));
+  const fonts = join(directory, "fonts");
+  const font = join(fonts, "caption.ttf");
+  const project: VideoProjectAst = {
+    schemaVersion: 1,
+    id: "caption-fonts",
+    canvas: { width: 320, height: 180, fps: 30, duration: 1 },
+    captions: {
+      schemaVersion: 1,
+      format: "vtt",
+      cues: [{
+        id: "caption",
+        start: 0,
+        end: 1,
+        text: "Caption",
+        style: { fontFile: join("fonts", "caption.ttf") }
+      }]
+    },
+    tracks: []
+  };
+
+  try {
+    await mkdir(fonts, { recursive: true });
+    await writeFile(font, "font-placeholder");
+    const resolved = await resolveProjectFontFiles(project, { baseDirectory: directory });
+    assert.equal(resolved.captions?.cues[0]?.style?.fontFile, font);
+    assert.equal(
+      project.captions?.cues[0]?.style?.fontFile,
+      join("fonts", "caption.ttf")
+    );
+
+    const defaulted = await resolveProjectFontFiles({
+      ...project,
+      captions: {
+        ...project.captions!,
+        cues: [{ id: "default", start: 0, end: 1, text: "Default" }]
+      }
+    }, {
+      baseDirectory: directory,
+      defaultFontFile: join("fonts", "caption.ttf")
+    });
+    assert.equal(defaulted.captions?.cues[0]?.style?.fontFile, font);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Vexa programmable timing browser parity</title>
+</head>
+<body>
+  <pre id="result">VEXA_TIMING_PARITY_PENDING</pre>
+  <script type="module">
+    import {
+      createFrameContext,
+      interpolate,
+      interpolateColor,
+      loopFrameContext,
+      offsetFrameContext,
+      resolveSeries,
+      seededRandom,
+      spring
+    } from "../dist/browser.js";
+
+    const result = document.querySelector("#result");
+    const closeEnough = (left, right, tolerance = 1e-12) => Math.abs(left - right) <= tolerance;
+
+    try {
+      const root = createFrameContext(61, 30);
+      const nested = offsetFrameContext(root, 17);
+      const interpolation = interpolate(7, [0, 10], [10, 20], { extrapolateLeft: "clamp" });
+      const color = interpolateColor(3, [0, 6], ["#123456", "#abcdef"]);
+      const springValue = spring({ frame: 17, fps: 30, damping: 12 });
+      const randomValue = seededRandom("parity", 9);
+      const loop = loopFrameContext(root, 24);
+      const series = resolveSeries([
+        { durationInFrames: 10 },
+        { durationInFrames: 5, offsetFrames: -2 }
+      ]);
+
+      const checks = [
+        JSON.stringify(root) === JSON.stringify({ frame: 61, absoluteFrame: 61, fps: 30 }),
+        JSON.stringify(nested) === JSON.stringify({ frame: 44, absoluteFrame: 61, fps: 30 }),
+        interpolation === 17,
+        color === "rgba(95, 129, 163, 1)",
+        closeEnough(springValue, 1.030573574292958),
+        randomValue === 0.8174329013563693,
+        JSON.stringify(loop) === JSON.stringify({ frame: 13, absoluteFrame: 61, fps: 30 }),
+        JSON.stringify(series) === JSON.stringify([
+          {
+            index: 0,
+            offsetFrames: 0,
+            startFrame: 0,
+            durationInFrames: 10,
+            endFrameExclusive: 10,
+            lastFrame: 9
+          },
+          {
+            index: 1,
+            offsetFrames: -2,
+            startFrame: 8,
+            durationInFrames: 5,
+            endFrameExclusive: 13,
+            lastFrame: 12
+          }
+        ])
+      ];
+
+      if (checks.some((passed) => !passed)) {
+        throw new Error("Browser timing vector did not match the expected deterministic values.");
+      }
+
+      result.textContent = "VEXA_TIMING_PARITY_PASS";
+      document.body.dataset.status = "pass";
+    } catch (error) {
+      result.textContent = `VEXA_TIMING_PARITY_FAIL: ${error instanceof Error ? error.message : String(error)}`;
+      document.body.dataset.status = "fail";
+    }
+  </script>
+</body>
+</html>

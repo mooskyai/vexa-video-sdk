@@ -188,6 +188,12 @@ export class TimelineHistory {
     return next;
   }
 
+  /** Apply transient external state such as player playhead movement without creating an undo entry. */
+  sync(command: TimelineEditorCommand): TimelineEditorState {
+    this.#state = applyTimelineEditorCommand(this.#state, command);
+    return this.#state;
+  }
+
   undo(): TimelineEditorState {
     const previous = this.#undo.pop();
     if (!previous) return this.#state;

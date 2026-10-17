@@ -91,6 +91,54 @@ test("VideoProject renders sequential clips, mixed audio and text in one composi
 });
 
 
+test("VideoProject rejects unreadable explicit text fonts before render planning", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "vexa-project-font-failure-"));
+  try {
+    const project = VideoProject.create({
+      id: "font-failure",
+      width: 320,
+      height: 180,
+      fps: 30,
+      duration: 1
+    })
+      .addTrack({ id: "t1", type: "text" })
+      .addClip("t1", {
+        id: "title",
+        kind: "text",
+        text: "Vexa",
+        start: 0,
+        duration: 1,
+        style: { fontFile: join(workspace, "missing-font.ttf") }
+      });
+
+    await assert.rejects(
+      () => project.planRender(join(workspace, "font-failure.mp4")),
+      (error: unknown) =>
+        error instanceof InvalidProjectError &&
+        /font file cannot be read/u.test(error.message)
+    );
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("VideoProject.create preserves composition captions", () => {
+  const project = VideoProject.create({
+    id: "captions",
+    width: 320,
+    height: 180,
+    fps: 30,
+    captions: {
+      schemaVersion: 1,
+      format: "vtt",
+      cues: [{ id: "c1", start: 0, end: 2, text: "Composition caption" }]
+    }
+  });
+
+  assert.equal(project.durationSeconds, 2);
+  assert.equal(project.ast.captions?.cues[0]?.text, "Composition caption");
+});
+
 test("VideoProject renders image and standalone audio tracks", async () => {
   const workspace = await mkdtemp(join(tmpdir(), "vexa-project-assets-"));
   const image = join(workspace, "card.png");

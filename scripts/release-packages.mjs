@@ -1,0 +1,20 @@
+export const releasePackages = Object.freeze([
+  Object.freeze({ name: "@vexa-video/core", directory: "packages/core" }),
+  Object.freeze({ name: "@vexa-video/ffmpeg", directory: "packages/ffmpeg" }),
+  Object.freeze({ name: "@vexa-video/sdk", directory: "packages/sdk" }),
+  Object.freeze({ name: "@vexa-video/angular", directory: "packages/angular" }),
+  Object.freeze({ name: "@vexa-video/ai", directory: "packages/ai" }),
+  Object.freeze({ name: "@vexa-video/editor", directory: "packages/editor" }),
+  Object.freeze({ name: "@vexa-video/react", directory: "packages/react" }),
+  Object.freeze({ name: "@vexa-video/player", directory: "packages/player" }),
+  Object.freeze({ name: "@vexa-video/bundler", directory: "packages/bundler" }),
+  Object.freeze({ name: "@vexa-video/renderer", directory: "packages/renderer" }),
+  Object.freeze({ name: "@vexa-video/gif", directory: "packages/gif" }),
+  Object.freeze({ name: "@vexa-video/waveform", directory: "packages/waveform" }),
+  Object.freeze({ name: "@vexa-video/sound-effects", directory: "packages/sound-effects" }),
+  Object.freeze({ name: "@vexa-video/web-renderer", directory: "packages/web-renderer" }),
+  Object.freeze({ name: "@vexa-video/studio", directory: "packages/studio" }),
+  Object.freeze({ name: "@vexa-video/cli", directory: "packages/cli" }),
+  Object.freeze({ name: "@vexa-video/mcp", directory: "packages/mcp" }),
+  Object.freeze({ name: "@vexa-video/test", directory: "packages/test" })
+]);
