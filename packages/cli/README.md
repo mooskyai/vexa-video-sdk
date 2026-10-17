@@ -1,21 +1,42 @@
 # @vexa-video/cli
 
-Command-line interface for Vexa Video SDK.
+Terminal access to Vexa media workflows and programmable composition discovery, bundling, validation, inspection and rendering.
+
+> Stable baseline: **2.0.0** · Node.js command-line interface.
+
+## Install
 
 ```bash
-vexa compositions
-vexa bundle ./src/video.tsx --out-dir ./.vexa/bundle
-vexa probe input.mp4
-vexa plan input.mp4 output.mp4 --width 1280 --height 720
-vexa render input.mp4 output.mp4 --hardware auto
-vexa render ProductDemo output.mp4 --manifest ./.vexa/bundle/vexa.bundle.json --props '{"title":"Launch"}'
-vexa still ProductDemo thumbnail.png --manifest ./.vexa/bundle/vexa.bundle.json --frame 120
-vexa hardware --json
-vexa stream input.mp4 ./hls --protocol hls --preset balanced
+npm install @vexa-video/cli@2.0.0
 ```
 
-The `compositions` command defaults to `src/video.tsx` under the current directory and prints the deterministic discovery descriptors. Use `--root-dir` for another project root and `--json` for compact machine-readable output. `bundle` reuses `@vexa-video/bundler`; it does not introduce a separate composition parser or build path.
+## When to use it
 
-Composition rendering reuses `@vexa-video/renderer`. `render` preserves existing media-file behavior when its first argument is an existing path, URL, or filename-like source; a plain composition id can resolve through `.vexa/bundle/vexa.bundle.json`, and `--manifest` forces composition resolution. `still` is composition-only: true still compositions render directly, while video compositions render frame zero by default or the frame selected with `--frame`. `--props` accepts a JSON object, and composition video renders also support `--start-frame`, `--end-frame`, `--concurrency`, `--timeout-ms`, and the shared hardware options.
+Use this package for local scripting, diagnostics, CI helpers and composition workflows without writing a Node wrapper first.
 
-When developing this repository on Windows, prefer `node packages/cli/dist/bin.js ... --props '{"key":"value"}'` for structured-props acceptance. The repository-only `npm run cli -- ...` wrapper passes through `cmd.exe`, which can remove the inner JSON quotes before the CLI receives argv. Repository acceptance therefore uses direct Node invocation for structured props; installed-package shell behavior is validated separately during release hardening.
+## Capabilities
+
+- Media probe/plan/render
+- Hardware inspection and adaptive streaming commands
+- Composition discovery and bundling
+- Composition inspect/validate/render/still
+- Machine-readable JSON output/errors
+
+## Quick commands
+
+```bash
+vexa --help
+vexa probe input.mp4
+vexa hardware --json
+```
+
+## Runtime boundary
+
+The CLI delegates to existing SDK/bundler/renderer contracts; it is not a separate execution engine.
+
+## Documentation
+
+- [getting-started.md](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/getting-started.md)
+- [compositions.md](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/compositions.md)
+
+For the full package map and runtime boundaries, see the [Vexa package guide](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/package-guide.md).

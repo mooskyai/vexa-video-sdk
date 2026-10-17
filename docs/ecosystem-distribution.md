@@ -1,57 +1,48 @@
-# Ecosystem and distribution
+# Ecosystem and Distribution
 
-This repository contains the distribution surfaces around the media SDK:
+Vexa 2.0.0 is distributed as eighteen synchronized public npm packages plus repository examples and deployment recipes.
 
-- `@vexa-video/cli` for command-line probing, planning, rendering, hardware inspection, and adaptive packaging;
-- `examples/rest-service` as a dependency-light HTTP/job-service template;
-- `deploy/docker-worker` as a containerized render-service/worker recipe with FFmpeg;
-- `examples/react-client` and `examples/vue-client` as source-only browser integration examples;
-- `@vexa-video/editor` as framework-neutral timeline state/history/snap foundations;
-- `@vexa-video/gif` as an optional Node-side frame-aware GIF surface integration that keeps source paths and decoding outside core/browser packages;
-- `@vexa-video/waveform` as an optional Node-side static audio-waveform surface integration that keeps media paths and FFmpeg rasterization outside core/browser packages;
-- `@vexa-video/sound-effects` as a browser-safe logical sound catalog that emits existing programmable audio assets/nodes instead of adding another execution path;
-- `@vexa-video/web-renderer` as a browser-safe WebCodecs capability and render-planning boundary with deterministic typed fallback to backend rendering;
-- `HostedRenderer` and `HostedRenderAdapter` for provider-neutral hosted rendering;
-- `.github/workflows/release.yml` plus release validation scripts for controlled npm publication.
+## Public package model
+
+Use the smallest package set that matches a runtime. Node media execution, browser UI, optional adapters and automation surfaces are intentionally separated.
+
+See [Package guide](./package-guide.md).
 
 ## CLI
 
-After packages are published:
+`@vexa-video/cli` exposes media and composition operations without creating a separate execution engine. Commands delegate to the same SDK/bundler/renderer contracts used by application code.
 
 ```bash
-npx @vexa-video/cli probe input.mp4
-npx @vexa-video/cli plan input.mp4 output.mp4 --width 1280 --height 720 --hardware auto
-npx @vexa-video/cli render input.mp4 output.mp4 --video-codec h264 --audio-codec aac
-npx @vexa-video/cli hardware --json
-npx @vexa-video/cli stream input.mp4 ./hls --protocol hls --preset balanced
+npm install --global @vexa-video/cli@2.0.0
+vexa --help
 ```
 
-## REST service template
+## REST/service examples
+
+The repository includes a generic Node render-service example and Docker worker recipe. They demonstrate how to keep browser clients separated from Node execution, but they are templates rather than a hosted Vexa SaaS product.
+
+Run the REST example:
 
 ```bash
 npm run example:rest-service
 ```
 
-The template listens on `127.0.0.1:4190` by default and exposes health, raw media upload, background render jobs, cancellation, and output serving.
+Default address:
 
-## Container worker
-
-```bash
-docker compose -f deploy/docker-worker/compose.yaml up --build
+```text
+http://127.0.0.1:4190
 ```
-
-The container includes Node.js 24 and FFmpeg and runs the REST job worker with configurable concurrency.
 
 ## Framework examples
 
-React and Vue examples are intentionally source-only so the monorepo does not force React/Vue dependencies onto SDK contributors. Copy them into an application created with the framework's preferred toolchain.
+Browser examples demonstrate transport/job/progress/playback patterns without adding all frameworks as runtime dependencies of the SDK.
 
-## Browser editor foundation
+Angular has a published browser integration package. React has a published composition authoring package. Additional framework/service packages planned for Version 3 should reuse shared contracts rather than duplicate renderer behavior.
 
-`@vexa-video/editor` is framework-neutral and owns serializable timeline selection, playhead, viewport, snapping, clip move/trim operations, and undo/redo history. It does not render DOM or import Node execution code.
+## MCP and agents
 
-## Public releases
+`@vexa-video/mcp` provides typed composition and hosted-render tools over the existing contracts. It intentionally does not expose arbitrary shell execution.
 
-`npm run release:check` validates package metadata, synchronized versions, and the static trusted-publishing contract. `npm run release:pack` performs dry-run packing, `npm run release:install-check` installs real tarballs into an isolated consumer, and `npm run release:ffmpeg-check` validates the supported FFmpeg/ffprobe capability baseline. Publication is restricted to the protected `release.yml` workflow, the `npm-release` GitHub environment, a tag ref, and tokenless npm OIDC credentials; normal CI never publishes packages.
+## Release model
 
-See [release operations](./release-operations.md) for the supported platform matrix, trusted-publisher bootstrap procedure, and final release sequence.
+Public packages are versioned together and published through the protected GitHub Actions release workflow using npm trusted publishing/provenance. See [Release operations](./release-operations.md).

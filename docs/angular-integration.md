@@ -1,35 +1,14 @@
 # Angular Integration
 
-`@vexa-video/angular` is the browser-facing integration layer for Vexa Video SDK. It communicates with a Node render service while keeping FFmpeg, local filesystem access, worker infrastructure, and other Node-only dependencies outside the browser bundle.
+`@vexa-video/angular` is the browser-safe Angular integration for Vexa Video SDK. It talks to a render service through an explicit transport and never runtime-imports the Node SDK or FFmpeg execution code.
 
-## Architecture
+## Install
 
-```text
-Angular application
-      |
-      v
-@vexa-video/angular
-      |
- fetch / custom transport
-      |
-      v
-Node render service
-      |
-      v
-@vexa-video/sdk
-      |
- jobs / storage / hardware / FFmpeg
+```bash
+npm install @vexa-video/angular@2.0.0
 ```
 
-The Angular package must not have runtime imports from `@vexa-video/sdk`, `node:*`, or `child_process`.
-
-## Compatibility
-
-The public Angular package targets modern Angular/RxJS applications through peer dependencies. The repository's runnable demo should use a single internally compatible Angular toolchain.
-
-The root repository currently uses TypeScript 5.9.x. Angular build tooling that requires TypeScript 6 must not be allowed to float into the demo independently. Keep Angular CLI/build/compiler/runtime packages aligned on a TypeScript-5.9-compatible Angular 21.2.x release unless the repository TypeScript baseline is intentionally upgraded as one coordinated change.
-
-Avoid resolving install conflicts with `--force` or `--legacy-peer-deps`; those flags can hide a genuinely incompatible compiler/tooling combination.
+The repository development baseline uses Angular 21.2.x and TypeScript 5.9.x.
 
 ## Configure providers
 
@@ -39,233 +18,77 @@ import { provideVexaVideo } from "@vexa-video/angular";
 export const appConfig = {
   providers: [
     provideVexaVideo({
-      baseUrl: "https://media.example.com",
-      pollIntervalMs: 750,
-      headers: async () => ({
-        authorization: `Bearer ${await getAccessToken()}`
-      })
+      baseUrl: "http://127.0.0.1:4180",
+      pollIntervalMs: 500
     })
   ]
 };
 ```
 
-Default service paths:
+The package exposes browser-side upload, render-job, cancellation, Signal/RxJS state and transport abstractions. The server remains responsible for media execution.
+
+## Recommended architecture
 
 ```text
-POST   /v1/media
-POST   /v1/jobs
-GET    /v1/jobs/:id
-DELETE /v1/jobs/:id
+Angular application
+      |
+      v
+@vexa-video/angular
+      |
+      v
+HTTP/custom transport
+      |
+      v
+Node render service
+      |
+      v
+@vexa-video/sdk / @vexa-video/renderer
 ```
 
-Paths and transport behavior can be customized through providers.
+## Repository render-service example
 
-## Upload and render
-
-```ts
-import { inject } from "@angular/core";
-import {
-  VexaMediaService,
-  VexaRenderService
-} from "@vexa-video/angular";
-
-const media = inject(VexaMediaService);
-const renders = inject(VexaRenderService);
-
-const uploaded = await media.upload(file);
-
-const job = await renders.renderVideo({
-  mediaId: uploaded.id,
-  operations: [
-    { type: "trim", options: { start: 2, duration: 15 } },
-    { type: "resize", options: { width: 1280, height: 720, fit: "contain" } }
-  ],
-  outputFormat: "mp4",
-  export: {
-    videoCodec: "h264",
-    audioCodec: "aac",
-    hardwareAcceleration: "auto"
-  }
-}, {
-  idempotencyKey: "customer-42:render-7",
-  retry: { maxAttempts: 3 }
-});
-```
-
-## Signals
-
-`VexaJobRef` exposes Angular Signals for job state:
-
-- `snapshot()`
-- `state()`
-- `progress()`
-- `result()`
-- `error()`
-- `done()`
-
-A ref polls through the configured render provider until the job reaches a terminal state. Stop manually tracked refs when they are no longer needed.
-
-## RxJS
-
-Applications that prefer streams can use `VexaRenderService.watch(...)`:
-
-```ts
-const subscription = renders.watch(jobId).subscribe({
-  next(snapshot) {
-    console.log(snapshot.state, snapshot.progress?.percent);
-  },
-  complete() {
-    console.log("Job reached a terminal state");
-  }
-});
-```
-
-Unsubscribing stops future polling and aborts the active request.
-
-## Preview helpers
-
-`VexaPreviewService` converts media/output references into render-service URLs and can attach them to an `HTMLMediaElement`.
-
-```ts
-const detach = preview.attach(videoElement, uploaded, {
-  autoplay: true,
-  muted: true
-});
-
-// later
-detach();
-```
-
-## Replace transport, media, or render providers
-
-The default implementation uses browser `fetch`, but applications can replace layers independently:
-
-```ts
-provideVexaVideo(
-  { baseUrl: "/api/media" },
-  withVexaTransport(MyTransport),
-  withVexaMediaProvider(MyMediaProvider),
-  withVexaRenderProvider(MyRenderProvider)
-);
-```
-
-This supports custom authentication, storage, API gateways, GraphQL/RPC transports, or existing job backends without changing component-facing APIs.
-
-## Project rendering
-
-`renderProject(...)` accepts a serializable `VideoProjectAst` plus a mapping from project source identifiers to uploaded media IDs. The Node service resolves those IDs before calling `VideoProject`.
-
-The browser should exchange serializable domain objects, not live Node SDK instances.
-
-## Example render service
-
-The repository includes `examples/angular-render-service`, a small Node HTTP service using `@vexa-video/sdk` and `JobQueue`.
-
-Start it with:
+Build and run the bundled Angular render service from the repository root:
 
 ```bash
 npm run example:angular-service
 ```
 
-Default origin:
-
-```text
-http://127.0.0.1:4180
-```
-
-Developer-facing routes:
-
-```text
-GET    /
-GET    /health
-POST   /v1/media
-POST   /v1/jobs
-GET    /v1/jobs/:id
-DELETE /v1/jobs/:id
-GET    /v1/media/:id/:name
-GET    /v1/outputs/:name
-```
-
-Opening `/` shows a service status page. `/health` returns JSON health data. Port `4180` is the render API, not the Angular application UI.
-
-## Runnable browser demo
-
-`examples/angular-client` is intended to be a real browser demo for the Angular package.
-
-Start the runnable browser demo with:
-
-```bash
-npm run example:angular-demo
-```
-
-Expected local endpoints:
-
-```text
-Angular UI    http://127.0.0.1:4200
-Render API    http://127.0.0.1:4180
-Health        http://127.0.0.1:4180/health
-```
-
-The demo exercises:
-
-- service health;
-- file selection/drag-and-drop;
-- media upload;
-- source preview;
-- output dimensions;
-- hardware preference;
-- retry count and optional idempotency key;
-- background render submission;
-- Signal-driven state/progress;
-- cancellation;
-- completed-output playback.
-
-A compatible alternate render service can be selected through a `service` query parameter when supported by the demo configuration.
-
-## Browser bootstrap guidance
-
-The configured browser target matrix may reject top-level `await`. Use promise handling instead of:
-
-```ts
-await bootstrapApplication(AppComponent, appConfig);
-```
-
-Prefer:
-
-```ts
-bootstrapApplication(AppComponent, appConfig).catch((error: unknown) => {
-  console.error("Failed to bootstrap the Vexa Angular demo.", error);
-});
-```
-
-## Troubleshooting
-
-### `ERESOLVE` mentions Angular build and TypeScript 6
-
-Cause: an Angular build-tool version that requires TypeScript 6 was resolved while the repository still uses TypeScript 5.9.
-
-Fix: align `@angular/build`, `@angular/cli`, `@angular/compiler`, `@angular/compiler-cli`, `@angular/core`, `@angular/common`, and `@angular/platform-browser` on one compatible Angular 21.2.x release. Do not paper over the mismatch with npm force flags.
-
-### `Top-level await is not available in the configured target environment`
-
-Remove top-level `await` from `main.ts` and handle the bootstrap promise with `.catch(...)` as shown above.
-
-### Opening `http://127.0.0.1:4180` does not show the Angular app
-
-Expected behavior: port `4180` is the Node render API. The Angular UI runs separately on port `4200` when the browser demo is started.
-
-### Service indicator is offline
-
-Check:
+The example service uses port `4180` and exposes a health endpoint at:
 
 ```text
 http://127.0.0.1:4180/health
 ```
 
-Then verify the Angular client's configured `baseUrl`, browser console, CORS policy, and whether another process is already using the port.
+The browser client example lives under `examples/` and should use its own workspace scripts/configuration; the root package does not promise a generic `example:angular-demo` script.
 
-## Browser safety verification
+## Custom transport
 
-Automated coverage should scan the Angular package and reject runtime references to Node-only modules. This is an architectural contract, not a bundler workaround.
+Production applications can replace the default transport while preserving the browser-safe public contracts. Typical reasons include:
 
-When adding a new Angular feature, ask whether the feature belongs in the browser adapter or in the Node render service. Media execution, local files, cloud credentials, Redis workers, and FFmpeg belong on the Node side.
+- existing API gateways;
+- authenticated request clients;
+- WebSocket/SSE status delivery;
+- organization-specific upload protocols.
+
+Keep authentication, authorization and tenant context in your application/service boundary rather than adding credentials to reusable browser state.
+
+## Browser safety
+
+Do not import these from Angular runtime code:
+
+- `@vexa-video/sdk`;
+- Node `child_process`/`node:*` modules;
+- FFmpeg executors;
+- Redis clients.
+
+If a feature requires server execution, add it to the render-service API and return a serializable job/result contract.
+
+## Production checklist
+
+- authenticate upload/render endpoints;
+- enforce media/request size limits;
+- use managed server workspaces;
+- handle cancellation and failed jobs;
+- avoid exposing local filesystem paths to the browser;
+- use trusted output URLs or application-owned download endpoints;
+- configure CORS intentionally rather than broadly.

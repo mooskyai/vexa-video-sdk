@@ -1,29 +1,41 @@
 # Changelog
 
-All notable public changes are documented here.
-
-The project uses Semantic Versioning and keeps the public `@vexa-video/*` workspace set on one synchronized release version.
+All notable public changes to Vexa Video SDK are documented here. Public `@vexa-video/*` packages use synchronized semantic versions.
 
 ## Unreleased
 
-## [2.0.0]
+No unreleased public changes are recorded yet.
+
+## [2.0.0] — 2026-10-17
+
+Version 2 establishes Vexa as a programmable-video platform in addition to its deterministic media-processing foundation.
 
 ### Added
 
-- Vexa-native programmable composition contracts, deterministic frame/time/animation primitives, scene graphs, React authoring, Player, TypeScript/TSX bundling, Node rendering, Studio, browser/WebCodecs rendering, templates, hosted rendering, CLI/MCP workflows, and frame-level visual regression tooling.
-- Shapes, effects, transitions, fonts, composition captions, GIF, waveform, sound-effect, parameterized-template, and agent-facing integrations built on the existing Vexa media/runtime boundaries.
-- Version 2 migration guidance and protected tokenless npm release operations.
+- programmable composition contracts, deterministic frame/time primitives and scene graphs;
+- browser-safe React authoring, Player, Studio and WebCodecs rendering layers;
+- TypeScript/TSX composition bundling and Node bundle-backed rendering;
+- shapes, effects, transitions, typography, composition captions and reusable templates;
+- GIF, waveform and sound-effect integrations;
+- hosted composition rendering and deterministic artifact publication contracts;
+- CLI composition discovery/bundling/inspection/validation/render/still workflows;
+- MCP tools and official stdio protocol transport;
+- deterministic visual/runtime regression helpers and browser pixel acceptance;
+- synchronized release tooling for all eighteen public packages.
 
-### Changed
+### Release and supply chain
 
-- all eighteen public `@vexa-video/*` packages release in lockstep at `2.0.0`;
-- release acceptance verifies packed-tarball installs on Ubuntu 24.04, Windows, and macOS, plus Chrome/Edge Studio acceptance and a Node 26 compatibility lane;
-- npm publication uses GitHub Actions OIDC trusted publishing with provenance and rejects `NPM_TOKEN`/`NODE_AUTH_TOKEN` in the protected publish path.
+- all public packages are synchronized at `2.0.0`;
+- release acceptance covers Windows, Ubuntu and macOS plus Chrome and Windows Edge;
+- Node.js 24.21.0 is the primary release baseline with an Ubuntu Node.js 26 compatibility lane;
+- packed tarballs are installed into isolated consumers before publication;
+- npm publication uses GitHub Actions OIDC trusted publishing with provenance;
+- a fresh public-registry smoke test verified SDK import, CLI execution, registry signatures and attestations.
 
 ### Migration
 
-See [`docs/V2_MIGRATION.md`](./docs/V2_MIGRATION.md) before upgrading an existing Vexa application.
+Existing 1.x users should read [`docs/V2_MIGRATION.md`](./docs/V2_MIGRATION.md).
 
 ## [1.0.0]
 
-- Initial Vexa Video SDK release line.
+Initial public Vexa Video SDK release line.

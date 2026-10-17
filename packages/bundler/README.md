@@ -1,69 +1,44 @@
 # @vexa-video/bundler
 
-Node-side composition bundling and discovery tooling for Vexa programmable video.
+Bundles TypeScript/TSX programmable compositions and produces deterministic manifests/discovery metadata with controlled CSS/assets, source maps and environment exposure.
 
-The package turns a TypeScript/TSX composition entry into a browser-executable ESM bundle plus a deterministic `vexa.bundle.json` manifest. It is development/build tooling: playback remains in `@vexa-video/player`, composition semantics remain in `@vexa-video/core` / `@vexa-video/react`, and Node rendering is owned by `@vexa-video/renderer`.
+> Stable baseline: **2.0.0** · Node.js build-time package.
 
-## Entry contract
+## Install
 
-A composition entry exports a `vexaCompositions` array. Use the browser-safe helper from `@vexa-video/bundler/entry` to validate and deterministically sort the metadata:
+```bash
+npm install @vexa-video/bundler@2.0.0
+```
+
+## When to use it
+
+Use this package when composition source code must be converted into an executable Vexa bundle for Studio, CLI or Node rendering.
+
+## Capabilities
+
+- TypeScript/TSX composition bundling
+- Deterministic composition discovery/manifests
+- CSS and static asset handling
+- Source-map modes
+- Explicit public-environment allowlisting
+
+## Minimal example
 
 ```ts
 import { defineBundleCompositions } from "@vexa-video/bundler/entry";
 
 export const vexaCompositions = defineBundleCompositions([
-  {
-    id: "product-demo",
-    kind: "video",
-    width: 1920,
-    height: 1080,
-    fps: 30,
-    durationInFrames: 300
-  }
+  { id: "intro", kind: "video", width: 1920, height: 1080, fps: 30, durationInFrames: 150 }
 ]);
 ```
 
-The entry can also export the React/components/runtime values needed by the browser bundle. Discovery requires module initialization to remain side-effect-safe for Node execution; DOM work should happen inside components/runtime functions rather than at module top level.
+## Runtime boundary
 
-## Bundle
+Bundling is Node/build-time work. Do not expose private environment variables into browser composition bundles.
 
-```ts
-import { bundleCompositions } from "@vexa-video/bundler";
+## Documentation
 
-const result = await bundleCompositions({
-  rootDir: process.cwd(),
-  entry: "src/video.tsx",
-  outDir: ".vexa/bundle",
-  publicDir: "public",
-  mode: "development",
-  sourceMap: "external",
-  environmentAllowlist: ["VEXA_PUBLIC_API_URL"]
-});
+- [compositions.md](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/compositions.md)
+- [architecture.md](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/architecture.md)
 
-console.log(result.manifest.compositions);
-```
-
-Only environment variables named in `environmentAllowlist` are embedded. Both `process.env` and `import.meta.env` are replaced with the filtered object; other host environment values are not exposed to the browser bundle.
-
-## Output
-
-A build can contain:
-
-```text
-.vexa/bundle/
-  index.js
-  index.js.map
-  index.css
-  chunks/
-  assets/
-  <copied public files>
-  vexa.bundle.json
-```
-
-The manifest contains normalized relative paths, sorted composition discovery, the allowlisted environment-variable names, and SHA-256/size metadata for emitted files. It intentionally contains no timestamps or machine-specific absolute paths.
-
-Bundle publication uses a staging directory and final directory promotion. On Windows, transient `EPERM`, `EACCES`, or `EBUSY` promotion failures are retried with a short bounded backoff so filesystem indexing or antivirus handles do not make otherwise successful builds flaky.
-
-## Security boundary
-
-Bundling and discovery execute trusted application source in the local Node development/build environment. This package is not a sandbox. A hosted service that accepts untrusted composition code must isolate bundling/discovery at the process or container boundary.
+For the full package map and runtime boundaries, see the [Vexa package guide](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/package-guide.md).

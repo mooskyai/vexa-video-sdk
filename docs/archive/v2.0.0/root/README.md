@@ -1,0 +1,633 @@
+# Vexa Video SDK
+
+[![CI](https://github.com/mooskyai/vexa-video-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/mooskyai/vexa-video-sdk/actions/workflows/ci.yml)
+![Node.js](https://img.shields.io/badge/Node.js-%3E%3D24.21.0-339933.svg?logo=node.js&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6.svg?logo=typescript&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-blue.svg)
+
+A typed, modular media-processing SDK for Node.js and TypeScript.
+
+Vexa provides high-level APIs for video editing, timeline composition, audio processing, captions, adaptive streaming, hardware-accelerated encoding, remote media, background jobs, and browser-safe Angular integration while keeping FFmpeg behind a backend-neutral API.
+
+> **Project status:** Version 2 release-ready. The eighteen public packages are versioned together at 2.0.0; example workspaces remain private. Existing applications should review the [Version 2 migration guide](./docs/V2_MIGRATION.md) before upgrading.
+
+## Why Vexa?
+
+FFmpeg is extremely capable, but production applications usually need more than command-line construction. They also need validation, codec/container compatibility, filter-graph planning, progress, cancellation, retries, storage, worker coordination, GPU selection, and browser/server boundaries.
+
+Vexa keeps those concerns behind a typed SDK:
+
+- **Backend-neutral APIs** — describe media intent instead of raw FFmpeg flags.
+- **Immutable pipelines** — build edits first; execute only at terminal operations.
+- **Deterministic plans** — inspect filters, codecs, hardware decisions, and generated arguments before rendering.
+- **Single-pass optimization** — compatible operations are combined into one FFmpeg graph where practical.
+- **Cross-platform behavior** — Windows, Linux, and macOS are treated as first-class Node.js targets.
+- **Safe process execution** — argument arrays, typed errors, timeouts, cancellation, and structured progress.
+- **Runtime-verified GPU acceleration** — NVENC, Quick Sync, AMF, and VideoToolbox are tested before automatic selection.
+- **Browser/server separation** — Angular clients never import Node-only FFmpeg execution code.
+
+## Capabilities
+
+| Area | Current capabilities |
+| --- | --- |
+| Video | Probe, trim, resize, crop, rotate, thumbnail, audio extraction, export |
+| Planning | Serializable ASTs, deterministic execution plans, validation, stream-copy optimization |
+| Timeline | Video/audio/image/text tracks, transforms, keyframes, transitions, blend modes, track ordering |
+| Audio | Loudness normalization, fades, channel mapping, ducking, silence detection, waveforms |
+| Captions | SRT, WebVTT, ASS, styling, templates, word timings, sentence/active-word burn-in, speaker metadata and deterministic speaker style overrides |
+| Streaming | HLS, MPEG-DASH, rendition ladders, segments, manifests, preview sprites |
+| Hardware | CPU, NVIDIA NVENC, Intel Quick Sync, AMD AMF, Apple VideoToolbox |
+| Storage | Local files, safe HTTPS, managed workspaces, S3/GCS/Azure adapter hooks |
+| Jobs | Local workers, retries, idempotency, cancellation, Redis-backed distributed transport |
+| Angular | Browser-safe providers, uploads, render jobs, Signals, RxJS polling, preview helpers |
+| Plugins | Lifecycle-managed custom operations, storage adapters, job handlers, render backends, encoder providers |
+| AI extension | Provider-neutral transcription/captions, FFmpeg scene detection, silence removal, smart reframe, highlight hooks |
+| CLI | Probe, plan, media rendering, hardware inspection, adaptive streaming, deterministic composition discovery/bundling, bundle-backed composition video/still rendering, executable composition inspection, props validation, and machine-readable output/errors |
+| Agent/MCP | Typed composition tools plus an official MCP protocol server and stdio transport for list/inspect/validate and hosted render start/state/cancel, with stable machine-readable failures and no raw shell execution |
+| Visual testing | Node-side selected-frame checkpoints, checked-in deterministic transition baselines, exact Player/Studio/browser-renderer checkpoint timing parity, real Chromium Studio wipe captures, deterministic image/video/audio/caption/props fixture coverage, frame-derived A/V duration/sync assertions, and tolerance-aware PNG snapshot comparison |
+| Browser editor foundation | Framework-neutral timeline state, snapping, clip edits, viewport state, undo/redo |
+| Hosted rendering | Provider-neutral submit/get/cancel/wait plus typed composition requests, existing job-worker execution, deterministic artifact identity, retry-safe remote publication through the normal Storage upload boundary, and explicit provider publishing for directory artifacts |
+| Programmable authoring | Deterministic composition metadata, JSON-serializable input schemas with defaults/validation, deterministic reusable-template catalogs with validated 16:9/9:16/1:1 variants, reusable scene/storage asset descriptors, and JSON-safe service/agent invocation, frame/time math, scene graphs, serializable shape/effect/transition/typography contracts, reusable logical sound-effect catalogs, visual scene nodes, and React authoring primitives |
+| Browser player | Framework-neutral playback state, seek/step/loop/rate/buffering, responsive host, events, and fullscreen |
+| Browser rendering | Browser-safe WebCodecs capability probing, typed fallback planning, cancellable video plus AAC/Opus audio encoding, H.264/AAC MP4 and VP9-or-AV1/Opus WebM A/V muxing with Blob/File output, concrete Canvas and serializable-DOM frame capture adapters, and deterministic capture-to-container acceptance coverage |
+| Composition bundling | TypeScript/TSX browser bundles, CSS/assets, deterministic manifests/discovery, source maps, and environment allowlists |
+| Composition rendering | Bundle-backed still/frame/range/video rendering with progress, cancellation, hardware selection, managed storage assets, renderer-owned shape plus fill/solid SVG-to-PNG rasterization, opt-in static and frame-aware surface renderer adapters with validated SVG/PNG frame results and managed lossless animation intermediates, optional logical-source GIF frame decoding, optional logical-source audio waveform rasterization, ordered programmable effects, easing-aware programmable fade/slide/wipe/zoom/circular-iris transitions, paired programmable push transitions, deterministic text stroke/shadow/alignment/line-spacing, readable local-font readiness, opt-in provider-keyed remote-font adapters, composition-level caption cue rendering, precise active-word timing, and speaker-aware caption styling before FFmpeg planning |
+| Studio runtime | Browser-safe composition session state that coordinates Player preview, Editor timeline state, draft props, resolved metadata, and hot-reload frame preservation |
+| Creative playground UI | Unified Vexa Editor and Vexa Studio dark creative-tool shell with media search/filtering, scene navigation, timeline visualization, inspector tooling, and responsive layouts |
+| Studio development host | Recursive composition-source watching, SSE hot reload, dirty-props/frame preservation, diagnostics overlay, and browser-driven render success/failure acceptance including Windows paths with spaces |
+
+## Requirements
+
+| Requirement | Notes |
+| --- | --- |
+| Node.js | **24.21.0+** |
+| npm | 11+ for development; **11.15.0+** for trusted-publisher administration |
+| FFmpeg | **6.1+** for the first public release baseline; `drawtext`, `libx264`, and AAC required for the default acceptance surface |
+| ffprobe | **6.1+**, preferably from the same distribution/build as FFmpeg |
+| TypeScript | 5.9.x in the repository toolchain |
+
+Verify your local tools:
+
+```bash
+node --version
+npm --version
+ffmpeg -version
+ffprobe -version
+```
+
+## Quick start
+
+```bash
+git clone https://github.com/mooskyai/vexa-video-sdk.git
+cd vexa-video-sdk
+npm install
+npm run verify
+```
+
+A basic video edit:
+
+```ts
+import { Video } from "@vexa-video/sdk";
+
+await Video.load("input.mp4")
+  .trim({ start: 5, duration: 20 })
+  .resize({ width: 1280, height: 720, fit: "contain" })
+  .rotate({ degrees: 90 })
+  .export("output.mp4", {
+    videoCodec: "h264",
+    audioCodec: "aac",
+    crf: 20,
+    preset: "fast",
+    onProgress(progress) {
+      console.log(progress.percent);
+    }
+  });
+```
+
+Editing methods build an immutable pipeline. FFmpeg starts only when a terminal operation such as `export()` is called.
+
+## Inspect an execution plan
+
+```ts
+const video = Video.load("input.mp4")
+  .resize({ width: 1920, height: 1080, fit: "cover" });
+
+const plan = await video.planExport("output.mp4", {
+  videoCodec: "h264",
+  audioCodec: "aac",
+  hardwareAcceleration: "auto"
+});
+
+console.log(plan.video);
+console.log(plan.audio);
+console.log(plan.filters);
+console.log(plan.hardware);
+console.log(plan.optimizations);
+```
+
+For compatible untouched media, Vexa can choose stream copy instead of re-encoding.
+
+## Timeline composition
+
+`VideoProject` provides a serializable multi-track editing model:
+
+```ts
+import { createProject } from "@vexa-video/sdk";
+
+const project = createProject({
+  id: "demo",
+  name: "Demo edit",
+  width: 1920,
+  height: 1080,
+  fps: 30,
+  background: "black"
+})
+  .addTrack({ id: "video", type: "video", name: "Main video" })
+  .addTrack({ id: "titles", type: "text", name: "Titles" })
+  .addClip("video", {
+    id: "scene-1",
+    kind: "video",
+    source: "scene.mp4",
+    start: 0,
+    duration: 5,
+    transform: { fit: "cover" }
+  })
+  .addClip("titles", {
+    id: "title-1",
+    kind: "text",
+    text: "Hello from Vexa",
+    start: 0.5,
+    duration: 2.5,
+    transform: { x: 80, y: 80 },
+    style: { fontSize: 64, color: "white" }
+  });
+
+await project.render("project-output.mp4");
+```
+
+Projects support video, audio, image, and text tracks; clip-relative keyframes; fades, crossfades and wipes; full-canvas blend modes; mixed audio; and deterministic planning before execution.
+
+## Audio
+
+```ts
+import { Audio } from "@vexa-video/sdk";
+
+await Audio.load("music.wav")
+  .trim({ start: 2, duration: 30 })
+  .normalize({ targetLufs: -16, truePeakDb: -1.5, loudnessRange: 11 })
+  .fadeIn(0.5)
+  .fadeOut(1)
+  .channels("stereo")
+  .export("music.m4a", { codec: "aac", bitrate: "192k" });
+```
+
+Audio workflows also include sidechain ducking, silence detection, and waveform generation.
+
+## Captions
+
+```ts
+import { Captions, Video } from "@vexa-video/sdk";
+
+const captions = Captions.applyTemplate(
+  Captions.parse(`1
+00:00:00,500 --> 00:00:02,500
+Welcome to Vexa Video
+`, "srt"),
+  "subtitle",
+  {
+    fontSize: 42,
+    color: "white",
+    backgroundColor: "black@0.55",
+    animation: "fade"
+  }
+);
+
+await Video.load("input.mp4").burnCaptions(captions, "captioned.mp4");
+```
+
+Supported text formats are SRT, WebVTT, and ASS. Caption documents can preserve word-level timing metadata for transcription and karaoke-style workflows.
+
+## Adaptive streaming
+
+```ts
+import { Streaming } from "@vexa-video/sdk";
+
+await Streaming.load("input.mp4").package("./dist/hls", {
+  protocol: "hls",
+  preset: "balanced",
+  segmentDuration: 4
+});
+```
+
+Vexa can create HLS and MPEG-DASH packages, custom rendition ladders, aligned segments, and JPEG/WebVTT seek-preview sprites. Windows-specific path normalization keeps generated manifests portable.
+
+## Hardware acceleration
+
+```ts
+import { Hardware, Video } from "@vexa-video/sdk";
+
+const capabilities = await Hardware.detect();
+console.log(capabilities.providers);
+
+await Video.load("input.mp4")
+  .resize({ width: 1920, height: 1080 })
+  .export("output.mp4", {
+    videoCodec: "h264",
+    hardwareAcceleration: "auto",
+    hardwareFallback: true,
+    crf: 21,
+    preset: "fast"
+  });
+```
+
+An encoder is not considered usable merely because it appears in `ffmpeg -encoders`. Hardware providers are verified with a small real encode before they become eligible for automatic selection.
+
+## Storage and remote media
+
+```ts
+import { Storage, Video } from "@vexa-video/sdk";
+
+const storage = new Storage();
+
+await storage.withResolved(
+  "https://cdn.example.com/input.mp4",
+  async (media) => {
+    console.log(await Video.load(media.path).probe());
+  }
+);
+```
+
+Remote HTTP handling is conservative by default: HTTPS only, no embedded credentials, public-network destinations only, redirect revalidation, byte limits, and managed cleanup. S3, Google Cloud Storage, and Azure Blob are supported through application-owned adapter hooks rather than mandatory cloud SDK dependencies.
+
+## Jobs and workers
+
+```ts
+import { JobQueue, Video } from "@vexa-video/sdk";
+
+const jobs = new JobQueue({ concurrency: 2 });
+
+jobs.register("video.render", async (payload, context) => {
+  const output = `renders/${context.job.descriptor.id}.mp4`;
+
+  await Video.load(payload.source).export(output, {
+    signal: context.signal,
+    onProgress(progress) {
+      void context.reportProgress({
+        ...(progress.percent != null ? { percent: progress.percent } : {}),
+        phase: "render"
+      });
+    }
+  });
+
+  return { output };
+});
+```
+
+The same serializable job model can run through the local worker pool or a Redis-backed distributed transport. Idempotency keys deduplicate submission; handlers should still make external side effects idempotent when retries are enabled.
+
+## Angular integration
+
+`@vexa-video/angular` is a separate browser-safe package. It never imports FFmpeg, `child_process`, `node:*`, or the Node-only `@vexa-video/sdk` runtime.
+
+```ts
+import { provideVexaVideo } from "@vexa-video/angular";
+
+export const appConfig = {
+  providers: [
+    provideVexaVideo({
+      baseUrl: "http://127.0.0.1:4180",
+      pollIntervalMs: 500
+    })
+  ]
+};
+```
+
+The Angular integration provides upload, preview, render-job, Signal, RxJS, cancellation, and customizable transport/provider APIs.
+
+### Local Angular demo
+
+The repository includes a browser client and Node render-service example. In the current development setup, the Angular demo toolchain should stay on an Angular 21.2.x release compatible with TypeScript 5.9.x; do not let Angular build tooling float to a version that requires TypeScript 6 without upgrading the whole repository together.
+
+Run the render service:
+
+```bash
+npm run example:angular-service
+```
+
+Service status:
+
+```text
+http://127.0.0.1:4180/
+http://127.0.0.1:4180/health
+```
+
+Start the complete Angular demo with:
+
+```bash
+npm run example:angular-demo
+```
+
+The browser UI runs on `http://127.0.0.1:4200` and talks to the render API on port `4180`.
+
+See [docs/angular-integration.md](./docs/angular-integration.md) for configuration, API contracts, local-demo setup, and troubleshooting.
+
+## Plugin system
+
+`PluginRegistry` provides explicit, namespaced extension points without allowing installed packages to silently replace Vexa's normal planning or safety behavior.
+
+```ts
+import { definePlugin, PluginRegistry, Video } from "@vexa-video/sdk";
+
+const watermarkTools = definePlugin({
+  metadata: {
+    schemaVersion: 1,
+    id: "acme.video-tools",
+    name: "Acme video tools",
+    version: "1.0.0",
+    capabilities: ["video-operation"]
+  },
+  setup(context) {
+    context.registerVideoOperation({
+      name: "square",
+      transform() {
+        return { type: "crop", options: { width: 1080, height: 1080 } };
+      }
+    });
+  }
+});
+
+const plugins = new PluginRegistry();
+await plugins.register(watermarkTools);
+const edited = plugins.applyVideoOperation(
+  Video.load("input.mp4"),
+  "acme.video-tools:square",
+  {}
+);
+await edited.export("square.mp4");
+```
+
+Plugins can contribute backend-neutral video operations, storage adapters, job handlers, explicit render backends, and encoder providers. Metadata/catalog types are safe for framework tooling, while plugin runtime code is loaded explicitly only by the Node host.
+
+See [docs/plugins.md](./docs/plugins.md).
+
+## Optional AI extension
+
+`@vexa-video/ai` is a separate Node package. It does not add model SDKs or provider credentials to `@vexa-video/core`, `@vexa-video/ffmpeg`, or the normal Node SDK. Applications choose the transcription, tracking, and highlight providers they want.
+
+Generate captions from any transcription adapter:
+
+```ts
+import { VexaAI } from "@vexa-video/ai";
+
+const ai = new VexaAI({
+  transcription: myTranscriptionAdapter
+});
+
+const { captions } = await ai.captions("interview.mp4", {
+  language: "en",
+  template: "subtitle",
+  style: { color: "white", backgroundColor: "black@0.55" }
+});
+```
+
+The normalized transcript preserves segment and optional word timings, so the resulting `CaptionDocument` can be burned with the existing caption renderer.
+
+Scene detection works out of the box through a deterministic FFmpeg detector:
+
+```ts
+const scenes = await new VexaAI().detectScenes("input.mp4", {
+  threshold: 0.3
+});
+
+console.log(scenes.scenes);
+```
+
+Silence removal reuses the existing audio detector and timeline renderer:
+
+```ts
+const ai = new VexaAI();
+const plan = await ai.planSilenceRemoval("talk.mp4", {
+  noiseDb: -40,
+  minSilenceDuration: 0.6,
+  paddingSeconds: 0.08
+});
+
+console.log(plan.outputDurationSeconds);
+await ai.removeSilence("talk.mp4", "talk-tight.mp4");
+```
+
+Provider hooks are also available for subject tracking/smart reframing and highlight extraction. Those adapters return validated normalized results; Vexa converts them into serializable `VideoProjectAst` plans instead of exposing provider-specific model output to the render layer.
+
+See [docs/ai-extension.md](./docs/ai-extension.md).
+
+## CLI and service templates
+
+The repository now includes a dependency-light CLI and deployable service templates around the same SDK contracts.
+
+```bash
+npm run cli -- compositions ./packages/bundler/test/fixtures/basic/entry.ts --json
+npm run cli -- bundle ./packages/bundler/test/fixtures/basic/entry.ts --out-dir ./.tmp/v2.14-cli-bundle --json
+npm run cli -- probe input.mp4
+npm run cli -- plan input.mp4 output.mp4 --width 1280 --height 720 --hardware auto
+npm run cli -- inspect product-demo --manifest ./.vexa/bundle/vexa.bundle.json --json
+node ./packages/cli/dist/bin.js validate product-demo --manifest ./.vexa/bundle/vexa.bundle.json --props '{"fps":24}' --json
+npm run cli -- render product-demo output.mp4 --manifest ./.vexa/bundle/vexa.bundle.json
+npm run cli -- still product-demo thumbnail.png --manifest ./.vexa/bundle/vexa.bundle.json --frame 15
+npm run cli -- render input.mp4 output.mp4 --video-codec h264 --audio-codec aac
+npm run cli -- hardware --json
+npm run cli -- stream input.mp4 ./hls --protocol hls --preset balanced
+```
+
+Programmable discovery and bundling reuse `@vexa-video/bundler` directly. Composition video/still execution, inspection, and props validation all reuse `VexaCompositionRenderer`; existing media-file `render` detection is preserved. Structured `--props` acceptance on Windows invokes the built CLI entry point directly because the PowerShell → npm → `cmd.exe` path can strip JSON quotes before Node receives them.
+
+### MCP and agent workflows
+
+`@vexa-video/mcp` publishes the same six typed composition/render-control operations through the official MCP protocol. Hosts can create a protocol server with `@vexa-video/mcp/server` or connect it directly to stdin/stdout with `@vexa-video/mcp/stdio`. The protocol layer publishes the existing Vexa tool schemas and routes calls into the existing dispatcher; it does not accept shell commands or redefine composition validation, rendering, jobs, or hosted requests.
+
+```ts
+import { serveVexaMcpStdio } from "@vexa-video/mcp/stdio";
+
+await serveVexaMcpStdio(tools, { name: "my-vexa-server", version: "1.0.0" });
+```
+
+A generic REST render-service template is available with:
+
+```bash
+npm run example:rest-service
+```
+
+It listens on `http://127.0.0.1:4190` by default and exposes health, raw media upload, background render jobs, cancellation, and output serving. A matching Docker worker recipe lives under `deploy/docker-worker`.
+
+Source-only React and Vue examples demonstrate the same upload → job → progress → playback contract without adding either framework to the SDK dependency graph.
+
+## Browser timeline editor foundation
+
+`@vexa-video/editor` provides framework-neutral timeline state helpers for browser editors. It owns selection, playhead, viewport/zoom state, time snapping, clip move/trim commands, and undo/redo history while keeping the project itself as a serializable `VideoProjectAst`.
+
+```ts
+import { TimelineHistory, createTimelineEditorState } from "@vexa-video/editor";
+
+const history = new TimelineHistory(
+  createTimelineEditorState(project, { snapSeconds: 0.1 })
+);
+
+history.dispatch({
+  type: "move-clip",
+  trackId: "video",
+  clipId: "scene-1",
+  start: 3.27
+});
+
+console.log(history.state.project);
+history.undo();
+```
+
+The package has no DOM renderer and no Node execution dependency, so Angular/React/Vue applications can build their own timeline UI around the same state model.
+
+## Hosted rendering
+
+`HostedRenderer` wraps cloud or hosted render providers behind a small submit/get/cancel adapter contract:
+
+```ts
+import { HostedRenderer } from "@vexa-video/sdk";
+
+const renderer = new HostedRenderer(myHostedAdapter);
+
+const job = await renderer.submit({
+  schemaVersion: 1,
+  type: "video.render",
+  payload: {
+    source: "s3://media/input.mp4",
+    output: "s3://media/output.mp4"
+  },
+  idempotencyKey: "customer-42-render-7"
+});
+
+const result = await renderer.wait(job.id);
+```
+
+The adapter owns vendor SDKs, authentication, queueing, and artifact storage. Vexa keeps the public contract portable.
+
+See [docs/hosted-rendering.md](./docs/hosted-rendering.md) and [docs/ecosystem-distribution.md](./docs/ecosystem-distribution.md).
+
+## Local visual playground
+
+The repository also includes a framework-independent editor-style acceptance playground:
+
+```bash
+npm run dev
+```
+
+Open:
+
+```text
+http://127.0.0.1:4173
+```
+
+It exercises uploads, video edits, timeline composition, audio, captions, streaming, hardware selection, remote media, background jobs, progress, cancellation, generated outputs, the programmable Player workspace, composition Bundles workspace, and Node render planning. The bundled composition fixture also supports executable still, single-frame, frame-range, and video output through `@vexa-video/renderer`, including render progress, cancellation, timeout, and hardware-selection controls. The playground uses a compact desktop-editor layout with a focused clip inspector, dense timeline, predictable truncation/wrapping, and an overlay control drawer for project/audio/captions/streaming/GPU/job settings so the preview canvas keeps more working space.
+
+See [docs/visual-playground.md](./docs/visual-playground.md).
+
+## Packages
+
+| Package | Responsibility |
+| --- | --- |
+| `@vexa-video/core` | Backend-neutral types, ASTs, validation, errors, and browser-safe shared contracts |
+| `@vexa-video/ffmpeg` | FFmpeg/ffprobe planning, filter compilation, process execution, hardware detection, streaming packaging |
+| `@vexa-video/sdk` | Node-only developer API for media, storage, hardware, and jobs/workers |
+| `@vexa-video/angular` | Browser-safe Angular providers, uploads, render clients, Signals/RxJS state, and preview helpers |
+| `@vexa-video/ai` | Optional Node-side AI/provider adapters plus deterministic media-planning helpers |
+| `@vexa-video/editor` | Browser-safe, framework-neutral timeline-editor state/history foundations |
+| `@vexa-video/react` | Browser-safe React authoring adapter for programmable compositions, timing scopes, and scene/media components |
+| `@vexa-video/player` | Browser-safe framework-neutral playback controller, responsive DOM host, controls, events, and fullscreen integration |
+| `@vexa-video/bundler` | Node-side TypeScript/TSX composition bundling, deterministic manifests/discovery, CSS/assets, source maps, and environment filtering |
+| `@vexa-video/renderer` | Node-side bundle-backed composition inspection, props resolution/validation, planning, and still/frame/range/video execution with progress, cancellation, timeout, and hardware controls |
+| `@vexa-video/test` | Node-side selected-frame checkpoints, reviewed PNG baselines, deterministic runtime checkpoint parity, and tolerance-aware comparison reused by Node renders and real browser-capture acceptance |
+| `@vexa-video/gif` | Optional Node-side GIF surface adapter with logical source IDs, deterministic frame extraction, fit/loop controls, and private temporary-workspace cleanup |
+| `@vexa-video/waveform` | Optional Node-side audio waveform surface adapter with logical source IDs, deterministic FFmpeg rasterization, and private temporary-workspace cleanup |
+| `@vexa-video/sound-effects` | Browser-safe reusable sound-effect catalogs that emit ordinary programmable audio assets and nodes without adding another execution path |
+| `@vexa-video/web-renderer` | Browser-safe WebCodecs capability detection and deterministic browser/backend render planning |
+| `@vexa-video/studio` | Browser-safe Studio session/runtime state for composition selection, preview/timeline coordination, props, metadata, and hot reload |
+| `@vexa-video/cli` | Node.js command-line interface for media workflows plus composition discovery, bundling, inspection, validation, video rendering, and still/frame rendering through the existing renderer |
+| `@vexa-video/mcp` | Agent-safe composition tools plus official MCP server/stdio adapters that route protocol calls into the existing renderer and HostedRenderer-compatible contracts |
+
+Extended programmable media stays additive: specialized packages integrate through the shared surface or scene/project boundaries, while `@vexa-video/core` and the normal SDK remain free of optional renderer dependencies.
+
+## Architecture
+
+```text
+Angular application                       Node application / render service
+        |                                           |
+        v                                           v
+@vexa-video/angular ---------------------> @vexa-video/sdk
+        |                              serializable contracts
+        |                                           |
+        +------------------- @vexa-video/core ------+
+                                                    |
+                                                    v
+                                      planning + optimization
+                                                    |
+                                      @vexa-video/ffmpeg
+                                                    |
+                                  FFmpeg / ffprobe / storage
+```
+
+The public model is intentionally not a one-to-one wrapper around FFmpeg flags. This makes it possible to optimize execution, keep browser packages safe, and add alternate backends later.
+
+See [docs/architecture.md](./docs/architecture.md).
+
+## Development
+
+```bash
+npm run verify                 # typecheck + tests + builds
+npm run typecheck              # TypeScript project references
+npm test                       # automated test suite
+npm run build                  # build workspace packages/examples
+npm run dev                    # watch + tests + visual playground
+npm run playground             # build + visual playground
+npm run release:check          # synchronized public-package metadata
+npm run release:pack           # dry-run published package contents
+npm run release:install-check  # clean tarball install/import + Angular consumer compile
+npm run release:ffmpeg-check   # FFmpeg/ffprobe version + required capability baseline
+npm run release:trusted-publish-check # static trusted-publishing contract audit
+```
+
+CI validates Node.js 24.21.0 on Ubuntu, Windows, and macOS, retains a Node 26 Ubuntu compatibility lane, and exercises Studio in Chrome plus Windows Edge through the existing CDP acceptance harness. Release validation also runs the FFmpeg 6.1+ capability gate and clean packed-package installs on the three primary operating systems before publication, including an Angular compiler consumer check against the installed `@vexa-video/angular` tarball. npm publication is restricted to the protected `release.yml` GitHub Actions workflow and its `npm-release` environment through tokenless OIDC trusted publishing.
+
+## Documentation
+
+- [Architecture](./docs/architecture.md)
+- [Angular integration](./docs/angular-integration.md)
+- [Visual playground](./docs/visual-playground.md)
+- [Plugin system](./docs/plugins.md)
+- [AI extension](./docs/ai-extension.md)
+- [Ecosystem and distribution](./docs/ecosystem-distribution.md)
+- [Release operations](./docs/release-operations.md)
+- [Hosted rendering](./docs/hosted-rendering.md)
+- [API stability and versioning](./docs/API-STABILITY.md)
+- [Changelog](./CHANGELOG.md)
+- [Roadmap](./ROADMAP.md)
+- [Contributing](./CONTRIBUTING.md)
+- [Security](./SECURITY.md)
+
+## Project direction
+
+Vexa 1.x establishes the deterministic media, timeline, storage, jobs, hardware, browser-integration, plugin, AI-adapter, and distribution foundations.
+
+Version 2 is focused on programmable video creation: code-defined compositions, deterministic frame animation, browser playback, a local Studio experience, Node and browser rendering, reusable motion primitives, parameterized templates, and agent-friendly composition workflows. The shared core now establishes backend-neutral composition definitions, deterministic timing, and a browser-safe programmable scene graph, while `@vexa-video/react` provides React authoring and `@vexa-video/player` provides framework-neutral browser playback state, deterministic frame advancement, responsive scaling, typed events, accessible default controls, and a thin DOM/fullscreen host. React and browser playback remain outside the deterministic media core, and representable scenes continue to lower into the existing `VideoProjectAst` path instead of creating a second media engine.
+
+Production scheduling, render caching, advanced GPU pipelines, professional editing, cloud-media adapters, collaboration, and larger hosted-render infrastructure are deferred to Version 3.
+
+See [ROADMAP.md](./ROADMAP.md) for the current implementation sequence and architecture links.
+
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](./CONTRIBUTING.md) before changing public APIs, execution behavior, or package boundaries.
+
+## Security
+
+Please review [SECURITY.md](./SECURITY.md) before reporting a security issue or deploying remote-media/render endpoints on an untrusted network.
+
+## License
+
+MIT

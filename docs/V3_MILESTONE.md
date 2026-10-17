@@ -1,10 +1,26 @@
-# Vexa Video SDK — Version 3 Milestone Plan
+# Version 3 Delivery Plan — Production Media Platform
 
-Version 3 contains the production-platform, scaling, professional-editor, cloud-media, and advanced infrastructure work that follows the programmable composition foundation planned for Version 2.
+Version 3 builds on the released Vexa Video SDK **2.0.0** contract. It is not a rewrite of programmable compositions, media execution, jobs, storage or browser tooling.
 
-Version 3 should not begin until the core Version 2 composition/runtime model is stable enough that infrastructure work will not lock Vexa into the wrong render contract.
+## Baseline
+
+```text
+V2 release: 2.0.0
+Tag:        v2.0.0
+Source:     af8d1d8e0c967e2651b8f77c1e02b6f11135a90a
+```
+
+## Planning rule
+
+Each V3 stage must begin by identifying the Version 2 contracts it extends. Parallel queues, renderers, project formats, security models or browser/server boundaries should not be created unless the existing contract is intentionally versioned and the migration is documented.
 
 ## V3.1 — Production hardening
+
+### Existing foundation
+
+Version 2 already provides local/Redis jobs, retries, idempotency, cancellation, progress, managed workspaces and deterministic artifact identity in hosted composition workflows.
+
+### Add
 
 - worker heartbeat;
 - worker leases;
@@ -12,118 +28,94 @@ Version 3 should not begin until the core Version 2 composition/runtime model is
 - stale-job recovery;
 - retry reconciliation;
 - dead-letter handling;
-- structured logging;
+- structured logging context;
 - metrics and tracing hooks;
-- artifact retention;
-- deterministic workspace cleanup.
+- artifact-retention contracts;
+- deterministic workspace cleanup/recovery.
+
+### Acceptance
+
+- simulated worker death proves leases expire/recover safely;
+- retry reconciliation cannot duplicate committed artifacts;
+- dead-letter state preserves actionable failure context;
+- workspace cleanup is deterministic after success, cancellation and crash recovery;
+- metrics/tracing hooks do not couple the SDK to one observability vendor.
 
 ## V3.2 — Capability-aware distributed scheduler
 
-Workers advertise:
+### Existing foundation
 
-- platform;
-- CPU capacity;
-- memory;
-- concurrency;
-- NVENC/QSV/AMF/VideoToolbox availability;
-- supported codecs;
-- composition/browser-render capability.
+Redis transport, job descriptors, hardware detection and composition/browser-render capabilities exist independently.
 
-Jobs declare requirements and fallback policy.
+### Add
+
+Workers advertise platform, CPU, memory, concurrency, NVENC/QSV/AMF/VideoToolbox, codecs and browser/composition capability. Jobs declare requirements and fallback policy.
+
+### Acceptance
+
+Scheduling is deterministic for a stable capability snapshot, explains rejection reasons, honors fallback policy and is tested across mixed worker pools.
 
 ## V3.3 — Render cache and incremental execution
 
-- content fingerprints;
-- operation/render-node hashes;
-- intermediate artifact cache;
-- dependency graph;
-- partial invalidation;
-- resumable execution;
-- local/cloud cache adapters;
-- cache diagnostics.
+Add content fingerprints, render-node hashes, intermediate artifacts, dependency graphs, partial invalidation, resumable execution, local/cloud cache adapters and diagnostics.
+
+Cache hits must be reproducible and never reuse artifacts after a relevant dependency changes.
 
 ## V3.4 — Advanced hardware pipeline
 
-Extend acceleration beyond encode:
+Extend hardware use beyond encode:
 
 ```text
 hardware decode
-      |
-      v
-GPU-resident frames
-      |
-      v
-GPU-capable filters
-      |
-      v
-hardware encode
+      -> GPU-resident frames
+      -> GPU-capable filters
+      -> hardware encode
 ```
 
-Maintain verified CPU fallback.
+Maintain verified CPU fallback and expose why a pipeline falls back.
 
 ## V3.5 — Professional editor engine
 
-Expand `@vexa-video/editor` with:
+Extend `@vexa-video/editor` with split, ripple, multi-select, copy/paste/duplicate, grouping, linked audio/video, slip edits, track locks, mute/solo, markers, magnetic timeline, advanced snapping and transaction-aware history.
 
-- split;
-- ripple edits;
-- multi-select;
-- copy/paste/duplicate;
-- grouping;
-- linked audio/video;
-- slip editing;
-- track locks;
-- mute/solo;
-- markers;
-- magnetic timeline;
-- advanced snapping;
-- history transactions.
+Editor commands must remain serializable/testable independently of a framework UI.
 
 ## V3.6 — Advanced preview/proxy pipeline
 
-Build on the Version 2 player/browser renderer:
+Build on Player/Studio/browser rendering with proxy media, frame-accurate seeking, waveform/caption overlays, quality levels, preview cache, background decoding, large-project optimization and backend-generated fallback assets.
 
-- proxy media;
-- frame-accurate seeking;
-- waveform/caption overlays;
-- preview quality levels;
-- preview cache;
-- background decoding;
-- large-project optimization;
-- backend-generated fallback assets.
+## V3.7 — Advanced graphics and reusable motion
 
-## V3.7 — Advanced graphics and reusable motion systems
-
-- rich multi-span text;
-- masks;
-- gradients;
-- SVG manipulation;
-- anchor points/transform origins;
-- reusable animated components;
-- safe zones;
-- responsive layout rules;
-- cross-aspect-ratio composition adaptation.
+Build on Version 2 shapes/text/effects/transitions with rich multi-span text, masks, gradients, SVG manipulation, anchor points/transform origins, reusable animated components, safe zones, responsive layout and cross-aspect adaptation.
 
 ## V3.8 — AI editing workflows
 
-Expand `@vexa-video/ai` with provider-neutral contracts for:
+### Already in Version 2
 
-- transcription;
+- provider-neutral transcription adapters;
+- normalized segment/word timing;
+- automatic captions;
+- FFmpeg scene detection;
+- silence-removal planning/rendering;
+- subject-tracking hooks/smart reframe;
+- highlight hooks/project generation.
+
+### V3 additions
+
 - diarization;
-- word alignment;
+- improved word alignment;
 - filler-word detection;
 - OCR;
-- object/face tracking;
+- object/face tracking adapters;
 - scene understanding;
 - semantic search;
-- highlight extraction;
 - moderation.
 
-AI produces typed edit/composition plans; deterministic Vexa rendering remains authoritative.
+AI output must normalize into typed Vexa-owned edit/composition plans. Model output is not the authoritative render representation.
 
 ## V3.9 — First-party cloud media adapters
 
-Optional packages:
+Add optional packages:
 
 ```text
 @vexa-video/storage-s3
@@ -131,127 +123,70 @@ Optional packages:
 @vexa-video/storage-azure
 ```
 
-Support:
-
-- multipart/resumable transfers;
-- signed URLs;
-- direct browser uploads;
-- checksums;
-- retention/lifecycle policies;
-- remote render outputs.
+Support multipart/resumable transfer, signed URLs, direct browser uploads, checksums, lifecycle/retention policies and remote render outputs without pulling cloud SDKs into core packages.
 
 ## V3.10 — Streaming 2.0
 
-- CMAF;
-- fragmented MP4;
-- alternate audio;
-- subtitle renditions;
-- language metadata;
-- I-frame playlists;
-- encryption contracts;
-- optional DRM-provider adapters;
-- manifest validation.
+Build on HLS/DASH/rendition/segment support with CMAF, fragmented MP4, alternate audio, subtitle renditions, language metadata, I-frame playlists, encryption contracts, optional DRM-provider adapters and manifest validation.
 
 ## V3.11 — Project format 2.0
 
-- versioned project schema;
-- migration API;
-- JSON Schema;
-- canonical normalization;
-- project diff;
-- import/export;
-- annotations;
-- collaboration metadata.
+Introduce an explicit versioned project schema, migration API, JSON Schema, canonical normalization, project diff, import/export, annotations and collaboration metadata.
+
+Persisted formats must have migration tests and canonical round-trip fixtures.
 
 ## V3.12 — Collaboration contracts
 
-Backend-neutral primitives for:
-
-- revisions;
-- operation logs;
-- comments;
-- annotations;
-- presence metadata;
-- conflict detection;
-- revision comparison.
-
-Do not require a specific realtime transport or database.
+Add backend-neutral revisions, operation logs, comments, annotations, presence metadata, conflict detection and revision comparison. Do not require a specific realtime transport or database.
 
 ## V3.13 — Hosted rendering platform
 
-- render quotas;
-- priority queues;
-- worker pools;
-- capability scheduling;
-- retries/reconciliation;
-- autoscaling contracts;
-- artifact lifecycle;
-- telemetry;
-- tenant-aware controls where needed.
+Extend existing hosted requests/jobs/storage publication with quotas, priority queues, worker pools, capability scheduling, retry reconciliation, autoscaling contracts, artifact lifecycle, telemetry and tenant-aware controls.
 
 ## V3.14 — Framework and service ecosystem
 
-Complete browser-safe integrations around shared Vexa contracts:
-
-```text
-@vexa-video/angular
-@vexa-video/react
-@vexa-video/vue
-@vexa-video/client
-```
-
-Framework packages remain free of Node/FFmpeg execution dependencies.
+Angular and React foundations already exist. Complete shared browser/service integration patterns, including Vue/client packages where justified, while preserving the same serializable transport contracts and Node/browser separation.
 
 ## V3.15 — Plugin ecosystem expansion
 
-Potential plugin capabilities:
+Add explicit plugin capabilities for effects, transitions, media sources, storage, AI providers, render backends, encoders, job handlers, Studio panels and templates.
 
-- effects;
-- transitions;
-- media sources;
-- storage;
-- AI providers;
-- render backends;
-- encoders;
-- job handlers;
-- Studio panels;
-- templates.
-
-Plugins remain explicit and must not silently bypass Vexa planning/security rules.
+Plugins remain opt-in host code and cannot bypass normal validation/security/planning.
 
 ## V3.16 — Version 3 release
 
-Release requires:
+Release only after:
 
-- synchronized package versions;
-- `npm run verify`;
-- release checks and packed-tarball installs;
-- Windows/Linux/macOS platform acceptance appropriate to changed code;
+- synchronized public package versions;
+- repository verification;
+- packed-tarball isolated consumer installs;
+- relevant Windows/Linux/macOS acceptance;
 - browser acceptance;
-- hosted-render acceptance;
-- migration documentation;
-- updated security/deployment guidance.
+- hosted/distributed acceptance;
+- migration and deployment guidance;
+- security documentation updates;
+- protected OIDC/provenance publication.
 
-## Recommended order
+## Recommended sequence
 
 ```text
 V3.1  Production hardening
   |
-V3.2  Distributed scheduler
+V3.2  Capability-aware scheduling
   |
-V3.3  Render cache
+V3.3  Render cache / resumability
   |
 V3.4  Advanced hardware pipeline
   |
 V3.5  Professional editor
   |
-V3.6  Advanced preview/proxies
+V3.6  Preview / proxies
   |
 V3.7  Advanced graphics
   |
 V3.8  AI editing
   |
-V3.9  Cloud media
+V3.9  First-party cloud media
   |
 V3.10 Streaming 2.0
   |
@@ -267,3 +202,7 @@ V3.15 Plugin ecosystem
   |
 V3.16 Version 3 release
 ```
+
+## Definition of done for a V3 stage
+
+A stage is complete only when public contracts, validation/planning, tests, real integration coverage, docs and migration/compatibility impact are all complete. A partial foundation from Version 2 does not make the V3 stage complete by itself.

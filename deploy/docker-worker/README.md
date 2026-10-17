@@ -1,11 +1,44 @@
-# Docker render worker
+# Vexa Docker Render Service
 
-Build and run the containerized REST render worker:
+This recipe builds the repository REST render-service example into a small Node.js container with FFmpeg installed.
+
+It is a deployment example, not the full Version 3 hosted-rendering platform.
+
+## Start with Docker Compose
+
+From the repository root:
 
 ```bash
 docker compose -f deploy/docker-worker/compose.yaml up --build
 ```
 
-Health: `http://127.0.0.1:4190/health`.
+The service listens on:
 
-The image includes Node.js 24 and FFmpeg and runs the same local `JobQueue`-based REST template used outside Docker. Mount `/var/lib/vexa` to control artifact retention. For multi-node deployments, replace the local queue with Vexa's distributed job transport while keeping the HTTP/media contract.
+```text
+http://127.0.0.1:4190
+```
+
+Health check:
+
+```text
+http://127.0.0.1:4190/health
+```
+
+## Defaults
+
+The image sets:
+
+```text
+VEXA_REST_HOST=0.0.0.0
+VEXA_REST_PORT=4190
+VEXA_WORKER_CONCURRENCY=2
+VEXA_REST_WORKSPACE=/var/lib/vexa
+```
+
+`/var/lib/vexa` is a persistent volume in the provided Compose file.
+
+## Production use
+
+Before exposing the service publicly, add application-level authentication/authorization, request/media size limits, network controls, retention policy and tenant isolation appropriate to your environment.
+
+See [`../../docs/hosted-rendering.md`](../../docs/hosted-rendering.md) and [`../../SECURITY.md`](../../SECURITY.md).

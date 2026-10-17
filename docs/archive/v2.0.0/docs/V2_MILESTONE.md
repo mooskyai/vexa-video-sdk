@@ -1,0 +1,974 @@
+# Vexa Video SDK — Version 2 Milestone Plan
+
+Version 2 adds a programmable video-composition layer on top of the existing Vexa 1.x media engine. The goal is to support code-defined video, interactive preview, local/server rendering, reusable motion primitives, templates, and agent-driven creation without replacing the deterministic FFmpeg, timeline, storage, job, hardware, or browser-safety foundations already present in the repository.
+
+## Independent implementation rule
+
+Vexa Version 2 is defined by Vexa's own product requirements and architecture. Its implementation must remain independent and Vexa-native:
+
+- do not copy or port third-party source code;
+- do not copy private/internal implementation details, tests, fixtures, package internals, or undocumented behavior from other products;
+- do not make source-level or API-level compatibility with another product a requirement;
+- use Vexa-owned types, naming, schemas, tests, examples, fixtures, and assets;
+- reuse Vexa's existing `VideoProjectAst`, planning, FFmpeg, storage, jobs, hardware, cancellation, progress, and error contracts;
+- document any new public runtime boundary before creating a package for it.
+
+This keeps Version 2 aligned with Vexa's architecture and prevents Vexa's public contracts from becoming coupled to third-party implementation details, APIs, or licensing constraints.
+
+## Version 2 product target
+
+The same composition definition should be usable for:
+
+```text
+code / framework authoring
+          |
+          v
+Vexa composition runtime
+          |
+          +---- browser preview / player
+          |
+          +---- local Node rendering
+          |
+          +---- render service / workers
+          |
+          +---- browser rendering where supported
+          |
+          +---- templates / agents / automation
+```
+
+Version 2 should not create a second media engine. Composition evaluation should eventually lower into the existing Vexa project and execution-planning paths wherever practical.
+
+## Existing Vexa foundation
+
+Version 2 starts from the current 1.x packages:
+
+| Package | Current role | Version 2 relationship |
+| --- | --- | --- |
+| `@vexa-video/core` | Shared types, ASTs, validation, browser-safe contracts | Add shared composition/frame contracts where they are truly backend-neutral |
+| `@vexa-video/ffmpeg` | FFmpeg planning/execution backend | Remains the main Node media backend |
+| `@vexa-video/sdk` | Node developer API, storage, jobs, workers, hardware | Executes composition render plans and integrates remote rendering |
+| `@vexa-video/angular` | Browser-safe Angular render client | Gains player/composition integration only through browser-safe contracts |
+| `@vexa-video/ai` | Optional AI adapters and deterministic media planning | Can generate composition/project inputs without owning rendering |
+| `@vexa-video/editor` | Framework-neutral editor state/history | Reused by Studio and later visual editing |
+| `@vexa-video/cli` | Node CLI | Gains composition discovery, preview, still, and render commands |
+
+New packages should be added only when a runtime or dependency boundary justifies them. Likely Version 2 packages include `@vexa-video/composition`, `@vexa-video/react`, `@vexa-video/player`, `@vexa-video/renderer`, `@vexa-video/bundler`, `@vexa-video/studio`, and `@vexa-video/web-renderer`.
+
+## V2.1 — Composition contracts and registry
+
+**Status:** Complete
+
+Implemented on the Version 2 branch in `@vexa-video/core` with:
+
+- `defineComposition()` and `defineStill()`;
+- schema-version validation;
+- JSON-safe, deterministically normalized default/input props;
+- runtime prop validation hooks;
+- async/sync dynamic metadata calculation;
+- deterministic static metadata serialization;
+- `ProgrammableCompositionRegistry` registration, lookup, sorted discovery, and atomic bulk registration;
+- typed programmable-composition errors;
+- browser-safe serializable metadata type exports.
+
+### Acceptance evidence
+
+Validated on Windows 11 with the supported repository toolchain:
+
+- focused programmable-composition tests: **10/10 passed**;
+- full `npm run verify`: **129/129 tests passed**, followed by a successful `tsc -b` build;
+- generated `packages/core/dist/browser.js` forbidden-import audit: no `node:*`, `child_process`, `@vexa-video/sdk`, `@vexa-video/ffmpeg`, or Redis references found;
+- `git diff --check`: clean.
+
+V2.1 intentionally exposes browser-safe serializable metadata/types rather than a browser execution runtime. Cross-runtime frame/evaluation parity begins with V2.2 and later browser runtime stages.
+
+The implementation is intentionally separate from the existing `composition.ts` timeline/project model. Version 2 compositions will lower into the existing Vexa project/execution paths in later stages rather than redefining V1 timeline semantics.
+
+**Status:** Complete
+
+The first Studio slice establishes the browser-safe state/runtime boundary before adding development-host orchestration:
+
+- public `@vexa-video/studio` package;
+- deterministic composition catalog ordering and selection;
+- draft JSON props separate from last resolved metadata;
+- dynamic metadata application with frame clamping/preservation;
+- Player-backed play/pause/seek/step timing;
+- `@vexa-video/editor` timeline/playhead/viewport reuse rather than a second editor state model;
+- safe same-composition reload behavior that preserves the current frame and dirty draft props;
+- still-composition handling and typed Studio errors;
+- browser-boundary coverage preventing Node/SDK/renderer/FFmpeg imports.
+
+The second Studio slice connects that browser runtime to the existing Playground development host:
+
+- a dedicated responsive/full-screen Studio workspace in the normal Playground;
+- browser loading of the real `@vexa-video/bundler` development output through a restricted bundle-serving route;
+- executable-composition evaluation for JSON props and dynamic metadata;
+- normalized scene/background/node and asset inspection;
+- frame scrub/step/play controls plus keyboard shortcuts backed by the Studio session;
+- Node renderer execution with the selected resolved props, hardware choice, progress, cancellation, and output preview;
+- explicit `Reload bundle` behavior preserving composition/frame state through the Studio reload contract.
+
+The next Studio slice hardens the development loop:
+
+- recursive composition-source watching on the Node development host with debounced, path-normalized change events;
+- Server-Sent Events as the browser-safe hot-reload transport rather than filesystem access in `@vexa-video/studio`;
+- automatic bundle rebuild/re-import while preserving the selected composition, legal current frame, and unapplied JSON-props draft;
+- queued hot reload while a build or render is active so source changes are not lost;
+- a Studio error overlay plus console capture for props, composition evaluation, build, render, and browser-runtime failures;
+- a dependency-free Chromium/Edge DevTools acceptance harness covering real Studio load, source-watch reload, frame/draft preservation, diagnostics, and recovery.
+
+V2.8 is complete after Windows/browser closure acceptance. The final harness verifies composition switching, play/pause and scrubbing, hot-reload preservation, props diagnostics recovery, real current-frame render progress/output, deliberate renderer-failure surfacing/recovery, and the Windows repository-path-with-spaces case while keeping filesystem/build/render execution on the Node development host.
+
+### Goal
+
+Define the backend-neutral composition model before building framework components or rendering.
+
+### Scope
+
+- composition identity;
+- width, height, fps, and duration-in-frames;
+- still-image compositions;
+- default/input props;
+- input validation hooks;
+- dynamic metadata calculation;
+- composition registry and discovery;
+- explicit composition schema version;
+- deterministic serialization of static metadata;
+- typed composition errors.
+
+Example target API:
+
+```ts
+const productDemo = defineComposition({
+  id: "product-demo",
+  width: 1920,
+  height: 1080,
+  fps: 30,
+  durationInFrames: 300,
+  defaultProps: {
+    title: "Vexa Video"
+  }
+});
+```
+
+### Architectural rule
+
+The core contract must not depend on React, DOM APIs, Node.js, FFmpeg, or a browser bundler.
+
+### Exit criteria
+
+- shared contracts compile from browser and Node consumers;
+- registry ordering and lookup are deterministic;
+- invalid dimensions/fps/duration fail before rendering;
+- schema version behavior is covered;
+- README/architecture/testing docs remain synchronized.
+
+## V2.2 — Frame, time, animation, and deterministic math
+
+**Status:** Complete
+
+Implemented in the current Version 2 branch slice with:
+
+- explicit immutable `FrameContext` values carrying local frame, root `absoluteFrame`, and fps;
+- nested local offsets that may become negative before a child sequence begins;
+- frame/second conversion with explicit rounding modes;
+- frame ranges with start, exclusive end, final frame, containment, local-frame, and clamp helpers;
+- piecewise numeric interpolation with `extend`, `clamp`, and `identity` extrapolation;
+- linear/quadratic easing primitives and custom easing callbacks;
+- deterministic color interpolation for hex and `rgb()`/`rgba()` input;
+- analytic under-damped, critically damped, and over-damped spring evaluation;
+- index-addressable seeded deterministic random values without `Math.random()`;
+- loop and frozen-frame context helpers;
+- deterministic sequential/series section resolution with explicit positive/negative offsets;
+- browser-safe runtime exports through `@vexa-video/core/browser`;
+- focused golden tests for timing boundaries and invalid input.
+
+### Acceptance evidence
+
+Validated on Windows 11 with the supported repository toolchain:
+
+- focused deterministic-timing suite: **13/13 passed**;
+- full `npm run verify`: **142/142 tests passed**, followed by a successful `tsc -b` build;
+- generated `packages/core/dist/browser.js` forbidden-import audit: no `node:*`, `child_process`, `@vexa-video/sdk`, `@vexa-video/ffmpeg`, or Redis references found;
+- Microsoft Edge headless browser execution of `packages/core/test/programmable-timing-browser.html` over HTTP returned `VEXA_TIMING_PARITY_PASS`;
+- `git diff --check`: clean.
+
+V2.3 is the next implementation target.
+
+### Goal
+
+Create the timing semantics used by every authoring adapter and renderer.
+
+### Scope
+
+- current-frame context;
+- seconds/frame conversion;
+- local frame offsets for nested sequences;
+- interpolation;
+- color interpolation;
+- easing;
+- spring animation;
+- seeded deterministic random values;
+- loop;
+- freeze;
+- series/sequential sections;
+- extrapolation/clamping behavior;
+- frame-range helpers.
+
+Target semantics:
+
+```ts
+const opacity = interpolate(frame, [0, 30], [0, 1], {
+  extrapolateLeft: "clamp",
+  extrapolateRight: "clamp"
+});
+```
+
+### Exit criteria
+
+- pure deterministic functions;
+- no Date/time/global-random dependence;
+- nested timing has golden tests;
+- Node and browser produce the same values for the same inputs.
+
+## V2.3 — Composition scene graph and media elements
+
+**Status:** Complete
+
+Implemented in the current Version 2 branch slice with:
+
+- schema-versioned, browser-safe programmable scene contracts;
+- nested `group`/`layer` containers plus fill, solid, text, image, video, audio, and serializable SVG/canvas surface intent;
+- deterministic parent-relative timing, additive z-order, opacity propagation, transform chains, and stable declaration ordering;
+- asset manifests covering static paths and existing Vexa local/HTTP/object-storage references;
+- explicit asset-class policy gates plus immutable preload/readiness state;
+- crop/fit, trim, playback-rate, volume/mute, text-style, and transform validation;
+- deterministic scene serialization and flattened render-graph discovery;
+- typed `VideoProjectAst` lowering for the representable subset, with unsupported frame-render features rejected instead of approximated;
+- remote HTTP/object assets requiring SDK/storage resolution before project lowering;
+- a real SDK integration fixture that lowers and renders a Vexa-owned background/video/image/text/audio scene and checks output metadata plus visual luminance checkpoints.
+
+### Acceptance evidence
+
+Validated on Windows 11 with the supported repository toolchain:
+
+- focused programmable-scene suite: **17/17 passed**;
+- regression coverage confirms explicit `x: 0` / `y: 0` survives `VideoProjectAst` lowering instead of being reinterpreted as centered media;
+- real SDK/FFmpeg programmable-scene render integration: **1/1 passed** with background, image, video, text, and audio output checks;
+- full `npm run verify`: **160/160 tests passed**, followed by a successful `tsc -b` build;
+- generated `packages/core/dist/browser.js` and `packages/core/dist/programmable-scene.js` forbidden-import audits found no `node:*`, `child_process`, `@vexa-video/sdk`, `@vexa-video/ffmpeg`, or Redis references;
+- `npm run release:check`: all **7** public packages reported release-ready;
+- `npm run release:pack`: succeeded and included `programmable-scene` declarations/runtime artifacts in the packed core package;
+- `git diff --check`: clean before closure.
+
+V2.4 is the next implementation target.
+
+### Goal
+
+Represent code-defined visual/audio intent without leaking FFmpeg filters into application code.
+
+### Scope
+
+- layer/group/fill primitives;
+- image;
+- video;
+- audio;
+- text;
+- solid/background;
+- SVG/canvas integration contracts;
+- z-order;
+- transforms;
+- opacity;
+- crop/fit;
+- volume/mute;
+- source trim and playback rate;
+- local/static assets;
+- remote-media references through existing Vexa storage policy;
+- asset preload/ready state.
+
+### Lowering strategy
+
+Prefer:
+
+```text
+composition scene graph
+       |
+       v
+normalized frame/timeline intent
+       |
+       v
+VideoProjectAst / media operations
+       |
+       v
+existing planner
+```
+
+A new execution path is justified only when a frame-rendered browser/DOM composition cannot be represented by the normal project renderer.
+
+## V2.4 — React authoring adapter
+
+**Status:** Complete
+
+Implemented in the current Version 2 branch slice with:
+
+- public `@vexa-video/react` package with React as a peer dependency and `@vexa-video/core` as its only Vexa runtime dependency;
+- React composition registration and deterministic sorted discovery around core programmable-composition definitions;
+- frame, absolute-frame, resolved composition-config, and input-props hooks;
+- sequence, series, loop, and freeze timing scopes backed by the shared core timing runtime;
+- group/layer/fill/solid/text/image/video/audio/surface authoring components that emit the shared programmable-scene model;
+- static/storage asset helpers that preserve core asset-policy semantics;
+- render-readiness controller plus delay/resume hooks with unmount cleanup for asynchronous authoring work;
+- browser-safe composition definition/resolution exports from `@vexa-video/core/browser` so framework code does not import the Node-oriented core entry point;
+- release/build wiring for the new public workspace.
+
+The adapter does not own player state, bundling, Node rendering, or FFmpeg execution. Those remain in their later Version 2 runtime boundaries.
+
+### Acceptance evidence
+
+Validated on Windows 11 with the supported repository toolchain:
+
+- React authoring tests pass as part of the full repository suite, including registration/cleanup, resolved props, frame/config hooks, nested sequence/series timing, loop/freeze semantics, media-to-scene mapping, asset helpers, render-ready lifecycle, invalid-hook behavior, preview/render parity, and package source boundary checks;
+- full `npm run verify`: **173/173 tests passed**, followed by a successful `tsc -b` build;
+- generated `packages/react/dist/index.js` and `packages/core/dist/browser.js` forbidden-import audits found no `node:*`, `child_process`, `@vexa-video/sdk`, `@vexa-video/ffmpeg`, or Redis references;
+- `npm run release:check`: all **8** public packages reported release-ready;
+- `npm run release:pack`: succeeded and included the `@vexa-video/react` runtime, declarations, maps, README, and package manifest;
+- the deterministic compatibility test confirms preview and render consumers observe identical timing and scene values for the same React composition;
+- `git diff --check`: clean apart from Git's Windows line-ending notice for the npm-generated lockfile.
+
+React 19 reports `react-test-renderer` as deprecated during tests; this is non-failing test-infrastructure debt and should be replaced before it becomes incompatible. `npm install` also reported audit advisories and unapproved install-script notices; those require separate dependency/security review and are not attributed to V2.4 without an `npm audit` dependency trace.
+
+V2.5 is the next implementation target.
+
+### Goal
+
+Offer React-based code authoring while keeping React outside the deterministic media core.
+
+Likely package:
+
+```text
+@vexa-video/react
+```
+
+### Scope
+
+- composition registration component;
+- frame/composition hooks;
+- sequence/series/loop/freeze components;
+- fill/layer wrappers;
+- media components;
+- asset helper integration;
+- input props;
+- render-ready/delay handling for asynchronous assets.
+
+### Boundary
+
+`@vexa-video/react` must not runtime-import:
+
+```text
+@vexa-video/sdk
+node:*
+child_process
+FFmpeg execution code
+Redis
+filesystem APIs
+```
+
+React is an adapter, not the source of Vexa's media semantics.
+
+## V2.5 — Browser player core and framework adapters
+
+**Status:** Complete
+
+Implemented in the current Version 2 branch slice with:
+
+- public `@vexa-video/player` package depending only on the browser-safe core contract at runtime;
+- deterministic programmatic controller for play/pause, frame/time seeking, stepping, end behavior, looping, volume/mute, playback rate, buffering, errors, and disposal;
+- exact fractional-frame carry so repeated small browser-clock deltas resolve to the same frame progression;
+- poster-frame presentation before first playback/seek interaction;
+- framework-neutral typed events and immutable snapshots;
+- responsive `contain`, `cover`, and `actual` scaling math;
+- fullscreen capability/request/exit helpers;
+- thin DOM host with requestAnimationFrame scheduling and ResizeObserver integration while controller semantics remain clock-independent;
+- accessible native default controls plus explicit `custom`/`none` modes that inject no unwanted controls;
+- Vexa-owned real-browser acceptance fixture for timing, resize, buffering, accessibility, and custom-controls behavior;
+- first-class Player workspace in the existing visual playground, reachable from normal playground navigation and isolated from unrelated clip-editing controls.
+
+The player does not own composition bundling or Node rendering. The render callback receives the selected frame and browser viewport; V2.6/V2.7 connect bundled compositions and Node frame/video rendering to the same timing contracts.
+
+### Acceptance evidence
+
+Validated with **17/17** focused player tests and **190/190** full repository tests, a successful `tsc -b` build, clean generated browser dependency audits, **9** release-ready public packages, successful release packing, and manual browser acceptance of the integrated Player workspace through `npm run dev`. V2.6 is the next implementation target.
+
+### Goal
+
+Embed deterministic composition playback in applications.
+
+Likely package:
+
+```text
+@vexa-video/player
+```
+
+### Scope
+
+- play/pause;
+- seek by frame/time;
+- frame step;
+- loop;
+- volume/mute;
+- playback rate;
+- responsive scaling;
+- buffering state;
+- poster frame;
+- fullscreen integration;
+- programmatic controller;
+- typed events;
+- accessibility baseline;
+- custom-controls mode.
+
+The state machine should be framework-neutral where practical so Angular and future Vue/React UI adapters do not implement different playback semantics.
+
+## V2.6 — Composition bundling and discovery
+
+**Status:** Complete
+
+Implemented in the current Version 2 branch slice with:
+
+- public Node-side `@vexa-video/bundler` package using esbuild as an explicit runtime dependency;
+- browser-executable ESM output from TypeScript and TSX composition entries;
+- a browser-safe `@vexa-video/bundler/entry` helper for validated, deterministically sorted `vexaCompositions` metadata;
+- build-time composition discovery with typed failures for missing/invalid discovery exports;
+- CSS extraction, fingerprinted local assets, copied public/static assets, and dynamic-import chunk splitting;
+- development/production modes and explicit none/external/inline source-map behavior;
+- environment allowlisting that replaces `process.env` and `import.meta.env` with only approved values;
+- schema-versioned deterministic `vexa.bundle.json` manifests with portable relative paths and SHA-256/byte metadata;
+- Windows path normalization helpers covering drive letters, backslashes, spaces, and deeply nested paths;
+- staging-directory output so a failed build does not replace the previous successful bundle;
+- typed/sanitized diagnostics that report project-relative source locations instead of machine-specific paths.
+
+Bundling/discovery executes trusted application code in the local Node build environment and is not a sandbox. Hosted use with untrusted code still requires process/container isolation.
+
+### Acceptance evidence
+
+Validated on Windows 11 with the supported repository toolchain:
+
+- focused bundler/discovery suite: **14/14 passed**;
+- full `npm run verify`: **204/204 tests passed**, followed by a successful `tsc -b` build;
+- real Vexa-owned fixtures exercised TypeScript, TSX, CSS, fingerprinted assets, public assets, dynamic imports, source-map modes, environment allowlisting, deterministic manifests/discovery, malformed-source diagnostics, and portable Windows path handling;
+- generated `packages/bundler/dist/entry.js` audit found no `node:*`, `child_process`, `@vexa-video/sdk`, `@vexa-video/ffmpeg`, or Redis references;
+- `npm run release:check`: all **10** public packages reported release-ready;
+- `npm run release:pack`: succeeded and included the bundler runtime, browser-safe entry helper, declarations, maps, README, and package manifest;
+- repository reference-hygiene scan returned no removed external-product references.
+
+V2.7 is the next implementation target.
+
+### Goal
+
+Produce a browser-executable composition bundle for Studio and frame rendering.
+
+Likely package:
+
+```text
+@vexa-video/bundler
+```
+
+### Scope
+
+- TypeScript/TSX;
+- source maps;
+- CSS/assets;
+- static/public assets;
+- environment allowlist;
+- deterministic bundle manifest;
+- composition discovery;
+- development and production modes;
+- Windows path normalization;
+- safe error reporting.
+
+### Security
+
+Bundling user application code does not make that code trusted. Server render deployments must isolate untrusted composition code at the process/container boundary.
+
+## V2.7 — Node composition renderer
+
+**Status:** Complete
+
+The first renderer slice establishes the Node package and planning boundary before frame/video execution:
+
+- public `@vexa-video/renderer` package;
+- load deterministic `vexa.bundle.json` manifests;
+- list/select bundled compositions in stable ID order;
+- typed missing-composition, kind-mismatch, frame/range, output, and option errors;
+- still, single-frame, frame-range, and video render plans;
+- explicit exclusive-end frame ranges;
+- deterministic concurrency and timeout defaults/overrides;
+- normal Playground render-plan controls tied to the selected bundled composition.
+
+The execution boundary now loads `vexaExecutableCompositions`, resolves input props and dynamic metadata, materializes unresolved programmable-scene storage assets through Vexa `Storage`, lowers representable scenes into `VideoProjectAst`, and produces real still/single-frame PNG/JPEG/WebP output. It also materializes `[startFrame, endFrameExclusive)` image ranges with bounded concurrency and encodes MP4/WebM ranges by trimming the final composed video graph at exact frame indices while trimming audio by equivalent frame-derived seconds. Execution controls reuse Vexa hardware detection/selection, normalized FFmpeg progress, `AbortSignal` cancellation, and process timeouts with renderer-specific typed errors. Storage assets share one managed render workspace and are cleaned after all workers settle on success or failure; explicit `resolvedAssets` remain available for already-materialized inputs. Durable job orchestration remains outside the synchronous renderer surface.
+
+### Goal
+
+Render a composition or still from Node while reusing existing Vexa infrastructure.
+
+Likely package:
+
+```text
+@vexa-video/renderer
+```
+
+### Scope
+
+- list/select compositions from a bundle;
+- resolve dynamic metadata;
+- render still;
+- render one frame;
+- render frame range;
+- render video;
+- progress;
+- cancellation;
+- timeouts;
+- configurable concurrency;
+- audio collection/mixing;
+- output codec/container options;
+- hardware encoding through existing Vexa hardware contracts;
+- storage/workspace integration;
+- typed rendering errors.
+
+### Architectural rule
+
+Do not duplicate:
+
+- FFmpeg process management;
+- codec validation;
+- hardware detection;
+- cancellation;
+- storage;
+- job state;
+- progress contracts.
+
+## V2.8 — Vexa Studio development environment
+
+### Goal
+
+Provide a local visual development surface for programmable compositions.
+
+Likely split if necessary:
+
+```text
+@vexa-video/studio        # browser UI/runtime
+@vexa-video/studio-server # Node development host, only if the boundary requires it
+```
+
+### Scope
+
+- composition selector;
+- player/preview;
+- playhead/timeline;
+- frame stepping;
+- props editor;
+- dynamic metadata inspection;
+- render controls;
+- output/progress panel;
+- asset inspection;
+- console/error overlay;
+- hot reload;
+- keyboard shortcuts;
+- preservation of current frame across safe reloads.
+
+Reuse `@vexa-video/editor` state/history utilities instead of creating a second editor state model.
+
+## V2.9 — Shapes, effects, transitions, fonts, and caption components
+
+**Status:** Complete.
+
+The first implementation slice establishes browser-safe, serializable shape geometry in `@vexa-video/core`: rectangle, ellipse, line, polygon, star, path, and arc descriptors; deterministic validation/defaulting; stable SVG path conversion; and JSON serialization. The second slice integrates that same contract as a first-class programmable scene node and adds generic plus convenience React authoring components without introducing a duplicate geometry model. The third slice adds real Node renderer execution without changing `VideoProjectAst`: normalized shapes are converted from Vexa-owned SVG markup to transparent PNG assets with `resvg-js` inside the managed render workspace, then flow through the existing FFmpeg image composition path. Timing, opacity, z-order, fill/stroke styling, dash/fill-rule behavior, and translation-only transforms are preserved; width/height, rotation, scale, and anchor transforms fail explicitly until a dedicated frame-render transform path can represent them correctly.
+
+The fourth implementation slice establishes backend-neutral, browser-safe effect contracts in `@vexa-video/core` for blur, brightness, contrast, saturation, hue, grayscale, sepia, shadow, glow, deterministic noise, and vignette. Normalization validates finite/ranged values, canonicalizes hue, applies deterministic defaults, freezes normalized values, preserves effect-chain declaration order, and provides stable JSON serialization. Scene/React attachment and renderer execution remain later V2.9 slices so the contract can stabilize before backend wiring.
+
+The fifth implementation slice attaches ordered programmable effect chains to visual scene leaves (fill, solid, shape, text, image, video, and surface) while keeping audio and group/layer containers effect-free. `@vexa-video/react` exposes the same typed `effects` prop on visual authoring components, and scene normalization reuses the shared effect contract so Node and browser authoring stay identical. Direct `VideoProjectAst` lowering rejects effect-bearing visuals until renderer execution is implemented, and shape rasterization preserves the effect chain so unsupported execution fails closed instead of silently dropping intent.
+
+The sixth implementation slice extends the existing `VideoProjectAst` image/video clip model with ordered programmable effects and compiles the representable linear/raster subset through the normal FFmpeg composition graph: blur, brightness, contrast, saturation, hue, grayscale, sepia, deterministic noise, and vignette. Renderer-rasterized shapes inherit that same image path. Effects run before existing opacity/fade handling, execution plans expose a `PROGRAMMABLE_EFFECT_GRAPH` marker, and real SDK/renderer integration coverage exercises FFmpeg output. Text/fill/solid/surface effects remain fail-closed because those nodes do not yet lower to an isolated visual clip, while shadow/glow remain fail-closed until compositor-branch execution can represent them without approximation.
+
+The seventh implementation slice adds ordered shadow/glow execution for image/video clips and renderer-rasterized shapes through explicit FFmpeg split/mask/blur/overlay compositor branches. Transparent bounds padding plus overlay-position compensation prevents spatial effects from clipping or shifting authored placement, declaration order remains stable when linear and compositor effects are interleaved, and execution plans expose `PROGRAMMABLE_EFFECT_COMPOSITOR_GRAPH`. Effect-bearing advanced wipes and spatial effects combined with non-normal blend modes fail explicitly until those graphs can preserve the same semantics. Text/fill/solid/surface effects remain fail-closed pending isolated visual-layer execution.
+
+The eighth implementation slice lets programmable text effects lower into `VideoProjectAst` and renders effect-bearing text on a transparent full-canvas layer before compositing it back into the project. The isolated layer reuses the same ordered FFmpeg effect compiler as image/video/shape, applies clip opacity and fade transitions after effects, preserves text position/font-size keyframes and default-font resolution, exposes `TEXT_ISOLATED_EFFECT_GRAPH`, and rejects effect-bearing text wipes/crossfades until an advanced text-transition graph exists. Fill/solid/surface effects remain fail-closed.
+
+The ninth implementation slice adds renderer-owned raster execution for Vexa `solid` nodes and effect-bearing `fill` nodes. These primitives are converted to transparent full-canvas SVG documents, rasterized to managed-workspace PNGs with the existing `resvg-js` path, substituted with image nodes while preserving timing/z/opacity/effects, and then executed through the same FFmpeg effect compiler as other raster visuals. Translation-only scene transforms are supported; width/height/rotation/scale/anchor transforms fail explicitly with `RENDER_PRIMITIVE_UNSUPPORTED`. Plain representable fills keep the direct project-background lowering fast path. Application-owned `surface` nodes remain contract-only until Vexa defines a renderer registration/execution API instead of guessing what a `rendererId` means.
+
+The tenth implementation slice establishes browser-safe programmable transition contracts in `@vexa-video/core` for fade, slide, wipe, push, zoom, and circular iris transitions. Durations are frame-based positive integers; easing supports linear/ease-in/ease-out/ease-in-out; slide/wipe/push directions normalize deterministically. Visual scene leaves and React authoring components expose typed `transitions` pairs, scene normalization freezes canonical values and rejects transition durations longer than the owning node, and renderer-owned shape/fill/solid raster substitution preserves transition metadata. `VideoProjectAst` lowering remains explicitly fail-closed until the dedicated transition execution graph is implemented, preventing partial or silently dropped transition semantics.
+
+The eleventh implementation slice starts real transition execution by carrying the existing programmable transition objects through representable `VideoProjectAst` clips and compiling programmable fade in/out through FFmpeg alpha expressions. Frame durations are converted with the project FPS, linear/ease-in/ease-out/ease-in-out intent is preserved, effects run before clip opacity and the transition alpha, transition-bearing text uses the existing isolated transparent-layer path, and renderer-materialized fill/solid/shape nodes keep the same transition metadata. Legacy timeline fade/crossfade/wipe behavior remains separate and compatible. Slide, wipe, push, zoom, and iris execution remain explicitly fail-closed until their spatial/mask semantics are implemented rather than approximated.
+
+The twelfth implementation slice extends that same execution graph with programmable slide and wipe transitions. Slide translates the completed visual layer by one canvas span and composes the offset with authored positioning; direction names the edge an incoming visual enters from or an outgoing visual exits toward. Wipe leaves geometry fixed and applies an easing-aware alpha boundary across the rendered layer; direction names the edge an incoming reveal opens from or an outgoing reveal closes toward. Both support in/out timing, all four shared easing modes, isolated text layers, and renderer-rasterized shapes/fills/solids without changing the authoring contract. Non-normal blend modes with programmable slide/wipe remain fail-closed until blend semantics can preserve the same geometry/mask behavior.
+
+The thirteenth implementation slice adds true paired programmable push execution without aliasing push to slide. Push is accepted only on the incoming second clip of an eligible two-clip full-canvas video track; the previous clip and incoming clip move in opposite directions across a shared transparent transition stage, preserving all four directions, project-FPS frame timing, and the shared easing modes. The clips must overlap by exactly the push duration and cannot combine push with effects, blend modes, opacity/keyframe motion, spatial offsets, or another transition in the same pair. Scene-leaf push remains fail-closed because a single leaf does not identify the visual state it should displace. Plans expose `PROGRAMMABLE_PUSH_TRANSITION_GRAPH`, and programmable push does not implicitly alter audio fades.
+
+The fourteenth implementation slice adds layer-local programmable zoom execution for image/video/text clips and renderer-materialized shapes/fills/solids. Zoom uses the existing frame-based transition duration and easing contract, scales the completed visual layer after effects/opacity/alpha transitions, and preserves the authored visual center for positioned image/video layers. Isolated text scales around the composition center. A near-zero scale floor keeps FFmpeg dimensions valid at transition boundaries without introducing opacity semantics. Animated transform geometry and non-normal blend modes combined with zoom remain explicit fail-closed paths. Plans expose `PROGRAMMABLE_ZOOM_TRANSITION_GRAPH`.
+
+The fifteenth implementation slice completes the declared programmable transition families with circular iris execution for image/video/text clips and renderer-materialized shapes/fills/solids. Iris applies a layer-centered radial alpha mask after effects/opacity and the existing programmable alpha transitions; its radius expands for incoming transitions and contracts for outgoing transitions using the shared frame duration and easing contract. The fully-open radius reaches the layer's farthest corner, while the zero-radius boundary is fully closed. Isolated text uses its full transparent canvas as the masked layer. Non-normal blend modes combined with iris remain explicit fail-closed paths. Plans expose `PROGRAMMABLE_IRIS_TRANSITION_GRAPH`.
+
+The sixteenth implementation slice starts typography execution by extending the shared text-style contract with deterministic stroke, shadow, horizontal alignment, and line-spacing intent. Scene normalization validates and freezes those values, representable text lowers them unchanged into `VideoProjectAst`, and both direct and isolated FFmpeg drawtext paths compile the same styling. Explicit `textAlign` treats authored `transform.x` as the selected left/center/right anchor while preserving the historical x-position behavior when alignment is omitted. Existing local `fontFile` handling remains compatible; managed font readiness and optional remote font adapters stay separate follow-up work rather than being mixed into the styling contract.
+
+The seventeenth implementation slice makes local-font readiness deterministic at the Node execution boundary. `@vexa-video/ffmpeg` now resolves every enabled/renderable text clip to an absolute readable local font before planning: explicit `style.fontFile` paths are checked, relative paths resolve against the caller-provided execution root, text without an explicit font receives the existing Vexa platform default, and absence/unreadability fails with `ProjectFontResolutionError` instead of leaking into FFmpeg. `VideoProject` uses the same preparation path, while the bundle-backed renderer resolves relative fonts from the persisted bundle directory and maps font failures to `RENDER_FONT_UNAVAILABLE`. Hidden tracks and disabled text clips do not block readiness. Optional remote font adapters remain later work.
+
+The eighteenth implementation slice adds optional remote-font adapters without moving provider/network code into core or FFmpeg. Shared text styles can carry a serializable `remoteFont` reference containing provider, family, optional weight, and normal/italic style; it is mutually exclusive with local `fontFile`. Bundle rendering accepts provider-keyed `fontAdapters` per render. An adapter receives the normalized reference plus composition/clip identity and cancellation signal, and must return an absolute local path that remains readable for the render. Vexa then runs that result through the existing local-font readiness resolver before FFmpeg planning. Missing or duplicate adapters, adapter failures, relative/unreadable returned paths, and cancellation all fail through typed renderer boundaries; direct FFmpeg/project paths reject unresolved remote references instead of silently falling back.
+
+The nineteenth implementation slice integrates the existing `CaptionDocument` directly into programmable scenes and `VideoProjectAst` instead of converting captions into generic text clips or introducing a second caption model. Scene/project normalization preserves deterministic cue/word timing and rejects cues that extend beyond an explicit composition duration. Caption endpoints contribute to inferred project duration when no explicit canvas duration exists. Node font readiness now resolves caption `fontFile` values and injects the controlled platform default when a cue omits one. The project FFmpeg compiler chains the existing caption drawtext graph after the final composed visual graph, so still, single-frame, frame-range, and video execution inherit the same cue styling, position, fade/pop animation, and word-timing metadata. Renderer shape/primitive materialization explicitly preserves scene captions.
+
+The twentieth implementation slice makes word timing visually executable without approximating font metrics. `CaptionStyle.wordMode` adds a browser-safe `"active-word"` mode alongside the default `"sentence"` mode, with optional `activeWordColor` and a deterministic `#facc15` fallback. Active-word cues require word timings and reject overlapping intervals. FFmpeg emits one drawtext primitive per timed word at the cue's normal caption position and enables each primitive only for that word's interval; cue font, size, outline, background, position, and animation semantics are reused. Plans expose `ACTIVE_WORD_CAPTION_GRAPH` in addition to the existing word-timing marker. This is intentionally one-word-at-a-time karaoke behavior rather than inaccurate inline highlighting based on guessed glyph widths.
+
+The twenty-first implementation slice completes V2.9 captions with speaker-aware styling. `CaptionCue.speaker` preserves normalized diarization identity, while `CaptionDocument.speakerStyles` maps trimmed speaker ids to deterministic visual overrides. Speaker styles intentionally cannot replace `fontFile` or `wordMode`; local-font readiness and sentence/active-word timing remain cue-owned. Matching speaker overrides are applied after template/cue visual defaults, including speaker-specific active-word color, and FFmpeg plans expose `SPEAKER_AWARE_CAPTION_GRAPH`. The provider-neutral AI transcription contract already carries segment speakers, so `VexaAI.captions()` now preserves that metadata and optional speaker-style maps without adding provider dependencies to core or FFmpeg. Real shape-showcase rendering exercises speaker-aware active-word captions after renderer-owned rasterization.
+
+### Goal
+
+Provide a Vexa-owned motion-graphics component library.
+
+### Scope
+
+Shapes:
+
+- rectangle;
+- circle/ellipse;
+- line;
+- polygon/star;
+- path/arc.
+
+Effects:
+
+- blur;
+- brightness/contrast;
+- saturation/hue;
+- grayscale/sepia;
+- shadow/glow;
+- noise/vignette.
+
+Transitions:
+
+- fade;
+- slide;
+- wipe;
+- push;
+- zoom;
+- iris/circle;
+- configurable timing/easing.
+
+Typography:
+
+- local fonts;
+- optional remote font adapters;
+- font readiness;
+- text stroke/shadow;
+- alignment/spacing;
+- deterministic font failures.
+
+Captions:
+
+- integrate existing `CaptionDocument`;
+- sentence and word timing;
+- active-word/karaoke rendering;
+- speaker-aware styles where metadata exists.
+
+## V2.10 — Extended programmable media
+
+**Status:** Complete.
+
+The first implementation slices establish the optional Node surface-renderer boundary already anticipated by the browser-safe `surface` scene contract. `VexaRenderExecutionOptions.surfaceAdapters` accepts renderer-id keyed adapters only for bundle rendering; core and the normal SDK gain no dependency on renderer integrations. Static adapters return SVG text or validated PNG bytes and enter the existing image/project path. Frame-aware adapters expose `renderFrame()` instead and receive deterministic local/absolute frame timing plus normalized progress for every authored surface frame. Vexa owns SVG rasterization, PNG validation/materialization, and sequence encoding inside its managed workspace; animated sequences become lossless alpha-capable QTRLE MOV assets, are substituted as muted video nodes, and reuse the existing `VideoProjectAst` timing/effects/transitions path. APNG remains rejected on the static result path so animation is never inferred from image bytes. An adapter must expose exactly one rendering mode. Missing, duplicate, or ambiguous adapters, adapter exceptions, malformed SVG/PNG frame results, cancellation, timeout, and unsupported non-translation transforms fail through typed renderer errors, and all generated frame/intermediary files are cleaned on success or failure. These renderer-owned result paths provide concrete canvas/WebGL/headless-canvas and future Lottie/Rive/Three-style integration boundaries without integration dependencies entering core packages.
+
+The first concrete optional integration is `@vexa-video/gif`. Browser/core scene data carries only a logical `sourceId` plus serializable fit/loop intent; the Node host maps that ID to a local GIF path when it creates the adapter. The adapter validates the source through the shared FFprobe wrapper, maps each requested Vexa local frame to GIF timeline time, extracts an RGBA PNG through the shared FFmpeg process layer, and deletes its private extraction workspace after every frame. `contain`, `cover`, and `stretch` fit modes are explicit, looping defaults on but can be overridden per source or surface, and process abort/timeout errors keep the renderer's normal typed cancellation/timeout semantics. The package depends outward on renderer/FFmpeg contracts; core and the normal SDK remain unaware of it.
+
+The second concrete optional integration is `@vexa-video/waveform`. Browser/core scene data carries only a logical `sourceId` plus optional serializable waveform color/background intent; the Node host maps that ID to a local media path when it creates the adapter. The adapter validates that the source exposes audio through the shared FFprobe wrapper, reuses the shared waveform compiler/executor at the authored surface dimensions, returns a PNG through the static surface path, and deletes its private raster workspace after each render. Invalid waveform styling is rejected through a typed adapter boundary while process abort/timeout errors retain the renderer's normal cancellation/timeout semantics. The package depends outward on renderer/FFmpeg contracts; core and the normal SDK remain unaware of it.
+
+The third concrete optional integration is `@vexa-video/sound-effects`. It does not add another renderer or audio executor because programmable scenes already have native audio assets/nodes that lower through the shared project path. Instead, the browser-safe package owns deterministic logical sound IDs, stable generated asset IDs, per-effect playback defaults, and helpers that emit ordinary `ProgrammableSceneAsset` plus `ProgrammableSceneAudioNode` values. Static and storage-backed sources remain existing core contracts; source acquisition, trimming, playback rate, gain, mute, timing, cancellation, and FFmpeg execution stay on the normal Vexa path. The package depends only on `@vexa-video/core`, so reusable application sound catalogs can be shared by TypeScript/React authoring without importing Node, SDK, renderer, filesystem, or FFmpeg runtime code.
+
+### Goal
+
+Cover common programmable-video inputs without bloating core packages.
+
+V2.10 is complete once the generic static/frame-aware surface boundary and representative concrete integrations prove the dependency model across animated visuals, audio-derived visuals, and reusable audio authoring. Additional integrations can build on those completed boundaries without reopening this stage.
+
+- Lottie;
+- Three.js;
+- Rive or similar animation adapters;
+- canvas/WebGL custom drawing.
+
+Each integration should be optional and should not become a dependency of `@vexa-video/core` or the normal Node SDK.
+
+## V2.11 — Browser rendering and WebCodecs
+
+**Status:** In progress.
+
+The first slice adds `@vexa-video/web-renderer` as a browser-safe capability and planning boundary. It probes H.264/VP9/AV1 plus AAC/Opus support through injectable WebCodecs-compatible hooks, chooses deterministic MP4/WebM codec plans, and returns typed backend-fallback reasons when required browser capabilities are unavailable.
+
+The second slice executes video-only browser plans through a frame-source callback and the browser `VideoFrame`/`VideoEncoder` path. It owns deterministic microsecond timestamps, periodic keyframes, bounded encoder queues, progress, `AbortSignal` cancellation/reset, frame cleanup, encoded-chunk copying, and typed render/encode failures. The result is explicitly an encoded video-chunk stream rather than a claimed MP4/WebM file because container muxing is not provided by WebCodecs. Canvas/DOM capture adapters, browser audio, muxing, and Blob/File output remain later V2.11 work behind this same boundary.
+
+The third slice adds dependency-free in-memory WebM muxing for Vexa's already-owned VP9/AV1 encoded chunks. It writes deterministic EBML/WebM headers, track metadata, clusters, and SimpleBlock payloads; requires a keyframe-first monotonic chunk stream; returns a `video/webm` Blob with byte-accurate metadata; and can create a browser `File` through the native File API.
+
+The fourth slice completes the video-only MP4 path by preserving `EncodedVideoChunkMetadata.decoderConfig` from the WebCodecs encoder callback, explicitly requesting AVC-format H.264 output, and carrying an owned copy of the `AVCDecoderConfigurationRecord` into a deterministic fragmented-MP4 muxer. The muxer writes `ftyp`/`moov` initialization metadata plus `moof`/`mdat` media data and exposes `video/mp4` Blob/File output. Missing AVC decoder metadata, reordered/non-monotonic samples, malformed configuration records, and unsupported codec/container pairs remain typed fail-closed.
+
+The fifth slice adds an independent browser `AudioEncoder` execution path for AAC and Opus. It deterministically partitions composition duration into PCM windows, lets a caller supply matching browser `AudioData`, owns encoded chunk bytes plus decoder metadata, configures raw AAC/Opus output suitable for later MP4/WebM muxing, and mirrors the video path's bounded queues, progress, cancellation/reset, typed failures, and cleanup. Video encoding no longer rejects a browser plan merely because that plan also requests audio; audio muxing and concrete Canvas/DOM capture adapters remain follow-on V2.11 work.
+
+The sixth slice muxes those owned audio chunks with the existing browser video outputs. H.264/AAC uses browser-provided AVC and AudioSpecificConfig metadata to build dual-track fragmented MP4, while VP9-or-AV1/Opus writes a second WebM track with `A_OPUS` and `OpusHead` codec-private data. Both paths require zero-origin monotonic streams, validate audio/video duration skew, preserve Blob/File compatibility, and fail closed for mismatched container/codec pairs. Concrete Canvas/DOM capture adapters remain the outstanding V2.11 execution surface.
+
+The seventh slice closes the concrete browser frame-source gap with Canvas and serializable-DOM capture adapters. Canvas capture validates encoder dimensions and runs an optional deterministic per-frame paint callback before returning the browser canvas directly. DOM capture snapshots a cloned element tree with computed styles, wraps it in SVG `foreignObject`, rasterizes it through `createImageBitmap`, draws into a reusable Canvas/OffscreenCanvas, closes each temporary bitmap immediately, waits for document fonts when available, and fails closed for canvas/video/iframe descendants that cannot be faithfully serialized. The resulting canvas plugs directly into the existing `encodeWebVideoFrames` callback without changing composition semantics or adding Node/FFmpeg dependencies.
+
+The closure acceptance slice validates the integrated browser path instead of adding another production API. A deterministic test wires Canvas capture into `encodeWebVideoFrames` and then `muxWebVideo`, asserting frame paint order, `VideoFrame` cleanup, timestamp/keyframe propagation, WebM container identity, and Blob metadata. With capability/fallback planning, video/audio encoding, MP4/WebM A/V muxing, Canvas/DOM capture, progress, cancellation, Blob/File output, and typed fallback all represented behind the same browser-safe boundary, V2.11 is complete. Native codec availability remains a runtime browser capability and continues to fail over through the typed backend plan when unsupported.
+
+### Goal
+
+Render suitable compositions entirely in the browser.
+
+Likely package:
+
+```text
+@vexa-video/web-renderer
+```
+
+### Scope
+
+- capability detection;
+- Canvas/DOM capture strategy selected by supported composition type;
+- WebCodecs video encoding where supported;
+- browser audio encoding/muxing where supported;
+- progress;
+- cancellation;
+- Blob/File output;
+- codec capability reporting;
+- deterministic fallback to backend rendering when unsupported.
+
+Browser rendering is an alternate backend, not a reason to weaken Node/browser package isolation.
+
+## V2.12 — Templates and parameterized compositions
+
+**Status:** Complete.
+
+The first slice adds a browser-safe serializable input-schema contract directly to existing programmable composition definitions. Object schemas cover strings, finite numbers/integers, booleans, enums, arrays, nested objects, required keys, bounded lengths/ranges/item counts, and explicit unknown-property policy. `defaultProps` remain the single source of defaults: definitions validate them against the normalized schema at authoring time, resolved props validate before any custom `validateProps`, and static composition metadata exposes the same frozen schema for Studio/API/agent discovery. No external schema library or second composition/template model is introduced.
+
+The second slice adds reusable template descriptors around those same composition definitions. Template metadata is normalized and frozen, while `ProgrammableTemplateCatalog` provides deterministic discovery entries containing presentation metadata plus the composition kind, dimensions/timing, defaults, and existing `inputSchema`. Catalog descriptors never execute independently: player, still, local render, and future hosted/agent invocation continue to target the wrapped composition.
+
+The third slice adds deterministic aspect-ratio variants to those descriptors. Each variant contains JSON-safe prop overrides and a declared `16:9`, `9:16`, or `1:1` ratio; resolution delegates to the existing composition prop validation and `calculateMetadata` path, then verifies the resolved dimensions match the declared ratio. One composition therefore supports landscape, vertical, and square output without cloned template code or an alternate render contract.
+
+The fourth slice adds a JSON-safe invocation envelope for services and agents. Invocation normalization validates and freezes `templateId`, optional `variantId`, and JSON-only props; catalog resolution merges variant presets before caller overrides, then delegates to the existing composition schema/custom validation and dynamic-metadata path. Variant aspect-ratio verification runs after those final props resolve, so remote callers cannot bypass responsive-template guarantees.
+
+The fifth slice adds reusable template assets by referencing the existing `ProgrammableSceneAsset` contract instead of introducing template-specific media URLs or files. Template asset sets normalize through the same static/storage source validation, preload defaults, deterministic id ordering, duplicate rejection, and storage-security boundary already used by programmable scenes. Catalog entries expose those frozen JSON-safe descriptors so Studio, services, and agents can discover required media without bypassing scene/storage resolution.
+
+Closure acceptance on Windows 11 passed 9/9 focused template tests, 26/26 programmable-scene tests, 12/12 programmable-composition tests, and 365/365 full repository tests. `npm run typecheck`, `npm run build`, and `npm run verify` completed successfully; the verify run repeated the 365/365 suite before the final build. The root README guard, repository prohibited-runtime guard, and `git diff --check` were clean. No second template execution model, render path, or asset-resolution path was introduced.
+
+### Goal
+
+Make compositions reusable by applications, APIs, and agents.
+
+### Scope
+
+- typed input schema;
+- defaults;
+- validation;
+- template metadata/catalog;
+- aspect-ratio variants;
+- dynamic metadata;
+- reusable assets;
+- JSON-safe invocation for service/agent use.
+
+Target flow:
+
+```text
+template + validated props
+          |
+          v
+composition
+          |
+          v
+player / still / local render / hosted render
+```
+
+## V2.13 — Hosted/serverless composition rendering
+
+The first slice extends the existing provider-neutral hosted contract rather than creating a second render service model. `composition.render` requests carry a provider-resolved bundle manifest reference, composition id, JSON-safe input props, a still/frame/range/video target, and explicit output artifact identity. `HostedRenderer.submitComposition()` normalizes that envelope and delegates to the same application-supplied submit/get/cancel adapter used by existing hosted work. Cloud SDKs and provider credentials remain outside core.
+
+The second slice adds the worker bridge inside `@vexa-video/renderer`, where the dependency direction already points toward `@vexa-video/sdk`. `registerHostedCompositionRenderWorker()` registers `composition.render` on the existing local `JobQueue` or distributed-worker registration contract, resolves the provider-owned manifest and local output through injected callbacks, and dispatches still/frame/range/video work to `VexaCompositionRenderer`. Renderer progress is forwarded into the existing job progress snapshot, and `AbortSignal` cancellation remains a cancelled job rather than a failed render.
+
+The third slice completes deterministic artifact publication without embedding a cloud provider. When `output.destination` is present, the worker must publish after local rendering rather than silently returning only a worker path. Single-file still/frame/video outputs may use `artifactStorage`, which delegates to the existing `Storage.upload()` contract and its application-owned adapters with retry-safe overwrite semantics and the worker cancellation signal. Frame-range output is a directory, so it requires `publishArtifact()` for explicit packaging/upload. The worker returns a normalized hosted artifact reference and fails closed with a typed publication error when a destination cannot be fulfilled.
+
+The closure slice adds explicit retry-safety acceptance: if publication fails transiently and the existing job retry policy runs the handler again, the worker resolves the same artifact identity and local output path, rerenders with overwrite enabled, republishes to the same destination with overwrite enabled, and returns the same hosted artifact identity. V2.13 therefore closes on the existing hosted adapter, job, renderer, and storage contracts without adding a parallel execution plane.
+
+### Goal
+
+Connect composition rendering to the existing hosted-render and job abstractions.
+
+### Scope
+
+- serializable render request;
+- composition bundle reference;
+- validated input props;
+- submit/get/cancel;
+- progress;
+- worker rendering;
+- deterministic artifact identity;
+- remote output storage;
+- optional provider adapters such as AWS/container platforms.
+
+Keep cloud SDKs outside core packages.
+
+## V2.14 — Agent, MCP, and CLI workflows
+
+### Goal
+
+Make composition discovery and rendering usable by humans, automation, and coding agents through typed operations.
+
+The first V2.14 slice extends the existing Node CLI with programmable composition discovery and bundle creation only. `vexa compositions` reuses `discoverBundleCompositions()` and defaults to `src/video.tsx`; `vexa bundle` reuses `bundleCompositions()` with explicit project-root, output-directory, build-mode, source-map, and JSON-output controls. Existing media-file `render` semantics stay intact until a renderer-backed composition command is introduced, so this slice does not create a second discovery/build path or silently reinterpret existing commands.
+
+The second slice connects the CLI directly to `VexaCompositionRenderer`. `vexa render` resolves a plain composition id through the default or explicit bundle manifest while existing paths, URLs, and filename-like media sources continue through `Video`. `--manifest` forces composition resolution when needed. `vexa still` always targets a composition and dispatches true stills to `renderStill()` or video snapshots to `renderFrame()`. JSON props and renderer-native progress, frame ranges, timeout, concurrency, hardware, and format validation are passed through rather than reimplemented.
+
+The third slice exposes executable composition inspection and props resolution on `VexaCompositionRenderer` before adding any agent-specific adapter. `inspectComposition()` returns the authoritative static definition metadata, including default props and any declared input schema, after the existing manifest/executable consistency check. `resolveComposition()` merges defaults, runs the existing schema and custom validators, and calculates dynamic metadata without constructing a scene. `vexa inspect` and `vexa validate` delegate to those methods and emit JSON-safe results; JSON-mode failures include stable renderer error codes. MCP remains a later adapter over these same typed operations.
+
+The fourth slice adds that adapter as the transport-neutral `@vexa-video/mcp` package. It exposes a stable typed tool catalog for composition listing, executable inspection, authoritative prop resolution, hosted render submission, render-state inspection, and cancellation. The package delegates to `VexaCompositionRenderer` and a `HostedRenderer`-compatible runtime, preserves their error codes, and validates only the operation envelope needed to reject unknown fields and raw command surfaces.
+
+The fifth slice closes V2.14 with an actual MCP protocol boundary over the unchanged adapter. `@vexa-video/mcp/server` uses the official MCP SDK low-level server so `tools/list` can publish Vexa's existing JSON schemas verbatim and `tools/call` can delegate to `callTool()` for the already-enforced operation checks. `@vexa-video/mcp/stdio` adds the official stdio transport for local agent hosts. The MCP SDK remains a peer dependency of this integration package, while renderer, hosted-job, provider, credential, and shell concerns stay in their existing owners.
+
+CLI targets:
+
+```bash
+vexa compositions
+vexa studio
+vexa inspect ProductDemo --json
+vexa validate ProductDemo --props '{"headline":"Launch"}' --json
+vexa render ProductDemo output.mp4
+vexa still ProductDemo thumbnail.png --frame 120
+vexa bundle ./src/video.tsx
+```
+
+Agent-safe operations should include:
+
+- list compositions;
+- inspect input schema;
+- validate props;
+- render preview/still;
+- start render;
+- inspect render state;
+- cancel render.
+
+The `@vexa-video/mcp` package must continue to expose the same typed composition/render contracts rather than bypassing them when additional MCP transports or host integrations are added.
+
+## V2.15 — Visual regression and parity testing
+
+**Status:** Complete
+
+### Goal
+
+Make programmable rendering testable at the frame level.
+
+The first V2.15 slice introduces `@vexa-video/test` as a Node-only visual-regression foundation. Named checkpoints delegate selected frames to `VexaCompositionRenderer.renderFrame()` and always materialize PNG output through the existing renderer path. Snapshot comparison decodes ordinary 8-bit non-interlaced grayscale/RGB/RGBA PNGs into a deterministic RGBA representation, then applies explicit per-channel tolerance and maximum changed-pixel ratio. Renderer behavior, composition evaluation, FFmpeg execution, and browser preview semantics remain in their existing packages.
+
+Package:
+
+```text
+@vexa-video/test
+```
+
+### Scope
+
+- selected-frame rendering;
+- image snapshot comparison;
+- tolerance configuration;
+- animation timing assertions;
+- player/renderer parity fixtures;
+- browser/Node parity fixtures;
+- deterministic test assets;
+- audio duration/sync assertions.
+
+The second V2.15 slice adds checked-in fixture baselines on top of the same comparison contract. A font-free 64×36 wipe composition records start, pre-transition, transition-midpoint, post-transition, and final-visible PNGs; `assertVisualCheckpointBaselines()` pairs named renderer outputs with those reviewed files and applies explicit tolerance from the fixture manifest. The fixture deliberately avoids fonts, external media, and browser-only execution so transition timing/geometry can be tested with narrow cross-platform tolerances.
+
+The third V2.15 slice adds runtime checkpoint parity on top of the same reviewed wipe manifest. The manifest now carries dimensions, fps, and duration in addition to named frames. Node renderer metadata, Player snapshots, Studio snapshots, and browser-renderer frame contexts are normalized into one semantic contract for frame identity, dimensions, fps, duration, microsecond timestamp, and frame duration. `@vexa-video/test` owns only the generic comparison helper; browser-safe packages do not import Node-only test tooling.
+
+The fourth V2.15 slice adds actual browser-capture pixel parity for the reviewed wipe fixture. Browser-safe transition visibility mirrors the existing FFmpeg progress/easing semantics, Studio applies that shared wipe geometry to its DOM inspection surface, and the existing Chromium DevTools acceptance captures the same five 64×36 checkpoints at device scale factor 1. The Node-side PNG comparator evaluates those real browser captures with the fixture's existing tolerance; no browser package imports `@vexa-video/test` and no second browser automation stack is introduced.
+
+The fifth V2.15 slice expands the deterministic fixture matrix without adding another renderer or asset model. A Vexa-owned 64×36/10fps fixture bundle covers shape/text timing, generated image and video media, an audio-bearing composition, captions, and parameterized props. Test media is generated through the existing FFmpeg boundary and injected through `resolvedAssets`; visual assertions continue to use the PNG comparator while `compareMediaDurationSync()` / `assertMediaDurationSync()` derive expected duration from fps/frame count and report typed duration or A/V-skew failures.
+
+The V2.15 closure audit confirms that the required fixture classes, frame-level regression surface, exact runtime timing contract, real Chromium Studio capture, and frame-derived media duration/A/V-sync assertions are all covered without adding another renderer, browser runtime, or asset model. Runtime comparison remains capability-specific: Node owns reviewed PNG/metadata output, Player and Studio own deterministic seek state, browser rendering exposes exact frame/timestamp context, and Studio supplies the real browser-pixel acceptance path.
+
+Testing requirements are defined in `V2_MILESTONE_TESTING.md`.
+
+## V2.16 — Version 2 release readiness
+
+**Status:** Complete
+
+### Goal
+
+Release the programmable-video layer without weakening the Version 1 guarantees.
+
+### Required release checks
+
+- all public packages use the synchronized release version;
+- package exports and browser/Node boundaries are audited;
+- packed-tarball clean installs pass;
+- Windows 11 real rendering passes;
+- Linux CI passes;
+- macOS-sensitive code has CI/acceptance coverage where applicable;
+- browser tests pass on supported Chromium/Edge versions;
+- no Node-only dependency leaks into browser packages;
+- documentation and examples are synchronized;
+- migration/release notes explain all Version 2 public API changes.
+
+The first V2.16 slice hardens the npm artifact boundary before any 2.0.0 version cut. A single release-package registry now drives metadata validation, dry-run packing, publication order, and packed-install acceptance for all eighteen public workspaces. `release:install-check` packs real tarballs, installs them into an isolated temporary consumer, rejects workspace symlinks, verifies shipped export/type/bin targets, and imports every shipped runtime export. The protected release workflow runs this gate before publication.
+
+The second V2.16 slice adds one reusable cross-platform release-acceptance workflow shared by pull-request/main CI and the protected tag/publish workflow. Node 24.21 verification and clean packed installs run on Ubuntu, Windows, and macOS, while Ubuntu also retains the Node 26 compatibility lane. The existing Studio/CDP harness runs unchanged in Chrome on all three operating systems and in Microsoft Edge on Windows; `VEXA_STUDIO_BROWSER_FAMILY` makes each lane fail if a different installed Chromium browser is selected.
+
+The cross-platform/browser slice closed with all eight release-acceptance lanes green on commit `cd6076f14031d6d63e34737f89cf774fb3ba5049`: Node 24.21 repository verification plus packed installs on Ubuntu, Windows, and macOS, Node 26 compatibility on Ubuntu, Chrome Studio acceptance on all three operating systems, and Microsoft Edge Studio acceptance on Windows.
+
+The third V2.16 slice hardens the public publishing contract without adding a second package format. `release:install-check` now validates the packed `@vexa-video/angular` ESM/export/peer-dependency shape, aligns the isolated consumer to the repository-tested Angular/RxJS peer versions, and compiles a minimal consumer with Angular's real `ngc` compiler against the installed tarballs. Because the Angular package exposes DI/services rather than decorated components or NgModules, this consumer-level acceptance is the relevant Angular publishing check while keeping the package browser-safe and framework-native. Commit `39ead3e6eb2480f141d8d202c7ea93d58a662a36` closed that slice with all eight release-acceptance lanes green, including the packed Angular consumer on Ubuntu, Windows, and macOS.
+
+The fourth V2.16 slice makes release-operator assumptions executable. `release:trusted-publish-check` audits the checked-in `release.yml` trust identity in normal CI and, inside the protected workflow, requires GitHub Actions OIDC, the canonical repository/workflow/environment identity, and the absence of `NPM_TOKEN`/`NODE_AUTH_TOKEN`. `release:publish` independently enforces the same tokenless trusted-publishing boundary and additionally requires a tag ref. The release workflow remains GitHub-hosted, uses `id-token: write`, and publishes with npm provenance.
+
+The same slice defines the first-public-release media baseline as FFmpeg/ffprobe 6.1+ with `drawtext`, `libx264`, and AAC available. `release:ffmpeg-check` runs in every repository and browser acceptance lane plus the protected release job, while hardware encoders remain optional and runtime-detected. The supported Windows/Linux/macOS and Chrome/Edge matrix plus trusted-publisher bootstrap procedure are documented in `release-operations.md`.
+
+V2.16.4 proved the protected tokenless publishing boundary in non-publishing run `38925542900`: all eight reusable acceptance lanes and `verify-and-release` passed, including the live `npm-release` OIDC preflight, while npm publication and GitHub release creation remained skipped. V2.16.5 then upgraded release workflows to `actions/checkout@v7` / `actions/setup-node@v7`, pinned release-critical Linux jobs to Ubuntu 24.04, and closed on commit `579d81e03724f8d61b55936bc7c92bee9ea5c281` with final dry-run `38929706513` green across all eight lanes and the protected release job.
+
+The final release-cut slice synchronizes the root and all eighteen public packages to `2.0.0`, updates exact internal Vexa dependency references and private example dependencies, and adds the Version 2 migration/release notes. Registry trusted-publisher configuration and actual npm publication remain protected operator actions after the release-ready branch is merged and the exact `main` commit is tagged.
+
+## Recommended implementation order
+
+```text
+V2.1  Composition contracts and registry
+  |
+V2.2  Frame/time/animation semantics
+  |
+V2.3  Scene graph and media elements
+  |
+V2.4  React authoring adapter
+  |
+V2.5  Browser player
+  |
+V2.6  Bundler and discovery
+  |
+V2.7  Node composition renderer
+  |
+V2.8  Studio
+  |
+V2.9  Shapes/effects/transitions/fonts/captions
+  |
+V2.10 Extended programmable media
+  |
+V2.11 Browser renderer/WebCodecs
+  |
+V2.12 Templates
+  |
+V2.13 Hosted/serverless rendering
+  |
+V2.14 Agent/MCP/CLI workflows
+  |
+V2.15 Visual regression
+  |
+V2.16 Version 2 release
+```
+
+## Version 2 completion definition
+
+Version 2 is complete when a developer can define one Vexa composition and use the same logical composition to:
+
+1. preview it interactively in a browser;
+2. render a still;
+3. render a video locally through Node;
+4. invoke it with validated input props;
+5. run it through Vexa's existing job/hosted-render contracts;
+6. test selected frames deterministically;
+7. use it without importing Node execution code into browser packages.
+
+The Version 3 platform work is tracked separately in `V3_MILESTONE.md`.

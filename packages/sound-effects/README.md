@@ -1,46 +1,32 @@
 # @vexa-video/sound-effects
 
-Browser-safe reusable sound-effect catalogs for Vexa programmable compositions.
+Defines reusable logical sound-effect catalogs that resolve into ordinary programmable audio assets/nodes.
 
-The package does not decode, load, or execute audio. It maps stable logical sound IDs to existing Vexa audio assets and creates ordinary programmable-scene audio nodes, so storage resolution and FFmpeg execution remain on Vexa's existing project path.
+> Stable baseline: **2.0.0** · Browser-safe reusable catalog package.
 
-```ts
-import { defineProgrammableScene } from "@vexa-video/core";
-import { createSoundEffectLibrary } from "@vexa-video/sound-effects";
+## Install
 
-const sounds = createSoundEffectLibrary({
-  effects: {
-    click: {
-      source: { kind: "static", src: "/media/click.wav" },
-      volume: 0.7
-    },
-    success: { kind: "static", src: "/media/success.wav" }
-  }
-});
-
-const scene = defineProgrammableScene({
-  id: "sound-demo",
-  width: 1920,
-  height: 1080,
-  fps: 30,
-  durationInFrames: 180,
-  assets: sounds.assets,
-  children: [
-    sounds.createNode("click", {
-      id: "click-1",
-      startFrame: 12,
-      durationInFrames: 18
-    }),
-    sounds.createNode("click", {
-      id: "click-2",
-      startFrame: 60,
-      durationInFrames: 18,
-      playbackRate: 1.1
-    })
-  ]
-});
+```bash
+npm install @vexa-video/sound-effects@2.0.0
 ```
 
-Catalog entries may use any existing `ProgrammableSceneAssetSource`, including storage-backed sources. Per-effect defaults support preload, source offset, playback rate, volume, and mute. Each node instance can override playback settings without duplicating the asset definition.
+## When to use it
 
-The package depends only on `@vexa-video/core`. It has no FFmpeg, filesystem, renderer, SDK, or browser-DOM runtime dependency.
+Use this package when authoring reusable composition sound cues without introducing a second audio execution path.
+
+## Capabilities
+
+- Reusable logical sound-effect catalogs
+- Serializable programmable audio asset/node generation
+- Browser-safe authoring metadata
+
+## Runtime boundary
+
+Catalogs describe intent; actual media resolution/rendering continues through existing Vexa asset and audio execution contracts.
+
+## Documentation
+
+- [compositions.md](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/compositions.md)
+- [package-guide.md](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/package-guide.md)
+
+For the full package map and runtime boundaries, see the [Vexa package guide](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/package-guide.md).

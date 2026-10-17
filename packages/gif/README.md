@@ -1,45 +1,33 @@
 # @vexa-video/gif
 
-Optional Node.js GIF integration for Vexa programmable surfaces.
+Integrates logical GIF sources with deterministic frame extraction for programmable composition surfaces.
 
-The package implements the renderer's frame-aware surface adapter contract. Composition data carries a logical `sourceId`; the Node host maps that ID to a local GIF path. This keeps filesystem paths and FFmpeg decoding outside `@vexa-video/core`, browser packages, and the normal SDK.
+> Stable baseline: **2.0.0** · Node.js optional composition-media adapter.
 
-```ts
-import { createGifSurfaceAdapter } from "@vexa-video/gif";
+## Install
 
-const gifAdapter = createGifSurfaceAdapter({
-  sources: {
-    spinner: "./media/spinner.gif"
-  }
-});
-
-await renderer.renderVideo({
-  compositionId: "demo",
-  output: "demo.mp4",
-  surfaceAdapters: [gifAdapter]
-});
+```bash
+npm install @vexa-video/gif@2.0.0
 ```
 
-Author the matching surface with serializable data:
+## When to use it
 
-```ts
-{
-  kind: "surface",
-  id: "spinner",
-  surface: {
-    kind: "gif",
-    rendererId: "vexa.gif",
-    data: {
-      sourceId: "spinner",
-      fit: "contain",
-      loop: true
-    }
-  }
-}
-```
+Use this package only when compositions need GIF-specific frame decoding through Vexa’s shared surface boundary.
 
-`fit` accepts `contain`, `cover`, or `stretch`. Looping defaults to `true` and can be configured per source or overridden by surface data.
+## Capabilities
 
-The adapter probes the configured GIF once per adapter instance, maps each Vexa local frame to source time, extracts an RGBA PNG with FFmpeg, returns the bytes to `@vexa-video/renderer`, and deletes its private extraction workspace. The renderer remains responsible for its own managed frame sequence and lossless animation intermediary.
+- Logical GIF source IDs
+- Deterministic frame extraction
+- Fit/loop controls
+- Managed private temporary-workspace cleanup
 
-This package is Node-only and intentionally optional. It does not add GIF/FFmpeg integration dependencies to core/browser packages.
+## Runtime boundary
+
+Optional package; the normal SDK/core stay free of GIF-specific runtime dependencies.
+
+## Documentation
+
+- [compositions.md](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/compositions.md)
+- [package-guide.md](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/package-guide.md)
+
+For the full package map and runtime boundaries, see the [Vexa package guide](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/package-guide.md).

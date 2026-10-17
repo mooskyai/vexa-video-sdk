@@ -1,29 +1,33 @@
 # @vexa-video/player
 
-Browser-safe, framework-neutral playback state and DOM hosting for Vexa programmable compositions.
+Deterministic browser playback state and a thin responsive DOM/fullscreen host for programmable compositions.
 
-```ts
-import { createVexaPlayerController, mountVexaPlayer } from "@vexa-video/player";
+> Stable baseline: **2.0.0** · Browser-safe and framework-neutral.
 
-const controller = createVexaPlayerController({
-  width: 1920,
-  height: 1080,
-  fps: 30,
-  durationInFrames: 300,
-  controls: "default"
-});
+## Install
 
-const host = mountVexaPlayer(document.querySelector("#player")!, controller, {
-  renderFrame: ({ frame, viewport }) => {
-    viewport.textContent = `frame ${frame}`;
-  }
-});
-
-controller.play();
+```bash
+npm install @vexa-video/player@2.0.0
 ```
 
-The controller owns deterministic frame, seek, loop, volume, rate, buffering, end, poster-frame, resize, and typed-event semantics. Browser scheduling and DOM behavior are thin adapters over that state machine.
+## When to use it
 
-`controls: "default"` mounts accessible native buttons/range input. `controls: "custom"` and `controls: "none"` inject no default controls so applications can bind their own UI to the same controller.
+Use this package when an application needs play/pause, seek, step, loop, playback-rate, buffering and responsive preview behavior without a Node dependency.
 
-The package may depend on `@vexa-video/core/browser`, but it must not runtime-import the Node SDK, FFmpeg execution code, Redis, filesystem modules, or `node:*` APIs.
+## Capabilities
+
+- Playback controller and frame-accurate seek/step semantics
+- Loop/rate/buffering state and typed events
+- Responsive host and accessible default controls
+- Fullscreen integration
+
+## Runtime boundary
+
+Preview/playback stays browser-side; final Node execution remains in renderer/SDK packages.
+
+## Documentation
+
+- [compositions.md](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/compositions.md)
+- [architecture.md](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/architecture.md)
+
+For the full package map and runtime boundaries, see the [Vexa package guide](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/package-guide.md).

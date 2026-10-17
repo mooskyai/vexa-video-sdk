@@ -1,8 +1,6 @@
-# Angular Client Demo
+# Angular browser integration example
 
-This example demonstrates the browser-safe `@vexa-video/angular` package against the Node render service in `examples/angular-render-service`.
-
-The intended data flow is:
+This source workspace demonstrates the browser boundary for `@vexa-video/angular@2.0.0` against the Node render service in `examples/angular-render-service`.
 
 ```text
 Angular UI
@@ -11,123 +9,40 @@ Angular UI
 @vexa-video/angular
    |
    v
+HTTP transport
+   |
+   v
 Node render service
    |
    v
-JobQueue
-   |
-   v
-@vexa-video/sdk
-   |
-   v
-FFmpeg
+@vexa-video/sdk -> FFmpeg
 ```
 
-The browser app does not import the Node SDK or FFmpeg directly.
+The browser client never imports the Node SDK or FFmpeg execution code.
 
-## Prerequisites
+## What this example demonstrates
 
-From the repository root, make sure Node.js, npm, FFmpeg, and ffprobe are available.
+- `provideVexaVideo(...)` configuration;
+- browser media upload;
+- render-job submission and polling;
+- Signal/RxJS state and progress;
+- cancellation;
+- completed-output playback.
 
-The repository currently uses TypeScript 5.9.x. Keep the demo Angular CLI/build/compiler/runtime packages aligned on a compatible Angular 21.2.x line unless TypeScript is upgraded across the whole workspace.
+## Run the matching render service
 
-If npm tries to install Angular build tooling that requires TypeScript 6, fix the version alignment instead of using `--force` or `--legacy-peer-deps`.
-
-## Start the render service
+From the repository root:
 
 ```bash
 npm run example:angular-service
 ```
 
-Verify:
+The service listens at `http://127.0.0.1:4180` and exposes a `/health` endpoint.
 
-```text
-http://127.0.0.1:4180/
-http://127.0.0.1:4180/health
-```
+## About the client workspace
 
-The service on port `4180` is an API/status service, not the Angular application UI.
+At the `2.0.0` baseline this directory is a **source integration example**, not a standalone root-script application. There is no `example:angular-client` or `example:angular-demo` script in the released root `package.json`.
 
-## Start the browser client
+To run the UI, place/adapt these source files in an Angular 21.2.x application compatible with the repository TypeScript 5.9.x baseline, or add an explicit application workspace in a future change. Do not work around incompatible Angular/TypeScript versions with `--force` or `--legacy-peer-deps`.
 
-Start the browser client with:
-
-```bash
-npm run example:angular-client
-```
-
-Or start both client and service together:
-
-```bash
-npm run example:angular-demo
-```
-
-Open:
-
-```text
-http://127.0.0.1:4200
-```
-
-## Demo workflow
-
-The runnable client is expected to support:
-
-1. render-service health check;
-2. video file selection or drag/drop;
-3. browser upload through `VexaMediaService`;
-4. uploaded source preview;
-5. output width/height selection;
-6. hardware preference selection;
-7. retry attempts and optional idempotency key;
-8. `video.render` submission;
-9. Signal-driven state/progress display;
-10. job cancellation;
-11. completed-output playback.
-
-## Alternate render service
-
-When supported by the local demo configuration, use a query parameter to point the UI at another compatible service:
-
-```text
-http://127.0.0.1:4200/?service=https://media.example.com
-```
-
-## Browser bootstrap
-
-Do not use top-level `await` in the demo entry point if the configured browser target matrix does not support it.
-
-Use:
-
-```ts
-bootstrapApplication(AppComponent, appConfig).catch((error: unknown) => {
-  console.error("Failed to bootstrap the Vexa Angular demo.", error);
-});
-```
-
-instead of:
-
-```ts
-await bootstrapApplication(AppComponent, appConfig);
-```
-
-## Troubleshooting
-
-### npm `ERESOLVE` references TypeScript 6
-
-Align all Angular CLI/build/compiler/runtime packages to the same Angular 21.2.x version compatible with TypeScript 5.9.x.
-
-### `Top-level await is not available`
-
-Update `src/main.ts` to handle `bootstrapApplication(...)` with `.catch(...)` instead of top-level `await`.
-
-### `Route not found` on port 4180
-
-Use a service build that includes the root/health routes, then rebuild. `/health` should return JSON with `status: "ok"`.
-
-### Angular UI reports the service offline
-
-Check `/health`, then inspect the browser console, configured service origin, and CORS response headers.
-
-## Security note
-
-The example render service is a development integration service. Production applications should add authentication, authorization, quotas, persistence, rate limits, CORS restrictions, and worker isolation appropriate to their deployment.
+See [`../../docs/angular-integration.md`](../../docs/angular-integration.md) for the supported package contract and deployment boundary.

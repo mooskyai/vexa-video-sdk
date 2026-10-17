@@ -1,140 +1,81 @@
 # Security Policy
 
-Vexa Video SDK processes untrusted media, starts native FFmpeg processes, can download remote content, and can expose render/job APIs. Deployments should treat those boundaries as security-sensitive.
+Vexa Video SDK executes media workloads, resolves files and URLs, launches FFmpeg processes, accepts plugin/provider integrations, and can expose render services to browsers or agents. Treat those boundaries as security-sensitive.
+
+## Supported version
+
+| Version | Security support |
+| --- | --- |
+| 2.x | Supported |
+| 1.x | Upgrade recommended |
+| Unreleased development branches | Best effort only |
 
 ## Reporting a vulnerability
 
-Please report suspected vulnerabilities privately to the repository maintainer rather than opening a public issue with exploit details.
+Please report suspected vulnerabilities privately to the maintainers rather than opening a public issue. Include:
 
-Include, when possible:
-
-- affected package/file;
-- impact;
+- affected package/version;
 - reproduction steps or proof of concept;
-- relevant platform/runtime versions;
-- suggested mitigation if known.
+- expected vs actual behavior;
+- security impact;
+- any known mitigation.
 
-Public discussion can happen after a fix or coordinated disclosure plan is available.
+Do not include secrets, customer media or credentials in issue trackers, test fixtures or public logs.
 
-## Supported code
+## Security model
 
-The project is in active development. Security fixes target the current `main` branch and the latest actively maintained package state. A formal long-term support matrix will be defined before stable public package releases.
+### Process execution
 
-## Threat model
+Vexa launches FFmpeg/ffprobe using explicit argument arrays. Public APIs should not concatenate untrusted input into shell commands. New execution backends must preserve that rule.
 
-The most important trust boundaries are:
+### Browser/server separation
 
-- uploaded media;
-- remote media URLs and redirects;
-- cloud/object-storage adapters;
-- FFmpeg/ffprobe processes;
-- filesystem workspaces and output paths;
-- job payloads crossing process/machine boundaries;
-- browser authentication headers;
-- future plugins and alternate backends.
+Browser packages must not import Node execution code. Browsers should communicate with a controlled render service through explicit transport contracts. Never expose arbitrary command execution as a browser convenience API.
 
-## Remote media and SSRF
+### Remote media
 
-The built-in remote-media path is intentionally restrictive.
+The Node storage/media resolver is intentionally conservative. Remote HTTP workflows should preserve HTTPS-only defaults, credential restrictions, redirect revalidation, size limits and public-network protections unless an application explicitly provides a trusted adapter with its own policy.
 
-Defaults include:
+Applications handling untrusted URLs should also apply infrastructure-level egress controls.
 
-- HTTPS required;
-- URL-embedded credentials rejected;
-- loopback/private/link-local/reserved destinations rejected;
-- DNS results checked before connection;
-- redirect targets revalidated;
-- sensitive auth/cookie headers stripped on cross-origin redirects;
-- maximum redirect and byte limits;
-- streamed writes into managed workspaces.
+### Filesystem paths
 
-Private-network and plain-HTTP access should be enabled only for trusted development or controlled internal environments.
+Render services should isolate workspaces, reject path traversal, avoid writing outside managed roots and ensure cleanup occurs on success, cancellation and failure.
 
-Do not remove these protections to support a single convenient test URL; add an explicit opt-in at the application boundary instead.
+### Plugins
 
-## Media uploads
+Plugins execute inside the Node host and therefore inherit host privileges. Only load trusted plugin packages. Plugin metadata is not a sandbox. Plugins must use explicit registration points and must not silently bypass validation, planning or security rules.
 
-Treat uploaded files as untrusted binary data.
+### AI providers
 
-Recommended deployment controls:
+`@vexa-video/ai` is provider-neutral. Provider credentials and vendor SDKs belong to application-owned adapters. Do not place provider secrets in browser bundles or serialized composition/project data.
 
-- enforce request/upload size limits before and during streaming;
-- isolate render workspaces from application source/configuration;
-- use unique non-user-controlled output names;
-- avoid serving temporary directories directly without path validation;
-- expire temporary media and render artifacts;
-- run exposed render workers with least filesystem privileges.
+### Agent and MCP surfaces
 
-## FFmpeg execution
+Agent-facing tools should expose typed Vexa operations, not raw shell/media commands. Validate all tool input and preserve existing renderer/hosted-render error boundaries.
 
-Vexa uses `spawn()` with explicit argument arrays instead of shell-concatenated commands. Keep that invariant.
+### Hosted rendering
 
-Do not interpolate untrusted media metadata into a shell command.
+Hosted adapters own authentication, tenant isolation, quota enforcement and vendor-specific infrastructure. Treat idempotency keys, artifact destinations and callback/event inputs as untrusted tenant data.
 
-FFmpeg itself is a large native-code parser/codec surface. Internet-facing deployments should keep FFmpeg updated and consider OS/container isolation, CPU/memory limits, execution timeouts, and restricted filesystem/network access for workers.
+## Supply-chain controls
 
-## Paths and workspaces
+The protected npm release path uses GitHub Actions OIDC trusted publishing with provenance. Release automation rejects legacy npm token variables in the protected publish environment and validates packed consumer installs before publication.
 
-Managed workspaces validate that generated paths remain inside the expected root. Any new feature that accepts a filename, relative path, package directory, or artifact key must preserve traversal protections.
+Maintainers should not bypass the protected workflow with local `npm publish` for normal releases.
 
-Platform-specific separators must not be allowed to escape package directories or produce non-portable manifest URIs.
+## Deployment recommendations
 
-## Cloud credentials
+For an internet-facing render service:
 
-S3/GCS/Azure integration is adapter-based by design. Vexa does not require cloud credentials in its core configuration.
+1. authenticate and authorize every render/upload endpoint;
+2. apply request/body/media size limits;
+3. isolate workspaces and service accounts;
+4. restrict outbound network access where possible;
+5. rate-limit expensive operations;
+6. validate media destinations and signed URLs;
+7. collect structured audit/operational logs without leaking secrets;
+8. keep FFmpeg, Node.js and Vexa dependencies patched;
+9. use explicit retention/deletion policies for customer media.
 
-Applications should:
-
-- use least-privilege service identities;
-- avoid embedding long-lived credentials in job payloads;
-- keep cloud clients/credential refresh logic in application infrastructure;
-- scope upload/download permissions to the required buckets/containers/prefixes;
-- avoid logging secrets or signed URLs unnecessarily.
-
-## Jobs and distributed workers
-
-Job payloads and results should remain serializable and should not contain secrets unless the transport/store is designed to protect them.
-
-Idempotency keys deduplicate submissions but do not guarantee exactly-once external side effects. Retryable handlers should write to deterministic object/output identities or use an external idempotent transaction contract.
-
-Redis or other distributed transports should use authenticated, encrypted connections appropriate to the deployment environment.
-
-## Angular/browser integration
-
-The browser package should never receive server credentials, local filesystem paths, Redis connection details, or FFmpeg command access.
-
-Authentication headers configured in Angular are browser-visible application credentials and should be short-lived/scoped appropriately.
-
-Render-service CORS should be restricted in production rather than using broad development defaults.
-
-The example Node render service is for local integration/testing. It is not a production-hardened internet-facing API without additional authentication, authorization, quotas, persistence, and isolation.
-
-## Plugins
-
-Future plugins will be executable application code, not untrusted data. Installing a plugin should be treated with the same trust level as installing any other Node package.
-
-Plugin contracts should still enforce browser/Node boundaries and prevent accidental bypass of validation/security policy.
-
-## Dependency and build security
-
-Before releases:
-
-- use clean installs in CI;
-- review dependency updates, especially native/build tooling;
-- avoid `--force` or `--legacy-peer-deps` as a permanent solution to incompatible peer dependencies;
-- keep Angular build/compiler/runtime versions aligned;
-- verify packed package contents before publication;
-- keep generated media/build artifacts out of source control.
-
-## Security-related tests
-
-Changes to remote media, path resolution, uploads, jobs, or browser transport should include negative tests for the unsafe case, not only happy-path coverage.
-
-Examples:
-
-- private-network URL rejection;
-- path traversal rejection;
-- oversized download rejection;
-- idempotency conflict behavior;
-- browser-package import scanning;
-- cancellation/timeout behavior.
+Version 3 production-hardening work expands worker recovery, retention, telemetry, scheduling and tenant-aware controls; those planned features should not be assumed to exist in 2.0.0.

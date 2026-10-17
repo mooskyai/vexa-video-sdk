@@ -1,34 +1,53 @@
-# Publishing the npm packages
+# npm Publishing
 
-The GitHub release and npm packages are separate. All eighteen public packages use the same version as the private root workspace, and the release scripts share one canonical package registry.
+Vexa public packages are published through GitHub Actions trusted publishing, not by maintainers running `npm publish` locally.
 
-## First publication
+## Current release model
 
-Create the `vexa-video` organization on npm and use an npm account with publish access. Run `npm login`, `npm run verify`, `npm run release:check`, `npm run release:pack`, and `npm run release:install-check` from the repository root. The install check must pass from real packed tarballs before any package is published. Publish each package in this order, completing npm's browser or two-factor prompts:
+- workflow: `.github/workflows/release.yml`;
+- protected GitHub environment: `npm-release`;
+- package versions are synchronized;
+- publication uses GitHub OIDC and npm provenance;
+- the protected workflow rejects legacy npm token variables;
+- packed package contents and isolated consumer installs are verified before publication.
 
-```powershell
-$packages = @(
-    "core", "ffmpeg", "sdk", "angular", "ai", "editor", "react", "player", "bundler",
-    "renderer", "gif", "waveform", "sound-effects", "web-renderer", "studio", "cli", "mcp", "test"
-)
-foreach ($package in $packages) {
-    npm publish --workspace "@vexa-video/$package" --access public --provenance=false
-    if ($LASTEXITCODE -ne 0) { throw "Publishing failed for $package" }
-}
+## Trusted-publisher identity
+
+Each public package must trust the canonical repository/workflow/environment combination:
+
+```text
+repository:  mooskyai/vexa-video-sdk
+workflow:    release.yml
+environment: npm-release
+permission:  publish
 ```
 
-Check each result with `npm view "@vexa-video/<package>@<version>" version`. Do not retry a name and version that is already published. As of v1.0.0, `@vexa-video/core` is published; check the registry for the other packages before continuing.
+## Release behavior
 
-## Trusted publishing for later versions
+A pushed `v*` tag triggers release qualification and GitHub release creation. It does **not** publish npm packages by itself.
 
-After each package exists on npm, add a GitHub Actions trusted publisher to **each of the eighteen packages** in npm package settings:
+After the tag-triggered run succeeds, an authorized maintainer dispatches the same workflow on the version tag with `publish=true`. That protected run performs the real npm publication with provenance.
 
-- GitHub organization: `mooskyai`
-- Repository: `vexa-video-sdk`
-- Workflow filename: `release.yml`
-- Environment: `npm-release`
-- Allowed action: direct `npm publish`
+This two-step design separates immutable release qualification from the explicit publication decision.
 
-The fields must match the release workflow exactly. npm accepts this workflow's GitHub OIDC identity without a stored npm token. The workflow uses `id-token: write` and publishes with provenance.
+## Do not
 
-For a new release, update the root and every public package to the same new version, update internal dependencies and the lockfile, run `npm run verify`, `npm run release:check`, `npm run release:pack`, and `npm run release:install-check`, then commit and push. Create and push a new `v<version>` tag. The tag workflow verifies the source, installs the packed artifacts into a clean consumer, and creates the GitHub release; it does **not** publish to npm. In GitHub Actions, run **Release packages** manually on that tag with `publish` enabled. The workflow rejects branch-based publish requests. Verify all eighteen new versions with `npm view` after the run.
+- add `NPM_TOKEN` or `NODE_AUTH_TOKEN` to the protected publish path;
+- run normal production releases with local `npm publish`;
+- publish from an unqualified branch SHA;
+- mix public package versions;
+- change dist-tags manually during the critical release path unless recovering from a documented release incident.
+
+## Verification
+
+After publication, verify each public package:
+
+```bash
+npm view @vexa-video/sdk@2.0.0 version
+npm dist-tag ls @vexa-video/sdk
+npm view @vexa-video/sdk@2.0.0 dist.attestations --json
+```
+
+Then perform a clean public-registry consumer install and run `npm audit signatures`.
+
+For the operator sequence, see [Release operations](./release-operations.md).

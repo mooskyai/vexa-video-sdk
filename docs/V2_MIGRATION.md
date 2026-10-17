@@ -1,52 +1,74 @@
 # Migrating to Vexa Video SDK 2.0
 
-Version 2 adds Vexa's programmable-video layer on top of the existing deterministic media, timeline, storage, jobs, hardware, and FFmpeg foundations. It does not introduce a second media engine.
+Version 2 keeps the deterministic media APIs from the 1.x line and adds a programmable composition platform, new public packages and stricter release/runtime boundaries.
 
-## Keep Vexa packages synchronized
+## Upgrade all Vexa packages together
 
-All public `@vexa-video/*` packages are released together at `2.0.0`. Applications that use more than one Vexa package should upgrade those packages in the same dependency change and should not mix exact `1.0.0` and `2.0.0` Vexa package versions.
+Public packages are synchronized at `2.0.0`. Do not intentionally mix 1.x and 2.x Vexa packages in the same application.
 
-For example:
+Example:
 
 ```bash
-npm install @vexa-video/core@2.0.0 @vexa-video/sdk@2.0.0
+npm install \
+  @vexa-video/core@2.0.0 \
+  @vexa-video/ffmpeg@2.0.0 \
+  @vexa-video/sdk@2.0.0
 ```
 
-Add only the programmable-video packages the application actually needs:
+Add optional packages only if your application uses them.
 
-- `@vexa-video/react` for browser-safe React authoring;
-- `@vexa-video/player` for deterministic browser playback;
-- `@vexa-video/bundler` for TypeScript/TSX composition bundling and discovery;
-- `@vexa-video/renderer` for Node composition/still/video rendering;
-- `@vexa-video/studio` for the browser-safe Studio runtime;
-- `@vexa-video/web-renderer` for capability-gated WebCodecs rendering;
-- `@vexa-video/cli` for composition CLI workflows;
-- `@vexa-video/mcp` for typed MCP composition/render operations;
-- `@vexa-video/test` for Node-side visual regression and media timing assertions.
+## Runtime baseline
 
-## Preserve the browser/Node boundary
+Version 2 uses Node.js **24.21.0+** as its primary Node baseline. FFmpeg/ffprobe **6.1+** with the required codec/filter capabilities is the release baseline for Node media execution.
 
-Browser applications should consume browser-safe Vexa packages and call a Node render service or custom transport when server rendering is required. Do not move `@vexa-video/sdk`, FFmpeg execution, filesystem access, Redis clients, or other Node-only execution code into browser bundles.
+## Browser applications
 
-The Angular integration remains a browser client boundary. Node rendering continues through the SDK/renderer/job surfaces.
+Do not import `@vexa-video/sdk` into Angular/React/browser code. Version 2 reinforces the browser/server boundary with dedicated packages:
 
-## Media runtime baseline
+- `@vexa-video/angular`;
+- `@vexa-video/react`;
+- `@vexa-video/player`;
+- `@vexa-video/editor`;
+- `@vexa-video/studio`;
+- `@vexa-video/web-renderer`.
 
-Node render hosts for the 2.0 release line require:
+Execute FFmpeg/server rendering behind an explicit HTTP/custom transport.
 
-- Node.js 24.21.0 or newer;
-- FFmpeg and ffprobe 6.1 or newer;
-- FFmpeg `drawtext`, `libx264`, and AAC encoding support for the supported software-rendering baseline.
+## Programmable video
 
-Hardware encoders remain optional and runtime-detected.
+New Version 2 applications can use:
 
-## Upgrade checklist
+- `@vexa-video/bundler` to bundle/discover TS/TSX compositions;
+- `@vexa-video/renderer` for Node composition rendering;
+- `@vexa-video/player` for browser playback;
+- `@vexa-video/react` for React authoring;
+- `@vexa-video/studio` for composition preview/editor coordination.
 
-1. Upgrade every Vexa package used by the application to `2.0.0` in one dependency change.
-2. Reinstall dependencies and regenerate the application's lockfile.
-3. Run the application's typecheck, tests, and production build.
-4. Verify browser bundles still respect the browser/Node dependency boundary.
-5. Verify the render host with the documented FFmpeg baseline.
-6. If adopting programmable compositions, validate the same composition through the intended Player/Studio/local/hosted render path before production rollout.
+Existing `Video` and project/timeline workflows do not need to be rewritten into programmable compositions unless that model benefits your application.
 
-Version 2 introduces new programmable-video packages and surfaces, so there is no repository-wide codemod. Resolve any compiler or export errors against the package's documented public exports rather than importing internal files.
+## CLI
+
+The published CLI is available as `@vexa-video/cli` and exposes media plus composition workflows:
+
+```bash
+npm install --global @vexa-video/cli@2.0.0
+vexa --help
+```
+
+## Plugins and AI
+
+The plugin and AI layers remain optional. Provider/vendor SDKs should stay in application-owned adapters rather than deterministic core packages.
+
+## Validation checklist
+
+After upgrading:
+
+1. install all Vexa packages at `2.0.0`;
+2. run your TypeScript build;
+3. run media integration tests with your FFmpeg distribution;
+4. verify browser bundles do not pull Node modules;
+5. verify render-service transport contracts;
+6. test cancellation/progress and output paths;
+7. verify persisted project/composition inputs still validate.
+
+For repository contributors, use the verification commands in [Engineering verification](./MILESTONE-TESTING.md).

@@ -1,177 +1,145 @@
 # Contributing to Vexa Video SDK
 
-Thanks for helping improve Vexa Video SDK. This project combines public TypeScript APIs, FFmpeg process execution, storage/network boundaries, worker infrastructure, and browser integrations, so changes should be small, testable, and explicit about runtime boundaries.
+Thank you for contributing. Vexa is a multi-package media SDK with strict browser/server boundaries and deterministic execution requirements, so changes should be small, testable and explicit about which runtime they affect.
 
-## Prerequisites
+## Baseline
 
-Install:
+The current stable baseline is Version **2.0.0**. The release source is `af8d1d8e0c967e2651b8f77c1e02b6f11135a90a` and public packages are synchronized at `2.0.0`.
 
-- Node.js 24.21.0 or newer;
-- npm 11+ recommended;
-- FFmpeg and ffprobe available in `PATH`.
-
-Verify:
+For new work, start from current `main` and verify your checkout before changing code:
 
 ```bash
-node --version
-npm --version
-ffmpeg -version
-ffprobe -version
+git status -sb
+git rev-parse HEAD
 ```
 
-## Setup
+## Local requirements
+
+- Node.js 24.21.0+
+- npm 11+
+- FFmpeg/ffprobe 6.1+
+- Git
+
+Install and verify:
 
 ```bash
-git clone https://github.com/mooskyai/vexa-video-sdk.git
-cd vexa-video-sdk
 npm install
 npm run verify
 ```
 
-## Repository structure
+## Repository model
 
-| Path | Purpose |
-| --- | --- |
-| `packages/core` | Backend-neutral types, ASTs, validation, errors |
-| `packages/ffmpeg` | FFmpeg/ffprobe planning and execution |
-| `packages/sdk` | Node developer-facing API, storage, jobs, workers |
-| `packages/angular` | Browser-safe Angular integration |
-| `examples/visual-playground` | Local Node SDK acceptance UI |
-| `examples/angular-client` | Angular browser integration demo |
-| `examples/angular-render-service` | Node render-service example |
-| `docs` | Architecture, integration, and acceptance documentation |
+The important package boundaries are:
 
-## Development rules
+- `@vexa-video/core`: backend-neutral contracts and serializable models;
+- `@vexa-video/ffmpeg`: Node FFmpeg/ffprobe planning and execution;
+- `@vexa-video/sdk`: high-level Node media/storage/jobs/hardware APIs;
+- browser packages: Angular, React, Player, Editor, Studio, Web Renderer;
+- execution packages: Bundler, Renderer, CLI, MCP and optional Node adapters.
 
-### Keep public APIs backend-neutral
+Browser packages must not runtime-import:
 
-Do not expose raw FFmpeg flags as the primary product API when a stable domain-level option can represent the same intent.
+- `@vexa-video/sdk`;
+- `@vexa-video/ffmpeg` execution code;
+- `node:*` modules;
+- `child_process`;
+- Redis or other Node-only worker clients.
 
-### Preserve browser safety
+If browser code needs execution, expose a serializable contract and communicate with a Node service through HTTP or another explicit transport.
 
-`@vexa-video/angular` must not import Node runtime modules or `@vexa-video/sdk` at runtime. Browser/server communication should use serializable contracts and replaceable transports.
+## Development workflow
 
-### Prefer deterministic planning
-
-Validation and compatibility decisions should happen before expensive FFmpeg work where possible. New execution paths should be inspectable through typed plans or equivalent diagnostics.
-
-### Reuse cancellation, progress, and error contracts
-
-Avoid introducing parallel conventions for common execution concerns. Use `AbortSignal`, structured progress, and typed SDK errors consistently.
-
-### Treat remote inputs as untrusted
-
-Do not weaken remote-media network restrictions, path traversal checks, upload limits, or redirect validation without a documented security reason and dedicated tests.
-
-## Making changes
-
-Create a focused branch for public contributions:
+Before a change:
 
 ```bash
-git switch -c feature/short-description
+git status -sb
+git rev-parse HEAD
 ```
 
-Keep commits scoped to one logical change. If a feature changes setup, public APIs, architecture, or acceptance behavior, update the relevant Markdown in the same change.
-
-## Testing
-
-Run the standard gate:
-
-```bash
-npm run verify
-```
-
-Use narrower commands while iterating:
+During development use focused tests where possible, then run the repository gate:
 
 ```bash
 npm run typecheck
 npm test
 npm run build
-npm run format:check
+npm run verify
 ```
 
-When FFmpeg behavior changes, add or update a real integration test rather than relying only on argument-string assertions.
-
-For browser/package-boundary changes, also verify the Angular package emits no Node-only imports.
-
-See [docs/MILESTONE-TESTING.md](./docs/MILESTONE-TESTING.md) for the full acceptance matrix.
-
-## Windows validation
-
-Windows has exposed several classes of real portability issues in media tooling. Explicitly test Windows when changing:
-
-- path construction/escaping;
-- drawtext/font paths;
-- HLS/DASH manifests and relative segments;
-- temp/workspace paths;
-- process cancellation;
-- GPU encoder detection.
-
-Do not weaken a cross-platform assertion just to make a Windows test pass. Fix the generated artifact or execution model when the output itself is non-portable.
-
-## New files and patches
-
-Before generating a patch or commit, check:
+Changes affecting Studio/browser behavior should also run:
 
 ```bash
-git status --short
+npm run verify:studio
 ```
 
-New source files, tests, examples, and documentation must be staged/included. A patch that changes imports but omits the new module is incomplete even if the edited files look correct.
-
-Before sharing a patch:
+Changes affecting package/release surfaces should additionally run:
 
 ```bash
-git diff --check
+npm run release:check
+npm run release:pack
+npm run release:install-check
+npm run release:ffmpeg-check
 ```
 
-If the patch is expected to apply to the current branch:
+## Design expectations
 
-```bash
-git apply --check path/to/change.patch
-```
+### Prefer intent over process arguments
 
-## Documentation style
+Public APIs should describe media intent. FFmpeg argument construction belongs behind planner/executor boundaries.
 
-Public documentation should:
+### Keep plans deterministic
 
-- lead with what a user needs to accomplish a task;
-- separate product behavior from internal delivery history;
-- avoid stale hard-coded test counts unless they are part of a specific validation report;
-- include copy-pasteable commands;
-- explain browser/Node boundaries clearly;
-- document security-sensitive defaults instead of hiding them.
+Where practical, the same normalized input should produce the same serializable plan. Avoid hidden process-global state and implicit filesystem dependencies.
 
-README is product-facing. Detailed implementation tracking belongs in `ROADMAP.md`, architecture, and acceptance docs.
+### Preserve cancellation and progress
+
+Long-running operations must integrate with existing signal/progress conventions rather than inventing parallel lifecycle models.
+
+### Reuse existing execution paths
+
+New composition, CLI, MCP, plugin or hosted-render features should delegate to existing validators/renderers/jobs/storage contracts. Do not create a second render engine for convenience.
+
+### Make security boundaries explicit
+
+Remote URLs, plugins, process execution, filesystem paths and agent-facing inputs are security-sensitive. Reuse existing validation and path/network restrictions.
+
+## Tests
+
+A feature is not complete with unit tests alone when it relies on FFmpeg, browsers, files, networking or worker lifecycle behavior. Add an integration test that exercises the real boundary.
+
+Useful guidance is in [`docs/MILESTONE-TESTING.md`](./docs/MILESTONE-TESTING.md).
+
+## Documentation
+
+Every public change must update the relevant documentation in the same pull request:
+
+- public onboarding/major capability changes: `README.md`;
+- architecture/package-boundary changes: `docs/architecture.md`;
+- user workflow changes: the relevant guide under `docs/`;
+- future sequencing/status changes: `ROADMAP.md`;
+- release-visible changes: `CHANGELOG.md`.
+
+Keep examples executable and do not document scripts or package exports that are not present in the current repository.
 
 ## Pull request checklist
 
-Before opening a pull request:
+Before requesting review:
+
+- working tree contains only intended changes;
+- typecheck, tests and build pass;
+- affected integration/browser tests pass;
+- no browser package gained a Node-only runtime dependency;
+- public API behavior is documented and versioning impact considered;
+- `git diff --check` passes;
+- documentation matches the code being proposed.
+
+## Commits
+
+Use focused commits with messages that describe user-visible intent, for example:
 
 ```text
-[ ] change is scoped and understandable
-[ ] npm install succeeds normally
-[ ] npm run verify passes
-[ ] real FFmpeg/network path tested when relevant
-[ ] browser safety preserved
-[ ] Windows behavior considered/tested when relevant
-[ ] new files are tracked
-[ ] docs/examples updated
-[ ] git diff --check passes
-[ ] no generated .tmp/dist/media artifacts are staged
+feat(scheduler): add worker lease recovery
+fix(renderer): preserve cancellation during frame ranges
+docs: rebaseline V3 on the 2.0.0 release
 ```
 
-## Commit messages
-
-Use short conventional-style subjects when practical:
-
-```text
-feat(streaming): add adaptive rendition planning
-fix(windows): normalize HLS playlist URIs
-docs: clarify Angular render-service setup
-test(storage): cover redirect policy
-```
-
-## Security changes
-
-For vulnerabilities or sensitive security findings, do not open a public issue with exploit details. Follow [SECURITY.md](./SECURITY.md).
+Do not combine unrelated refactors, generated artifacts and feature behavior in one commit unless they are inseparable.

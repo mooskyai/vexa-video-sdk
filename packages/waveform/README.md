@@ -1,47 +1,33 @@
 # @vexa-video/waveform
 
-Optional Node.js audio waveform integration for Vexa programmable surfaces.
+Rasterizes deterministic audio waveforms for programmable composition surfaces through FFmpeg-backed logical sources.
 
-The package implements the renderer's static surface adapter contract. Composition data carries a logical `sourceId`; the Node host maps that ID to a local media path. Filesystem paths, probing, and FFmpeg waveform rasterization therefore stay outside `@vexa-video/core`, browser packages, and the normal SDK.
+> Stable baseline: **2.0.0** · Node.js optional composition-media adapter.
 
-```ts
-import { createWaveformSurfaceAdapter } from "@vexa-video/waveform";
+## Install
 
-const waveformAdapter = createWaveformSurfaceAdapter({
-  sources: {
-    narration: "./media/narration.wav"
-  },
-  color: "#38bdf8",
-  background: "black@0"
-});
-
-await renderer.renderVideo({
-  compositionId: "demo",
-  output: "demo.mp4",
-  surfaceAdapters: [waveformAdapter]
-});
+```bash
+npm install @vexa-video/waveform@2.0.0
 ```
 
-Author the matching surface with serializable data:
+## When to use it
 
-```ts
-{
-  kind: "surface",
-  id: "narration-waveform",
-  surface: {
-    kind: "waveform",
-    rendererId: "vexa.waveform",
-    data: {
-      sourceId: "narration",
-      color: "#38bdf8",
-      background: "black@0"
-    }
-  }
-}
-```
+Use this package when a composition needs a visual waveform while keeping waveform execution out of the browser-safe core.
 
-`color` and `background` are optional per-surface overrides. The adapter uses the shared waveform compiler at the authored surface dimensions, so the existing waveform size/color validation rules apply.
+## Capabilities
 
-The adapter probes each configured source lazily to ensure an audio stream exists, renders one PNG with the shared FFmpeg execution layer, returns the bytes to `@vexa-video/renderer`, and deletes its private raster workspace. The generic static surface path remains responsible for authored timing, effects, and transitions.
+- Logical audio source IDs
+- Deterministic FFmpeg waveform rasterization
+- Composition-surface integration
+- Managed private temporary-workspace cleanup
 
-This package is Node-only and intentionally optional. It does not add audio-waveform execution dependencies to core/browser packages.
+## Runtime boundary
+
+Optional Node integration; browser/core packages do not take an FFmpeg dependency from it.
+
+## Documentation
+
+- [compositions.md](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/compositions.md)
+- [package-guide.md](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/package-guide.md)
+
+For the full package map and runtime boundaries, see the [Vexa package guide](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/package-guide.md).

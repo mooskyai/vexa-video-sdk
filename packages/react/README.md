@@ -1,53 +1,33 @@
 # @vexa-video/react
 
-Browser-safe React authoring primitives for Vexa programmable video compositions. React is an adapter over `@vexa-video/core` composition, timing, and scene contracts; this package does not execute FFmpeg or import the Node SDK.
+React primitives for authoring Vexa programmable compositions while keeping deterministic timing and scene contracts owned by `@vexa-video/core`.
 
-```tsx
-import { defineComposition, resolveProgrammableComposition } from "@vexa-video/core/browser";
-import {
-  VexaCompositionRoot,
-  VexaLayer,
-  VexaRectangle,
-  VexaText,
-  useVexaFrame,
-  vexaStaticAsset
-} from "@vexa-video/react";
+> Stable baseline: **2.0.0** · Browser-safe React authoring adapter.
 
-const definition = defineComposition({
-  id: "title-card",
-  width: 1280,
-  height: 720,
-  fps: 30,
-  durationInFrames: 90,
-  defaultProps: { title: "Vexa Video" }
-});
+## Install
 
-function TitleCard() {
-  const frame = useVexaFrame();
-  return (
-    <VexaLayer id="title-layer" transform={{ x: frame * 2, y: 200 }}>
-      <VexaRectangle
-        id="accent"
-        x={80}
-        y={80}
-        width={240}
-        height={120}
-        radiusX={24}
-        style={{ fill: "#5b5df0" }}
-        effects={[{ kind: "glow", radius: 18, color: "#8b5cf6", opacity: 0.65 }]}
-        transitions={{ in: { kind: "zoom", durationInFrames: 12, easing: "ease-out" } }}
-      />
-      <VexaText id="title" text="Vexa Video" style={{ fontSize: 72, color: "white" }} />
-    </VexaLayer>
-  );
-}
-
-const resolved = await resolveProgrammableComposition(definition);
-const logo = vexaStaticAsset("logo", "image", "/assets/logo.png");
-
-<VexaCompositionRoot resolved={resolved} frame={0} assets={[logo]} onScene={(scene) => console.log(scene)}>
-  <TitleCard />
-</VexaCompositionRoot>;
+```bash
+npm install @vexa-video/react@2.0.0
 ```
 
-The package also provides composition registration, sequence/series/loop/freeze timing scopes, media scene components, generic `VexaShape` authoring plus rectangle/ellipse/circle/line/polygon/star/path/arc convenience components, ordered `effects` and `transitions` props on visual scene components, input/config hooks, and render-readiness coordination for asynchronous authoring work. Effects and transitions use the shared browser-safe contracts from `@vexa-video/core/browser`; audio and group/layer containers intentionally do not expose visual effects or transitions. Transition authoring currently normalizes intent only; renderer execution remains fail-closed until the dedicated transition graph is implemented.
+## When to use it
+
+Use this package to express code-defined composition scenes in React and feed them into the normal Vexa bundling/rendering path.
+
+## Capabilities
+
+- React composition authoring primitives
+- Timing scopes and deterministic frame semantics
+- Scene/media components backed by shared Vexa contracts
+- Browser-safe authoring without Node execution imports
+
+## Runtime boundary
+
+React is an authoring adapter, not a second rendering model. Representable scenes lower through the shared Vexa composition/project contracts.
+
+## Documentation
+
+- [compositions.md](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/compositions.md)
+- [architecture.md](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/architecture.md)
+
+For the full package map and runtime boundaries, see the [Vexa package guide](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/package-guide.md).
