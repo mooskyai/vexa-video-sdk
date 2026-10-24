@@ -408,6 +408,11 @@ class FakeRedis implements RedisCommandClient {
     if (command === "ZREM") {
       return this.sorted.get(args[1]!)?.delete(args[2]!) ? 1 : 0;
     }
+    if (command === "ZREVRANGE") {
+      const entries = [...(this.sorted.get(args[1]!) ?? new Map<string, number>())];
+      entries.sort(([leftId, leftScore], [rightId, rightScore]) => rightScore - leftScore || rightId.localeCompare(leftId));
+      return entries.slice(Number(args[2]), Number(args[3]) + 1).map(([id]) => id);
+    }
     if (command === "LRANGE") {
       const list = this.lists.get(args[1]!) ?? [];
       const start = Number(args[2]);
@@ -516,6 +521,14 @@ class FakeRedis implements RedisCommandClient {
       }
       this.strings.set(keys[0]!, JSON.stringify(job));
       cleanup(status);
+      if (status === "exhausted" && !this.strings.has(keys[5]!)) {
+        this.strings.set(keys[5]!, JSON.stringify({
+          jobId: id, recordedAt: argv[1], reason: "stale-lease-exhausted", snapshot: job
+        }));
+        const index = this.sorted.get(keys[4]!) ?? new Map<string, number>();
+        index.set(id, Number(argv[2]));
+        this.sorted.set(keys[4]!, index);
+      }
       if (status === "requeued") {
         const queue = this.lists.get(keys[2]!) ?? [];
         queue.unshift(id);
@@ -628,6 +641,16 @@ class FakeRedis implements RedisCommandClient {
       const processing = this.lists.get(keys[1]!) ?? [];
       this.lists.set(keys[1]!, processing.filter((item) => item !== argv[1]!));
       this.strings.delete(keys[2]!);
+      if (candidate.state === "failed" && !this.strings.has(keys[4]!)) {
+        const reason = candidate.attempt >= candidate.descriptor.retry.maxAttempts
+          ? "retry-exhausted" : "non-retryable";
+        this.strings.set(keys[4]!, JSON.stringify({
+          jobId: argv[1], recordedAt: argv[3], reason, snapshot: candidate
+        }));
+        const index = this.sorted.get(keys[3]!) ?? new Map<string, number>();
+        index.set(argv[1]!, Number(argv[4]));
+        this.sorted.set(keys[3]!, index);
+      }
       return 1;
     }
     throw new Error("Unsupported fake Redis Lua script.");
@@ -789,4 +812,86 @@ test("Redis replacement worker autonomously recovers a crashed worker claim", as
   } finally {
     await worker.stop();
   }
+});
+
+test("Redis failed worker completion writes one durable dead letter", async () => {
+  const redis = new FakeRedis();
+  const transport = new RedisJobTransport(redis, { prefix: "test:vexa", queue: "dead-worker" });
+  const queue = new DistributedJobQueue(transport);
+  const worker = new DistributedJobWorker(transport, {
+    workerId: "dead-worker", claimWaitMs: 10, cancellationPollMs: 10,
+    leaseDurationMs: 500, heartbeatIntervalMs: 40
+  });
+  worker.register("dead.worker", async () => { throw new Error("render failed"); });
+  worker.start();
+  try {
+    const job = await queue.submit("dead.worker", {});
+    const done = await queue.wait(job.descriptor.id, { pollIntervalMs: 10, timeoutMs: 1_000 });
+    assert.equal(done.state, "failed");
+    const dead = await transport.getDeadLetter(job.descriptor.id);
+    assert.equal(dead?.jobId, job.descriptor.id);
+    assert.equal(dead?.reason, "retry-exhausted");
+    assert.equal(dead?.snapshot.state, "failed");
+    assert.match(dead!.snapshot.error!.message, /render failed/);
+    assert.equal(dead?.snapshot.attempt, 1);
+    assert.equal(dead?.snapshot.lease, undefined);
+    assert.equal((await transport.listDeadLetters()).length, 1);
+  } finally {
+    await worker.stop();
+  }
+});
+
+test("Redis non-retryable worker failure is archived before max attempts", async () => {
+  const redis = new FakeRedis();
+  const transport = new RedisJobTransport(redis, { prefix: "test:vexa", queue: "dead-no-retry" });
+  const queue = new DistributedJobQueue(transport);
+  const worker = new DistributedJobWorker(transport, {
+    claimWaitMs: 10, cancellationPollMs: 10, leaseDurationMs: 500, heartbeatIntervalMs: 40
+  });
+  worker.register("dead.nonretryable", async () => { throw new Error("invalid media"); }, {
+    retryable: () => false
+  });
+  worker.start();
+  try {
+    const job = await queue.submit("dead.nonretryable", {}, { retry: { maxAttempts: 3 } });
+    const done = await queue.wait(job.descriptor.id, { pollIntervalMs: 10, timeoutMs: 1_000 });
+    assert.equal(done.state, "failed");
+    assert.equal(done.attempt, 1);
+    assert.equal((await transport.getDeadLetter(job.descriptor.id))?.reason, "non-retryable");
+  } finally {
+    await worker.stop();
+  }
+});
+
+test("Redis stale-lease exhaustion archives a single durable failure", async () => {
+  const redis = new FakeRedis();
+  const transport = new RedisJobTransport(redis, { prefix: "test:vexa", queue: "dead-stale" });
+  const queue = new DistributedJobQueue(transport);
+  const job = await queue.submit("dead.stale", {});
+  const claim = await transport.claim("crashed", 10, 100);
+  assert.ok(claim?.lease);
+  claim!.state = "running";
+  claim!.attempt = 1;
+  await transport.save(claim!, claim!.lease!.claimId);
+  await sleep(125);
+  assert.equal((await transport.recoverStaleClaims()).exhausted, 1);
+  const dead = await transport.getDeadLetter(job.descriptor.id);
+  assert.equal(dead?.reason, "stale-lease-exhausted");
+  assert.equal(dead?.snapshot.error?.code, "JOB_STALE_LEASE_EXHAUSTED");
+  assert.equal((await transport.recoverStaleClaims()).exhausted, 0);
+  assert.equal((await transport.listDeadLetters()).length, 1);
+  await assert.rejects(() => transport.finish(claim!, claim!.lease!.claimId), /lease is no longer valid/i);
+});
+
+test("Redis dead-letter reads validate paging and never include cancellations", async () => {
+  const redis = new FakeRedis();
+  const transport = new RedisJobTransport(redis, { prefix: "test:vexa", queue: "dead-page" });
+  const queue = new DistributedJobQueue(transport);
+  const cancelled = await queue.submit("dead.cancel", {});
+  await queue.cancel(cancelled.descriptor.id);
+  assert.equal(await transport.getDeadLetter(cancelled.descriptor.id), null);
+  assert.deepEqual(await transport.listDeadLetters(), []);
+  await assert.rejects(() => transport.listDeadLetters(-1, 10), /Dead-letter offset/);
+  await assert.rejects(() => transport.listDeadLetters(0, 0), /Dead-letter offset/);
+  await assert.rejects(() => transport.listDeadLetters(0, 1001), /Dead-letter offset/);
 });

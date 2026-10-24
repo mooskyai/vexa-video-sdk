@@ -283,9 +283,9 @@ Start with the [documentation index](./docs/README.md).
 
 Version 2.0.0 is the stable programmable-video baseline. Version 3 is not a rewrite of Vexa; it builds production-platform capabilities on that baseline: worker resilience, capability-aware scheduling, render caching, advanced hardware pipelines, professional editor semantics, proxy workflows, richer graphics, AI editing, first-party cloud media adapters, Streaming 2.0, project-format evolution, collaboration, and hosted-render infrastructure.
 
-The current V3 development line adds renewable distributed-worker leases and heartbeats with ownership-checked Redis mutations. Expired-lease recovery and stale-job reconciliation remain subsequent V3.1 work rather than being implied by the lease foundation alone.
+The current V3 development line adds renewable distributed-worker leases and heartbeats, bounded expired-lease recovery, and durable dead-letter inspection for terminal Redis worker failures. Wider retry reconciliation and external artifact finalization remain subsequent V3.1 work.
 
-See [ROADMAP.md](./ROADMAP.md) for current status and sequencing. The unreleased V3.1 branch adds Redis worker leases, heartbeats, and bounded stale-claim recovery. For upgrades from earlier V3 development builds, stop old worker processes before enabling recovery; side effects remain at-least-once and should use stable idempotent artifact identities.
+See [ROADMAP.md](./ROADMAP.md) for current status and sequencing. These features are **unreleased** and do not change the published 2.0.0 package. Stop older V3 workers before upgrading; external side effects remain at-least-once and should use stable idempotent artifact identities.
 
 ## Contributing and security
 

@@ -23,8 +23,9 @@ Version 2 already provides local/Redis jobs, retries, idempotency, cancellation,
 ### Current implementation sequence
 
 - **V3.1a — worker lease + heartbeat foundation:** implemented in the current development slice. Claims carry unique fencing tokens; Redis renews lease heartbeat/expiry atomically; worker save/retry/finish mutations require active ownership; cancellation is preserved across concurrent heartbeat/progress updates.
-- **V3.1b — stale claim detection + recovery:** implemented in this development slice. Redis claims atomically move queued IDs into processing while establishing the lease, avoiding an unleased crash window. Bounded scans requeue expired claims, finalize expired cancellations, and fail exhausted attempts; the new owner receives a different claim token. Stale worker writes remain fenced.
-- **V3.1c and later:** dead-letter persistence and retry reconciliation beyond the basic expired-lease exhaustion status, reconciliation events, metrics, retention, and diagnostics.
+- **V3.1b — stale claim detection + recovery:** implemented. Redis atomically claims queued jobs, bounded scans safely recover abandoned processing entries, and old claim IDs remain fenced.
+- **V3.1c — durable dead letters:** implemented in this development slice. Successful terminal-failure transitions and expired-lease exhaustion atomically persist an indexed failure envelope containing the terminal snapshot and reason; bounded inspection does not alter jobs or retry them.
+- **V3.1d and later:** retry/event reconciliation, explicit operator replay, metrics, retention, diagnostics and artifact cleanup.
 
 ### Add
 

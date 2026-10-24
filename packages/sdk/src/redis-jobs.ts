@@ -34,6 +34,14 @@ export interface RedisJobRecoveryResult {
   active: number;
 }
 
+/** Persistent failure record; V3.1c does not automatically replay failed jobs. */
+export interface RedisJobDeadLetter {
+  jobId: string;
+  recordedAt: string;
+  reason: "retry-exhausted" | "non-retryable" | "stale-lease-exhausted";
+  snapshot: JobSnapshot;
+}
+
 function scalar(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   if (typeof value === "string") return value;
@@ -183,6 +191,16 @@ end
 redis.call('SET', KEYS[1], cjson.encode(candidate))
 redis.call('LREM', KEYS[2], 0, ARGV[2])
 redis.call('DEL', KEYS[3])
+if candidate.state == 'failed' and redis.call('EXISTS', KEYS[5]) == 0 then
+  local reason = 'non-retryable'
+  if candidate.attempt >= candidate.descriptor.retry.maxAttempts then
+    reason = 'retry-exhausted'
+  end
+  redis.call('SET', KEYS[5], cjson.encode({
+    jobId = ARGV[2], recordedAt = ARGV[4], reason = reason, snapshot = candidate
+  }))
+  redis.call('ZADD', KEYS[4], ARGV[5], ARGV[2])
+end
 return 1
 `;
 
@@ -283,6 +301,12 @@ end
 redis.call('SET', KEYS[1], cjson.encode(job))
 redis.call('LREM', KEYS[2], 0, ARGV[1])
 redis.call('DEL', KEYS[4])
+if status == 'exhausted' and redis.call('EXISTS', KEYS[6]) == 0 then
+  redis.call('SET', KEYS[6], cjson.encode({
+    jobId = ARGV[1], recordedAt = ARGV[2], reason = 'stale-lease-exhausted', snapshot = job
+  }))
+  redis.call('ZADD', KEYS[5], ARGV[3], ARGV[1])
+end
 if status == 'requeued' then redis.call('LPUSH', KEYS[3], ARGV[1]) end
 return status
 `;
@@ -292,6 +316,7 @@ export class RedisJobTransport implements DistributedJobTransport {
   private readonly queueKey: string;
   private readonly processingKey: string;
   private readonly delayedKey: string;
+  private readonly deadIndexKey: string;
   private readonly recoveryIntervalMs: number;
   private readonly recoveryBatchSize: number;
   private recoveryCursor = 0;
@@ -311,6 +336,7 @@ export class RedisJobTransport implements DistributedJobTransport {
     this.queueKey = `${this.prefix}:queue`;
     this.processingKey = `${this.prefix}:processing`;
     this.delayedKey = `${this.prefix}:delayed`;
+    this.deadIndexKey = `${this.prefix}:dead:index`;
     this.recoveryIntervalMs = options.recoveryIntervalMs ?? 1_000;
     this.recoveryBatchSize = options.recoveryBatchSize ?? 100;
     if (!Number.isInteger(this.recoveryIntervalMs) || this.recoveryIntervalMs < 10) {
@@ -429,14 +455,17 @@ export class RedisJobTransport implements DistributedJobTransport {
     const finished = integer(await this.send([
       "EVAL",
       FINISH_SCRIPT,
-      "3",
+      "5",
       this.jobKey(id),
       this.processingKey,
       this.cancelKey(id),
+      this.deadIndexKey,
+      this.deadEntryKey(id),
       JSON.stringify(snapshot),
       id,
       claimId,
-      new Date().toISOString()
+      new Date().toISOString(),
+      String(Date.now())
     ]));
     this.assertLeaseMutation(finished, id);
   }
@@ -491,6 +520,41 @@ export class RedisJobTransport implements DistributedJobTransport {
     return scalar(await this.send(["GET", this.cancelKey(jobId)])) === "1";
   }
 
+  /** Read one immutable dead-letter record without mutating the job or scheduling a replay. */
+  async getDeadLetter(jobId: string): Promise<RedisJobDeadLetter | null> {
+    const raw = scalar(await this.send(["GET", this.deadEntryKey(jobId)]));
+    if (raw === null) return null;
+    try {
+      const record = JSON.parse(raw) as RedisJobDeadLetter;
+      if (record.jobId !== jobId || record.snapshot?.descriptor?.id !== jobId
+        || record.snapshot.state !== "failed" || typeof record.recordedAt !== "string"
+        || !["retry-exhausted", "non-retryable", "stale-lease-exhausted"].includes(record.reason)) {
+        throw new Error("Dead-letter record has invalid fields.");
+      }
+      return record;
+    } catch (error) {
+      throw new JobTransportError(`Invalid Redis dead-letter record: ${jobId}`, { cause: error });
+    }
+  }
+
+  /** Read a bounded newest-first page. No implicit acknowledgement or replay. */
+  async listDeadLetters(offset = 0, limit = 100): Promise<readonly RedisJobDeadLetter[]> {
+    if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 1_000) {
+      throw new JobTransportError("Dead-letter offset must be non-negative and limit must be between 1 and 1,000.");
+    }
+    const raw = await this.send(["ZREVRANGE", this.deadIndexKey, String(offset), String(offset + limit - 1)]);
+    if (!Array.isArray(raw)) throw new JobTransportError("Redis dead-letter index returned an invalid page.");
+    const records: RedisJobDeadLetter[] = [];
+    for (const entry of raw) {
+      const id = scalar(entry);
+      if (!id) throw new JobTransportError("Redis dead-letter index contains an invalid job ID.");
+      const record = await this.getDeadLetter(id);
+      if (!record) throw new JobTransportError(`Redis dead-letter index points to a missing record: ${id}`);
+      records.push(record);
+    }
+    return records;
+  }
+
   /** Bounded recovery pass; safe for multiple workers to invoke concurrently. */
   async recoverStaleClaims(batchSize = this.recoveryBatchSize): Promise<RedisJobRecoveryResult> {
     if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 1_000) {
@@ -518,9 +582,10 @@ export class RedisJobTransport implements DistributedJobTransport {
     };
     for (const jobId of ids) {
       const status = scalar(await this.send([
-        "EVAL", RECOVER_EXPIRED_SCRIPT, "4",
+        "EVAL", RECOVER_EXPIRED_SCRIPT, "6",
         this.jobKey(jobId), this.processingKey, this.queueKey, this.cancelKey(jobId),
-        jobId, new Date().toISOString()
+        this.deadIndexKey, this.deadEntryKey(jobId),
+        jobId, new Date().toISOString(), String(Date.now())
       ]));
       if (status === "requeued" || status === "cancelled" || status === "exhausted"
         || status === "cleaned" || status === "active") {
@@ -575,6 +640,10 @@ export class RedisJobTransport implements DistributedJobTransport {
 
   private jobKey(jobId: string): string {
     return `${this.prefix}:job:${jobId}`;
+  }
+
+  private deadEntryKey(jobId: string): string {
+    return `${this.prefix}:dead:entry:${jobId}`;
   }
 
   private cancelKey(jobId: string): string {

@@ -29,7 +29,9 @@ The unreleased V3 worker path extends `DistributedJobWorker` and `RedisJobTransp
 
 The unreleased V3.1b Redis transport adds atomic queue-to-processing claiming plus bounded stale-claim recovery (`recoveryIntervalMs` defaults to 1 second, `recoveryBatchSize` defaults to 100). Call `transport.recoverStaleClaims()` for an explicit pass, or let active workers trigger periodic passes. Expired claims are requeued when attempts remain; cancelled claims become terminal; exhausted claims fail with `JOB_STALE_LEASE_EXHAUSTED`. Recovery never overwrites a still-valid lease and always fences the previous claim token.
 
-To upgrade from the V3.1a worker implementation, stop old workers before deploying new workers: mixed claim protocols are not supported. Recovery has at-least-once execution semantics; handlers publishing external artifacts must be idempotent. Full dead-letter persistence and external output reconciliation are not yet available.
+To upgrade between V3 development builds, stop old workers first: mixed claim protocols are not supported. Recovery has at-least-once execution semantics; handlers publishing external artifacts must be idempotent.
+
+V3.1c archives failed and exhausted distributed jobs atomically in Redis (`:dead:index` sorted by failure time and immutable `:dead:entry:<jobId>` records). Use `await transport.getDeadLetter(jobId)` or `await transport.listDeadLetters(offset, limit)` (default page 100, max 1,000) to inspect each terminal snapshot, failure reason and attempt. Cancelled jobs and pending retries do not enter this index. No automatic replay or retention is implied; existing failures from older builds are not retroactively indexed. External output reconciliation is still separate work.
 
 ## Minimal example
 

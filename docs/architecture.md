@@ -105,7 +105,9 @@ The current V3 development line extends the same serializable job contract with 
 
 A worker that cannot renew its lease fails closed: it aborts its handler signal and does not publish a result through the lost claim. V3.1b makes dequeue-plus-lease assignment one atomic Redis Lua operation (rather than `BRPOPLPUSH` followed by a separate lease write), closing the unleased claim crash window for new workers. Existing processing entries are checked in bounded periodic scans; a Lua script rechecks expiry and ownership before requeuing, cancelling, or failing an exhausted job.
 
-**Execution semantics:** lease fencing prevents stale workers from committing Redis job state after ownership changes. It does not make arbitrary media output, uploads, or other external handler side effects exactly once; those require idempotent artifact identities and later reconciliation. During deployment from V3.1a, stop old workers before enabling V3.1b recovery (no mixed claim protocols). Broader reconciliation and dead-letter storage remain future work.
+**Execution semantics:** lease fencing prevents stale workers from committing Redis job state after ownership changes. V3.1c additionally writes a dead-letter envelope and sorted index in the same Redis Lua transaction that commits a terminal failed job (normal worker failure or stale-lease exhaustion). The record preserves the failure, attempt, reason and terminal job snapshot; cancelled or retried jobs are not dead-lettered. `getDeadLetter()` and `listDeadLetters()` inspect these records without claiming/replaying work. These records have no automatic retention or replay policy yet.
+
+Arbitrary media output, uploads and other external handler side effects are still at-least-once, not exactly once; use idempotent artifact identities and later reconciliation. Stop old V3 worker processes before deploying protocol changes. Pre-existing failures are not retroactively backfilled into the dead-letter index.
 
 ## Storage
 
