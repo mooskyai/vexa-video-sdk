@@ -16,7 +16,7 @@ export type {
   PluginBackendExecutionOptions
 } from "./plugins.js";
 export { JobQueue, JobHandle, DistributedJobQueue, DistributedJobWorker } from "./jobs.js";
-export type { JobHandler, JobHandlerContext, JobHandlerOptions, JobProgressUpdate, LocalJobQueueOptions, JobListOptions, WaitForJobOptions, DistributedJobTransport, DistributedJobWorkerOptions } from "./jobs.js";
+export type { JobHandler, JobHandlerContext, JobHandlerOptions, JobProgressUpdate, LocalJobQueueOptions, JobListOptions, WaitForJobOptions, DistributedJobTransport, DistributedJobWorkerOptions, DistributedWorkerDiagnostics, DistributedWorkerDiagnosticEvent } from "./jobs.js";
 export { RedisJobTransport } from "./redis-jobs.js";
 export type { RedisCommandClient, RedisJobTransportOptions, RedisJobRecoveryResult, RedisJobDeadLetter, RedisRetryReconciliationResult, RedisJobQueueDiagnostics, RedisJobDiagnosticEvent } from "./redis-jobs.js";
 export { Storage, MediaWorkspace, parseStorageSource } from "./storage.js";

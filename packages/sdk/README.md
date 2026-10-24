@@ -35,6 +35,8 @@ V3.1c archives failed and exhausted distributed jobs atomically in Redis (`:dead
 
 V3.1d adds `await transport.reconcileDueRetries(batchSize)` (default 100, max 1,000), with `{scanned, promoted, discarded}`. Each due retry is checked against the authoritative job record; stale, missing, cancelled or terminal entries are discarded. `transport.cancel(jobId)` atomically finalizes unleased queued/retrying jobs or requests cancellation from an active lease holder. `await transport.getQueueDiagnostics()` reads approximate `{queued, processing, delayed, deadLetters}` counts without mutating state. Supply `onDiagnostic: (event) => { ... }` to observe structured `retry-reconciliation` and `stale-recovery` summaries. Callback errors do not affect Redis transitions. External output reconciliation, automatic replay and retention are still separate work.
 
+V3.1e adds `new DistributedJobWorker(transport, { errorBackoffMs: 250, onDiagnostic: (event) => { ... } })`. The worker emits synchronous `claim-error`, `execution-error`, `started`, and `lease-lost` events; a throwing listener is isolated. `worker.getDiagnostics()` returns local claim/execute/lease-loss counts and active job IDs. A claim or execution-path transport failure backs off before retrying the worker loop, while a lost lease still fails closed. Use this for worker telemetry; it does not enable replay, global metrics or exactly-once handler side effects.
+
 ## Minimal example
 
 ```ts

@@ -66,7 +66,7 @@ Add operational guarantees around the existing worker/job model:
 - artifact-retention policy contracts;
 - deterministic workspace cleanup and recovery tests.
 
-Current development includes V3.1a lease/heartbeat fencing, V3.1b atomic claim and stale recovery, V3.1c indexed durable dead letters, and V3.1d atomic cancellation plus bounded due-retry reconciliation, with read-only queue counters and optional diagnostic events. Broader orphan/workspace reconciliation, operator-controlled replay, retention and external artifact finalization remain later V3.1 work; handler side effects are not exactly once.
+Current development includes V3.1a lease/heartbeat fencing, V3.1b atomic claim and stale recovery, V3.1c indexed durable dead letters, V3.1d atomic cancellation and due-retry reconciliation, and V3.1e worker-level failure diagnostics and bounded claim/execute error recovery. Read-only worker/queue counters remain opt-in and process-local. Broader orphan/workspace reconciliation, operator-controlled replay, retention and external artifact finalization remain later V3.1 work; handler side effects are not exactly once.
 
 **Acceptance:** fault-injection tests must demonstrate that process interruption does not silently lose or duplicate claimed work, retries remain idempotent, and abandoned workspaces/artifacts are handled predictably.
 

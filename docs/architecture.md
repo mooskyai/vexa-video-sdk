@@ -109,6 +109,8 @@ A worker that cannot renew its lease fails closed: it aborts its handler signal 
 
 V3.1d introduces an atomic queued/delayed cancellation transition. Redis also verifies the current snapshot before promoting each due retry, discarding stale index references rather than resurrecting cancelled or terminal jobs. `reconcileDueRetries(batchSize)` returns bounded promotion/discard counters, `getQueueDiagnostics()` returns read-only approximate queue sizes, and the optional `onDiagnostic` callback receives non-blocking retry/recovery event envelopes. A callback failure cannot roll back a Redis transition. Queued/retrying cancellations still do not create dead letters.
 
+V3.1e hardens the distributed worker loop: transient claim or execution-path errors emit structured worker-local diagnostics and back off before polling again instead of terminating a worker task. `getDiagnostics()` exposes worker-local counts and current active job IDs; opt-in `onDiagnostic` events are synchronous and contain no payload/stack trace. A renewal failure emits `lease-lost` and aborts the handler, with no attempt to commit stale results. This does not guarantee idempotence for external side effects or replace Redis recovery.
+
 Arbitrary media output, uploads and other external handler side effects are still at-least-once, not exactly once; use idempotent artifact identities and later reconciliation. Stop old V3 worker processes before deploying protocol changes. Pre-existing failures are not retroactively backfilled into the dead-letter index.
 
 ## Storage

@@ -1033,3 +1033,125 @@ test("Redis active-owner cancellation stays fenced and diagnostics are read-only
   await assert.rejects(() => transport.reconcileDueRetries(0), /batch size/);
   await assert.rejects(() => transport.reconcileDueRetries(1001), /batch size/);
 });
+
+test("distributed worker survives transient claim errors with bounded backoff", async () => {
+  class FlakyTransport extends MemoryTransport {
+    failures = 2;
+    override async claim(workerId: string, waitMs: number, leaseMs: number): Promise<JobSnapshot | null> {
+      if (this.failures-- > 0) throw new Error("transient Redis outage");
+      return super.claim(workerId, waitMs, leaseMs);
+    }
+  }
+  const transport = new FlakyTransport();
+  const queue = new DistributedJobQueue(transport);
+  const events: string[] = [];
+  const worker = new DistributedJobWorker(transport, {
+    claimWaitMs: 10, errorBackoffMs: 10,
+    onDiagnostic: (event) => { events.push(event.type); throw new Error("broken logger"); }
+  });
+  worker.register("resilient.claim", async () => "ok");
+  const job = await queue.submit("resilient.claim", {});
+  worker.start();
+  try {
+    const finished = await queue.wait(job.descriptor.id, { pollIntervalMs: 10, timeoutMs: 2_000 });
+    assert.equal(finished.state, "succeeded");
+    assert.equal(worker.getDiagnostics().claimErrors, 2);
+    assert.equal(worker.getDiagnostics().executionErrors, 0);
+    assert.ok(events.includes("claim-error"));
+    assert.ok(events.includes("started"));
+  } finally {
+    await worker.stop();
+  }
+  assert.equal(worker.getDiagnostics().running, false);
+  assert.deepEqual(worker.getDiagnostics().activeJobIds, []);
+});
+
+test("distributed worker continues on a later job after a fenced save failure", async () => {
+  class FailedSaveTransport extends MemoryTransport {
+    failOnce = true;
+    override async save(snapshot: JobSnapshot, claimId: string): Promise<void> {
+      if (this.failOnce) { this.failOnce = false; throw new Error("simulated claim lost before start"); }
+      await super.save(snapshot, claimId);
+    }
+  }
+  const transport = new FailedSaveTransport();
+  const queue = new DistributedJobQueue(transport);
+  const events: string[] = [];
+  const first = await queue.submit("resilient.save", { id: 1 });
+  const second = await queue.submit("resilient.save", { id: 2 });
+  const worker = new DistributedJobWorker(transport, {
+    claimWaitMs: 10, errorBackoffMs: 10, onDiagnostic: (event) => events.push(event.type)
+  });
+  worker.register<{ id: number }, number>("resilient.save", async ({ id }) => id);
+  worker.start();
+  try {
+    const finished = await queue.wait(second.descriptor.id, { pollIntervalMs: 10, timeoutMs: 2_000 });
+    assert.equal(finished.state, "succeeded");
+    assert.equal(finished.result, 2);
+    assert.equal(worker.getDiagnostics().executionErrors, 1);
+    assert.ok(events.includes("execution-error"));
+    // The first claim remains fenced; Redis expiry recovery handles that job separately.
+    assert.equal((await queue.get(first.descriptor.id)).result, undefined);
+  } finally {
+    await worker.stop();
+  }
+  assert.deepEqual(worker.getDiagnostics().activeJobIds, []);
+});
+
+test("distributed worker reports lease loss without publishing the late handler result", async () => {
+  class LostLeaseTransport extends MemoryTransport {
+    override async heartbeat(): Promise<JobLease> { throw new Error("lease renewal rejected"); }
+  }
+  const transport = new LostLeaseTransport();
+  const queue = new DistributedJobQueue(transport);
+  const events: string[] = [];
+  const worker = new DistributedJobWorker(transport, {
+    claimWaitMs: 10, cancellationPollMs: 10, leaseDurationMs: 120,
+    heartbeatIntervalMs: 20, onDiagnostic: (event) => events.push(event.type)
+  });
+  worker.register("resilient.lease", async (_payload, context) => {
+    await new Promise<void>((resolve) => context.signal.addEventListener("abort", () => resolve(), { once: true }));
+    return "must-not-publish";
+  });
+  const job = await queue.submit("resilient.lease", {});
+  worker.start();
+  try {
+    for (let attempt = 0; attempt < 100 && worker.getDiagnostics().lostLeases === 0; attempt += 1) {
+      await sleep(10);
+    }
+    assert.equal(worker.getDiagnostics().lostLeases, 1);
+    assert.ok(events.includes("lease-lost"));
+    assert.equal((await queue.get(job.descriptor.id)).result, undefined);
+    assert.equal((await queue.get(job.descriptor.id)).state, "running");
+  } finally {
+    await worker.stop();
+  }
+});
+
+test("distributed worker exposes active jobs and validates error backoff", async () => {
+  const transport = new MemoryTransport();
+  assert.throws(() => new DistributedJobWorker(transport, { errorBackoffMs: 0 }), /errorBackoffMs/);
+  assert.throws(() => new DistributedJobWorker(transport, { errorBackoffMs: 60_001 }), /errorBackoffMs/);
+  let release!: () => void;
+  let entered!: () => void;
+  const running = new Promise<void>((resolve) => { entered = resolve; });
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const worker = new DistributedJobWorker(transport, { claimWaitMs: 10 });
+  worker.register("resilient.active", async () => { entered(); await gate; return "done"; });
+  const queue = new DistributedJobQueue(transport);
+  const job = await queue.submit("resilient.active", {});
+  worker.start();
+  try {
+    await running;
+    const diagnostics = worker.getDiagnostics();
+    assert.equal(diagnostics.running, true);
+    assert.deepEqual(diagnostics.activeJobIds, [job.descriptor.id]);
+    release();
+    const finished = await queue.wait(job.descriptor.id, { pollIntervalMs: 10, timeoutMs: 1_000 });
+    assert.equal(finished.state, "succeeded");
+  } finally {
+    release();
+    await worker.stop();
+  }
+  assert.deepEqual(worker.getDiagnostics().activeJobIds, []);
+});

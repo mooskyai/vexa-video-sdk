@@ -11,6 +11,7 @@ All notable public changes to Vexa Video SDK are documented here. Public `@vexa-
 - V3.1b bounded Redis stale-claim recovery, including safe requeue of expired claims, terminal cancellation cleanup, and explicit exhaustion failure context.
 - V3.1c durable Redis dead-letter entries for terminal worker failures and stale-lease exhaustion, with bounded read-only inspection APIs.
 - V3.1d bounded retry reconciliation, queue diagnostics, and optional structured operational events.
+- V3.1e worker-level claim/execution/lease-loss diagnostics, read-only activity counters, and retryable transport-error backoff.
 
 ### Changed
 

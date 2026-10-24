@@ -612,6 +612,27 @@ export class DistributedJobQueue {
   }
 }
 
+/** Worker-local diagnostics; counters reset when the worker instance is replaced. */
+export interface DistributedWorkerDiagnostics {
+  workerId: string;
+  running: boolean;
+  stopping: boolean;
+  activeJobIds: readonly string[];
+  claimErrors: number;
+  executionErrors: number;
+  lostLeases: number;
+}
+
+/** Synchronous, opt-in worker events. Never includes job payloads or stack traces. */
+export interface DistributedWorkerDiagnosticEvent {
+  type: "claim-error" | "execution-error" | "lease-lost" | "started";
+  at: string;
+  workerId: string;
+  jobId?: string;
+  claimId?: string;
+  message?: string;
+}
+
 export interface DistributedJobWorkerOptions {
   workerId?: string;
   concurrency?: number;
@@ -619,6 +640,10 @@ export interface DistributedJobWorkerOptions {
   cancellationPollMs?: number;
   leaseDurationMs?: number;
   heartbeatIntervalMs?: number;
+  /** Backoff after claim/transport errors; defaults to 250ms. */
+  errorBackoffMs?: number;
+  /** Optional synchronous observability hook; exceptions are isolated. */
+  onDiagnostic?: (event: DistributedWorkerDiagnosticEvent) => void;
 }
 
 export class DistributedJobWorker {
@@ -629,6 +654,12 @@ export class DistributedJobWorker {
   private readonly cancellationPollMs: number;
   private readonly leaseDurationMs: number;
   private readonly heartbeatIntervalMs: number;
+  private readonly errorBackoffMs: number;
+  private readonly onDiagnostic: DistributedJobWorkerOptions["onDiagnostic"];
+  private readonly activeJobIds = new Set<string>();
+  private claimErrors = 0;
+  private executionErrors = 0;
+  private lostLeases = 0;
   private stopping = false;
   private loops: Promise<void>[] = [];
 
@@ -642,6 +673,11 @@ export class DistributedJobWorker {
     this.cancellationPollMs = options.cancellationPollMs ?? 250;
     this.leaseDurationMs = options.leaseDurationMs ?? 30_000;
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? Math.min(10_000, Math.floor(this.leaseDurationMs / 3));
+    this.errorBackoffMs = options.errorBackoffMs ?? 250;
+    this.onDiagnostic = options.onDiagnostic;
+    if (!Number.isInteger(this.errorBackoffMs) || this.errorBackoffMs < 10 || this.errorBackoffMs > 60_000) {
+      throw new InvalidJobError("Distributed worker errorBackoffMs must be an integer between 10 and 60000.");
+    }
     if (!Number.isInteger(this.concurrency) || this.concurrency <= 0 || this.concurrency > 64) {
       throw new InvalidJobError("Distributed worker concurrency must be an integer between 1 and 64.");
     }
@@ -688,11 +724,59 @@ export class DistributedJobWorker {
     this.loops = [];
   }
 
+  /** Read-only snapshot suitable for an application metrics collector. */
+  getDiagnostics(): DistributedWorkerDiagnostics {
+    return {
+      workerId: this.workerId,
+      running: this.loops.length > 0,
+      stopping: this.stopping,
+      activeJobIds: [...this.activeJobIds].sort(),
+      claimErrors: this.claimErrors,
+      executionErrors: this.executionErrors,
+      lostLeases: this.lostLeases
+    };
+  }
+
+  private emitDiagnostic(event: Omit<DistributedWorkerDiagnosticEvent, "at" | "workerId">): void {
+    try {
+      this.onDiagnostic?.({ ...event, at: now(), workerId: this.workerId });
+    } catch {
+      // Application logging must never interrupt worker recovery or job mutation.
+    }
+  }
+
+  private async backoffOnError(): Promise<void> {
+    if (this.stopping) return;
+    await new Promise<void>((resolve) => setTimeout(resolve, this.errorBackoffMs));
+  }
+
   private async loop(): Promise<void> {
     while (!this.stopping) {
-      const snapshot = await this.transport.claim(this.workerId, this.claimWaitMs, this.leaseDurationMs);
+      let snapshot: JobSnapshot | null;
+      try {
+        snapshot = await this.transport.claim(this.workerId, this.claimWaitMs, this.leaseDurationMs);
+      } catch (error) {
+        this.claimErrors += 1;
+        this.emitDiagnostic({ type: "claim-error", message: error instanceof Error ? error.message : String(error) });
+        await this.backoffOnError();
+        continue;
+      }
       if (!snapshot) continue;
-      await this.execute(snapshot);
+      const jobId = snapshot.descriptor.id;
+      this.activeJobIds.add(jobId);
+      try {
+        await this.execute(snapshot);
+      } catch (error) {
+        this.executionErrors += 1;
+        this.emitDiagnostic({
+          type: "execution-error", jobId,
+          ...(snapshot.lease ? { claimId: snapshot.lease.claimId } : {}),
+          message: error instanceof Error ? error.message : String(error)
+        });
+        await this.backoffOnError();
+      } finally {
+        this.activeJobIds.delete(jobId);
+      }
     }
   }
 
@@ -711,6 +795,7 @@ export class DistributedJobWorker {
     delete snapshot.nextAttemptAt;
     delete snapshot.error;
     await this.transport.save(snapshot, claimId);
+    this.emitDiagnostic({ type: "started", jobId: snapshot.descriptor.id, claimId });
 
     if (!registration) {
       snapshot.state = "failed";
@@ -737,8 +822,13 @@ export class DistributedJobWorker {
           }
           snapshot.lease = renewed;
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           leaseFailed = true;
+          this.lostLeases += 1;
+          this.emitDiagnostic({
+            type: "lease-lost", jobId: snapshot.descriptor.id, claimId,
+            message: error instanceof Error ? error.message : String(error)
+          });
           controller.abort();
         })
         .finally(() => {
