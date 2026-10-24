@@ -31,7 +31,9 @@ The unreleased V3.1b Redis transport adds atomic queue-to-processing claiming pl
 
 To upgrade between V3 development builds, stop old workers first: mixed claim protocols are not supported. Recovery has at-least-once execution semantics; handlers publishing external artifacts must be idempotent.
 
-V3.1c archives failed and exhausted distributed jobs atomically in Redis (`:dead:index` sorted by failure time and immutable `:dead:entry:<jobId>` records). Use `await transport.getDeadLetter(jobId)` or `await transport.listDeadLetters(offset, limit)` (default page 100, max 1,000) to inspect each terminal snapshot, failure reason and attempt. Cancelled jobs and pending retries do not enter this index. No automatic replay or retention is implied; existing failures from older builds are not retroactively indexed. External output reconciliation is still separate work.
+V3.1c archives failed and exhausted distributed jobs atomically in Redis (`:dead:index` sorted by failure time and immutable `:dead:entry:<jobId>` records). Use `await transport.getDeadLetter(jobId)` or `await transport.listDeadLetters(offset, limit)` (default page 100, max 1,000) to inspect terminal failures. Cancelled jobs and pending retries are excluded.
+
+V3.1d adds `await transport.reconcileDueRetries(batchSize)` (default 100, max 1,000), with `{scanned, promoted, discarded}`. Each due retry is checked against the authoritative job record; stale, missing, cancelled or terminal entries are discarded. `transport.cancel(jobId)` atomically finalizes unleased queued/retrying jobs or requests cancellation from an active lease holder. `await transport.getQueueDiagnostics()` reads approximate `{queued, processing, delayed, deadLetters}` counts without mutating state. Supply `onDiagnostic: (event) => { ... }` to observe structured `retry-reconciliation` and `stale-recovery` summaries. Callback errors do not affect Redis transitions. External output reconciliation, automatic replay and retention are still separate work.
 
 ## Minimal example
 

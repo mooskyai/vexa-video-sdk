@@ -408,6 +408,8 @@ class FakeRedis implements RedisCommandClient {
     if (command === "ZREM") {
       return this.sorted.get(args[1]!)?.delete(args[2]!) ? 1 : 0;
     }
+    if (command === "LLEN") return (this.lists.get(args[1]!) ?? []).length;
+    if (command === "ZCARD") return (this.sorted.get(args[1]!) ?? new Map()).size;
     if (command === "ZREVRANGE") {
       const entries = [...(this.sorted.get(args[1]!) ?? new Map<string, number>())];
       entries.sort(([leftId, leftScore], [rightId, rightScore]) => rightScore - leftScore || rightId.localeCompare(leftId));
@@ -459,7 +461,33 @@ class FakeRedis implements RedisCommandClient {
       this.lists.set(keys[1]!, list);
       return argv[1]!;
     }
-    if (script.includes("ZRANGEBYSCORE")) return 0;
+    if (script.includes("ZRANGEBYSCORE")) {
+      const delayed = this.sorted.get(keys[0]!) ?? new Map<string, number>();
+      const due = [...delayed].filter(([, score]) => score <= Number(argv[0]))
+        .sort(([a, as], [b, bs]) => as - bs || a.localeCompare(b))
+        .slice(0, Number(argv[1]));
+      let promoted = 0;
+      let discarded = 0;
+      for (const [id] of due) {
+        if (!delayed.delete(id)) continue;
+        const jobKey = `${keys[2]!}${id}`;
+        const raw = this.strings.get(jobKey);
+        const job = raw ? JSON.parse(raw) as JobSnapshot : null;
+        if (job?.state === "retrying" && !job.lease && !job.cancellationRequested) {
+          job.state = "queued";
+          delete job.nextAttemptAt;
+          job.updatedAt = argv[2]!;
+          this.strings.set(jobKey, JSON.stringify(job));
+          const queue = this.lists.get(keys[1]!) ?? [];
+          queue.unshift(id);
+          this.lists.set(keys[1]!, queue);
+          promoted += 1;
+        } else {
+          discarded += 1;
+        }
+      }
+      return [due.length, promoted, discarded];
+    }
     if (script.includes("redis.call('RPOP', KEYS[1])")) {
       const queue = this.lists.get(keys[0]!) ?? [];
       for (let index = 0; index < 100; index += 1) {
@@ -585,6 +613,28 @@ class FakeRedis implements RedisCommandClient {
       if (current.cancellationRequested) candidate.cancellationRequested = true;
       this.strings.set(keys[0]!, JSON.stringify(candidate));
       return 1;
+    }
+    if (script.includes("-- ATOMIC_CANCEL")) {
+      const raw = this.strings.get(keys[0]!);
+      if (!raw) return null;
+      const job = JSON.parse(raw) as JobSnapshot;
+      if (isTerminalJobState(job.state)) return raw;
+      job.cancellationRequested = true;
+      job.updatedAt = argv[1]!;
+      if (!job.lease && (job.state === "queued" || job.state === "retrying")) {
+        const queue = this.lists.get(keys[1]!) ?? [];
+        this.lists.set(keys[1]!, queue.filter((id) => id !== argv[0]));
+        this.sorted.get(keys[2]!)?.delete(argv[0]!);
+        job.state = "cancelled";
+        job.completedAt = argv[1]!;
+        delete job.nextAttemptAt;
+        this.strings.delete(keys[3]!);
+      } else {
+        this.strings.set(keys[3]!, "1");
+      }
+      const encoded = JSON.stringify(job);
+      this.strings.set(keys[0]!, encoded);
+      return encoded;
     }
     if (script.includes("job.cancellationRequested = true")) {
       const raw = this.strings.get(keys[0]!);
@@ -894,4 +944,92 @@ test("Redis dead-letter reads validate paging and never include cancellations", 
   await assert.rejects(() => transport.listDeadLetters(-1, 10), /Dead-letter offset/);
   await assert.rejects(() => transport.listDeadLetters(0, 0), /Dead-letter offset/);
   await assert.rejects(() => transport.listDeadLetters(0, 1001), /Dead-letter offset/);
+});
+
+test("Redis due-retry reconciliation promotes eligible jobs once and prunes missing IDs", async () => {
+  const redis = new FakeRedis();
+  const events: string[] = [];
+  const transport = new RedisJobTransport(redis, {
+    prefix: "test:vexa", queue: "retry-reconcile",
+    onDiagnostic: (event) => events.push(event.operation)
+  });
+  const queue = new DistributedJobQueue(transport);
+  const submitted = await queue.submit("retry.work", {}, { retry: { maxAttempts: 2 } });
+  const claimed = await transport.claim("first", 10, 500);
+  assert.ok(claimed?.lease);
+  claimed!.state = "retrying";
+  claimed!.attempt = 1;
+  await transport.scheduleRetry(claimed!, Date.now() - 5, claimed!.lease!.claimId);
+  const index = redis.sorted.get("test:vexa:retry-reconcile:delayed")!;
+  index.set("missing", Date.now() - 5);
+  const report = await transport.reconcileDueRetries();
+  assert.deepEqual(report, { scanned: 2, promoted: 1, discarded: 1 });
+  assert.equal((await queue.get(submitted.descriptor.id)).state, "queued");
+  assert.equal((await queue.get(submitted.descriptor.id)).nextAttemptAt, undefined);
+  assert.deepEqual(await transport.reconcileDueRetries(), { scanned: 0, promoted: 0, discarded: 0 });
+  const next = await transport.claim("second", 10, 500);
+  assert.equal(next?.descriptor.id, submitted.descriptor.id);
+  assert.notEqual(next?.lease?.claimId, claimed!.lease!.claimId);
+  assert.equal(next?.attempt, 1);
+  assert.ok(events.includes("retry-reconciliation"));
+});
+
+test("Redis retry reconciliation never resurrects cancelled or terminal jobs", async () => {
+  const redis = new FakeRedis();
+  const transport = new RedisJobTransport(redis, { prefix: "test:vexa", queue: "retry-ghosts" });
+  const queue = new DistributedJobQueue(transport);
+  const submitted = await queue.submit("retry.ghost", {});
+  await queue.cancel(submitted.descriptor.id);
+  const index = new Map([[submitted.descriptor.id, Date.now() - 5]]);
+  redis.sorted.set("test:vexa:retry-ghosts:delayed", index);
+  assert.deepEqual(await transport.reconcileDueRetries(), { scanned: 1, promoted: 0, discarded: 1 });
+  assert.equal((await queue.get(submitted.descriptor.id)).state, "cancelled");
+  assert.equal((redis.lists.get("test:vexa:retry-ghosts:queue") ?? []).length, 0);
+  assert.equal((await transport.getDeadLetter(submitted.descriptor.id)), null);
+});
+
+test("Redis cancellation of delayed work atomically clears retry indexes", async () => {
+  const redis = new FakeRedis();
+  const transport = new RedisJobTransport(redis, { prefix: "test:vexa", queue: "retry-cancel" });
+  const queue = new DistributedJobQueue(transport);
+  const submitted = await queue.submit("retry.cancel", {}, { retry: { maxAttempts: 2 } });
+  const claimed = await transport.claim("first", 10, 500);
+  assert.ok(claimed?.lease);
+  claimed!.state = "retrying";
+  claimed!.attempt = 1;
+  await transport.scheduleRetry(claimed!, Date.now() - 5, claimed!.lease!.claimId);
+  const cancelled = await queue.cancel(submitted.descriptor.id);
+  assert.equal(cancelled.state, "cancelled");
+  assert.equal(redis.sorted.get("test:vexa:retry-cancel:delayed")?.size, 0);
+  assert.deepEqual(await transport.reconcileDueRetries(), { scanned: 0, promoted: 0, discarded: 0 });
+  assert.equal(await transport.claim("replacement", 10, 500), null);
+});
+
+test("Redis active-owner cancellation stays fenced and diagnostics are read-only", async () => {
+  const redis = new FakeRedis();
+  const events: string[] = [];
+  const transport = new RedisJobTransport(redis, {
+    prefix: "test:vexa", queue: "queue-observe",
+    onDiagnostic: (event) => { events.push(event.operation); throw new Error("listener failure"); }
+  });
+  const queue = new DistributedJobQueue(transport);
+  const submitted = await queue.submit("observe.work", {});
+  const claimed = await transport.claim("running", 10, 500);
+  assert.ok(claimed?.lease);
+  const observed = await transport.getQueueDiagnostics();
+  assert.equal(observed.queued, 0);
+  assert.equal(observed.processing, 1);
+  assert.equal(observed.delayed, 0);
+  assert.equal(observed.deadLetters, 0);
+  const cancelled = await queue.cancel(submitted.descriptor.id);
+  assert.equal(cancelled.lease?.claimId, claimed!.lease!.claimId);
+  assert.equal(cancelled.cancellationRequested, true);
+  claimed!.state = "running";
+  await transport.save(claimed!, claimed!.lease!.claimId);
+  assert.equal((await queue.get(submitted.descriptor.id)).cancellationRequested, true);
+  assert.equal((await transport.recoverStaleClaims()).active, 1);
+  assert.ok(events.includes("stale-recovery"));
+  assert.equal((await transport.getQueueDiagnostics()).processing, 1);
+  await assert.rejects(() => transport.reconcileDueRetries(0), /batch size/);
+  await assert.rejects(() => transport.reconcileDueRetries(1001), /batch size/);
 });

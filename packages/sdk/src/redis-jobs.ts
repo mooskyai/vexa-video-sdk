@@ -2,8 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { JobLease, JobSnapshot } from "@vexa-video/core";
 import {
   JobIdempotencyConflictError,
-  JobTransportError,
-  isTerminalJobState
+  JobTransportError
 } from "@vexa-video/core";
 import type { DistributedJobTransport } from "./jobs.js";
 
@@ -22,6 +21,8 @@ export interface RedisJobTransportOptions {
   recoveryIntervalMs?: number;
   /** Maximum processing entries inspected per sweep. Defaults to 100. */
   recoveryBatchSize?: number;
+  /** Optional, non-blocking operational events. Listener failures never affect Redis jobs. */
+  onDiagnostic?: (event: RedisJobDiagnosticEvent) => void;
 }
 
 /** Outcome counters from a bounded, ownership-fenced recovery sweep. */
@@ -33,6 +34,24 @@ export interface RedisJobRecoveryResult {
   cleaned: number;
   active: number;
 }
+
+export interface RedisRetryReconciliationResult {
+  scanned: number;
+  promoted: number;
+  discarded: number;
+}
+
+export interface RedisJobQueueDiagnostics {
+  capturedAt: string;
+  queued: number;
+  processing: number;
+  delayed: number;
+  deadLetters: number;
+}
+
+export type RedisJobDiagnosticEvent =
+  | { operation: "retry-reconciliation"; at: string; result: RedisRetryReconciliationResult }
+  | { operation: "stale-recovery"; at: string; result: RedisJobRecoveryResult };
 
 /** Persistent failure record; V3.1c does not automatically replay failed jobs. */
 export interface RedisJobDeadLetter {
@@ -83,14 +102,32 @@ redis.call('LPUSH', KEYS[2], ARGV[2])
 return ARGV[2]
 `;
 
+// A delayed index alone cannot resurrect a cancelled, terminal or missing job.
+// The validation, index removal and queue transition share one Redis transaction.
 const PROMOTE_DUE_SCRIPT = `
-local ids = redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', ARGV[1], 'LIMIT', 0, 100)
+local ids = redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', ARGV[1], 'LIMIT', 0, ARGV[2])
+local promoted = 0
+local discarded = 0
 for _, id in ipairs(ids) do
   if redis.call('ZREM', KEYS[1], id) == 1 then
-    redis.call('LPUSH', KEYS[2], id)
+    local key = KEYS[3] .. id
+    local raw = redis.call('GET', key)
+    local ready = false
+    if raw then
+      local job = cjson.decode(raw)
+      if job.state == 'retrying' and not job.lease and not job.cancellationRequested then
+        job.state = 'queued'
+        job.nextAttemptAt = nil
+        job.updatedAt = ARGV[3]
+        redis.call('SET', key, cjson.encode(job))
+        redis.call('LPUSH', KEYS[2], id)
+        ready = true
+      end
+    end
+    if ready then promoted = promoted + 1 else discarded = discarded + 1 end
   end
 end
-return #ids
+return {#ids, promoted, discarded}
 `;
 
 // Claiming and registering the lease happen in a single Redis command. A process
@@ -237,20 +274,30 @@ redis.call('DEL', KEYS[4])
 return 1
 `;
 
-const REQUEST_CANCEL_SCRIPT = `
+// Queue/index removal and cancellation are atomic with the ownership test.
+// A worker that already owns a lease receives a cancellation request instead.
+const CANCEL_SCRIPT = `
+-- ATOMIC_CANCEL
 local raw = redis.call('GET', KEYS[1])
-if not raw then
-  return nil
-end
+if not raw then return nil end
 local job = cjson.decode(raw)
 if job.state == 'succeeded' or job.state == 'failed' or job.state == 'cancelled' then
   return raw
 end
 job.cancellationRequested = true
-job.updatedAt = ARGV[1]
+job.updatedAt = ARGV[2]
+if not job.lease and (job.state == 'queued' or job.state == 'retrying') then
+  redis.call('LREM', KEYS[2], 0, ARGV[1])
+  redis.call('ZREM', KEYS[3], ARGV[1])
+  job.state = 'cancelled'
+  job.completedAt = ARGV[2]
+  job.nextAttemptAt = nil
+  redis.call('DEL', KEYS[4])
+else
+  redis.call('SET', KEYS[4], '1')
+end
 local encoded = cjson.encode(job)
 redis.call('SET', KEYS[1], encoded)
-redis.call('SET', KEYS[2], '1')
 return encoded
 `;
 
@@ -317,6 +364,7 @@ export class RedisJobTransport implements DistributedJobTransport {
   private readonly processingKey: string;
   private readonly delayedKey: string;
   private readonly deadIndexKey: string;
+  private readonly onDiagnostic: RedisJobTransportOptions["onDiagnostic"];
   private readonly recoveryIntervalMs: number;
   private readonly recoveryBatchSize: number;
   private recoveryCursor = 0;
@@ -337,6 +385,7 @@ export class RedisJobTransport implements DistributedJobTransport {
     this.processingKey = `${this.prefix}:processing`;
     this.delayedKey = `${this.prefix}:delayed`;
     this.deadIndexKey = `${this.prefix}:dead:index`;
+    this.onDiagnostic = options.onDiagnostic;
     this.recoveryIntervalMs = options.recoveryIntervalMs ?? 1_000;
     this.recoveryBatchSize = options.recoveryBatchSize ?? 100;
     if (!Number.isInteger(this.recoveryIntervalMs) || this.recoveryIntervalMs < 10) {
@@ -490,34 +539,59 @@ export class RedisJobTransport implements DistributedJobTransport {
   }
 
   async cancel(jobId: string): Promise<JobSnapshot | null> {
-    const snapshot = await this.get(jobId);
-    if (!snapshot || isTerminalJobState(snapshot.state)) return snapshot;
-
-    snapshot.cancellationRequested = true;
-    snapshot.updatedAt = new Date().toISOString();
-
-    if (snapshot.state === "queued" && !snapshot.lease) {
-      const removed = integer(await this.send(["LREM", this.queueKey, "0", jobId]));
-      if (removed > 0) return await this.finishCancelledOutsideProcessing(snapshot);
-    }
-
-    if (snapshot.state === "retrying" && !snapshot.lease) {
-      const removed = integer(await this.send(["ZREM", this.delayedKey, jobId]));
-      if (removed > 0) return await this.finishCancelledOutsideProcessing(snapshot);
-    }
-
     return parseSnapshot(await this.send([
-      "EVAL",
-      REQUEST_CANCEL_SCRIPT,
-      "2",
-      this.jobKey(jobId),
-      this.cancelKey(jobId),
-      new Date().toISOString()
+      "EVAL", CANCEL_SCRIPT, "4",
+      this.jobKey(jobId), this.queueKey, this.delayedKey, this.cancelKey(jobId),
+      jobId, new Date().toISOString()
     ]));
   }
 
   async isCancellationRequested(jobId: string): Promise<boolean> {
     return scalar(await this.send(["GET", this.cancelKey(jobId)])) === "1";
+  }
+
+  /** An atomic bounded sweep of due retries, pruning invalid delayed entries. */
+  async reconcileDueRetries(batchSize = 100): Promise<RedisRetryReconciliationResult> {
+    if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 1_000) {
+      throw new JobTransportError("Redis retry reconciliation batch size must be between 1 and 1,000.");
+    }
+    const timestamp = new Date();
+    const raw = await this.send([
+      "EVAL", PROMOTE_DUE_SCRIPT, "3",
+      this.delayedKey, this.queueKey, `${this.prefix}:job:`,
+      String(timestamp.getTime()), String(batchSize), timestamp.toISOString()
+    ]);
+    if (!Array.isArray(raw) || raw.length !== 3) {
+      throw new JobTransportError("Redis retry reconciliation returned invalid counters.");
+    }
+    const counts = raw.map((value) => integer(value));
+    if (counts.some((value) => !Number.isSafeInteger(value) || value < 0)
+      || counts[1]! + counts[2]! > counts[0]!) {
+      throw new JobTransportError("Redis retry reconciliation returned inconsistent counters.");
+    }
+    const result: RedisRetryReconciliationResult = {
+      scanned: counts[0]!, promoted: counts[1]!, discarded: counts[2]!
+    };
+    this.emitDiagnostic({ operation: "retry-reconciliation", at: timestamp.toISOString(), result });
+    return result;
+  }
+
+  /** Read-only approximate queue state at the time of four independent Redis reads. */
+  async getQueueDiagnostics(): Promise<RedisJobQueueDiagnostics> {
+    const raw = await Promise.all([
+      this.send(["LLEN", this.queueKey]),
+      this.send(["LLEN", this.processingKey]),
+      this.send(["ZCARD", this.delayedKey]),
+      this.send(["ZCARD", this.deadIndexKey])
+    ]);
+    const counts = raw.map((value) => integer(value));
+    if (counts.some((value) => !Number.isSafeInteger(value) || value < 0)) {
+      throw new JobTransportError("Redis queue diagnostics returned an invalid count.");
+    }
+    return {
+      capturedAt: new Date().toISOString(), queued: counts[0]!,
+      processing: counts[1]!, delayed: counts[2]!, deadLetters: counts[3]!
+    };
   }
 
   /** Read one immutable dead-letter record without mutating the job or scheduling a replay. */
@@ -594,6 +668,7 @@ export class RedisJobTransport implements DistributedJobTransport {
         throw new JobTransportError(`Unknown stale-claim recovery status: ${status ?? "null"}`);
       }
     }
+    this.emitDiagnostic({ operation: "stale-recovery", at: new Date().toISOString(), result: summary });
     return summary;
   }
 
@@ -611,25 +686,15 @@ export class RedisJobTransport implements DistributedJobTransport {
   }
 
   private async promoteDue(): Promise<void> {
-    await this.send([
-      "EVAL",
-      PROMOTE_DUE_SCRIPT,
-      "2",
-      this.delayedKey,
-      this.queueKey,
-      String(Date.now())
-    ]);
+    await this.reconcileDueRetries();
   }
 
-  private async finishCancelledOutsideProcessing(snapshot: JobSnapshot): Promise<JobSnapshot> {
-    snapshot.state = "cancelled";
-    snapshot.completedAt = new Date().toISOString();
-    snapshot.updatedAt = snapshot.completedAt;
-    delete snapshot.nextAttemptAt;
-    delete snapshot.lease;
-    await this.send(["SET", this.jobKey(snapshot.descriptor.id), JSON.stringify(snapshot)]);
-    await this.send(["DEL", this.cancelKey(snapshot.descriptor.id)]);
-    return snapshot;
+  private emitDiagnostic(event: RedisJobDiagnosticEvent): void {
+    try {
+      this.onDiagnostic?.(event);
+    } catch {
+      // Telemetry must never change a committed Redis job transition.
+    }
   }
 
   private assertLeaseMutation(result: number, jobId: string): void {

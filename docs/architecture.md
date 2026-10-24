@@ -107,6 +107,8 @@ A worker that cannot renew its lease fails closed: it aborts its handler signal 
 
 **Execution semantics:** lease fencing prevents stale workers from committing Redis job state after ownership changes. V3.1c additionally writes a dead-letter envelope and sorted index in the same Redis Lua transaction that commits a terminal failed job (normal worker failure or stale-lease exhaustion). The record preserves the failure, attempt, reason and terminal job snapshot; cancelled or retried jobs are not dead-lettered. `getDeadLetter()` and `listDeadLetters()` inspect these records without claiming/replaying work. These records have no automatic retention or replay policy yet.
 
+V3.1d introduces an atomic queued/delayed cancellation transition. Redis also verifies the current snapshot before promoting each due retry, discarding stale index references rather than resurrecting cancelled or terminal jobs. `reconcileDueRetries(batchSize)` returns bounded promotion/discard counters, `getQueueDiagnostics()` returns read-only approximate queue sizes, and the optional `onDiagnostic` callback receives non-blocking retry/recovery event envelopes. A callback failure cannot roll back a Redis transition. Queued/retrying cancellations still do not create dead letters.
+
 Arbitrary media output, uploads and other external handler side effects are still at-least-once, not exactly once; use idempotent artifact identities and later reconciliation. Stop old V3 worker processes before deploying protocol changes. Pre-existing failures are not retroactively backfilled into the dead-letter index.
 
 ## Storage
