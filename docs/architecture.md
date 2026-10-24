@@ -101,7 +101,9 @@ Version 2 provides:
 - progress reporting;
 - Redis-backed distributed transport.
 
-Version 2 does **not** yet claim full worker leases, heartbeat/stale-claim recovery, dead-letter reconciliation or capability-aware scheduling. Those are Version 3 work.
+The current V3 development line extends the same serializable job contract with a lease attached to an active distributed claim. A lease carries a unique `claimId`, owning `workerId`, acquisition time, latest heartbeat time, and expiry time. Redis treats that lease as authoritative: heartbeat, progress save, retry, and finish mutations must present the active claim token, and control-plane cancellation is merged without overwriting lease state.
+
+A worker that cannot renew its lease fails closed: it aborts its handler signal and does not publish a result through the lost claim. This slice does not yet scan or reclaim expired processing entries. Stale-claim detection/requeue and broader reconciliation remain the next V3.1 recovery work.
 
 ## Storage
 

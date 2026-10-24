@@ -65,6 +65,15 @@ export interface JobFailure {
   at: string;
 }
 
+export interface JobLease {
+  /** Unique fencing token for one worker claim. */
+  claimId: string;
+  workerId: string;
+  acquiredAt: string;
+  heartbeatAt: string;
+  expiresAt: string;
+}
+
 export interface JobSnapshot<TPayload = unknown, TResult = unknown> {
   descriptor: JobDescriptor<TPayload>;
   state: JobState;
@@ -75,6 +84,7 @@ export interface JobSnapshot<TPayload = unknown, TResult = unknown> {
   completedAt?: string;
   nextAttemptAt?: string;
   workerId?: string;
+  lease?: JobLease;
   progress?: JobProgress;
   result?: TResult;
   error?: JobFailure;

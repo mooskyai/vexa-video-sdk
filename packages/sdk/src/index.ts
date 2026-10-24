@@ -56,6 +56,7 @@ export type {
   JobDescriptor,
   JobProgress,
   JobFailure,
+  JobLease,
   JobSnapshot,
   JobEventType,
   JobEvent,

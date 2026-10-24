@@ -38,7 +38,7 @@ Version 3 turns the Version 2 programmable-video foundation into a more resilien
 
 | Stage | Focus | V2 foundation | V3 status |
 | --- | --- | --- | --- |
-| V3.1 | Production hardening | jobs, retries, cancellation, idempotency, workspaces | **Next** |
+| V3.1 | Production hardening | jobs, retries, cancellation, idempotency, workspaces | **In progress** |
 | V3.2 | Capability-aware distributed scheduler | Redis transport, hardware detection | Planned |
 | V3.3 | Render cache and incremental execution | deterministic plans and composition identity | Planned |
 | V3.4 | Advanced hardware pipeline | verified hardware encoders and CPU fallback | Planned |
@@ -65,6 +65,8 @@ Add operational guarantees around the existing worker/job model:
 - structured logs, metrics and tracing hooks;
 - artifact-retention policy contracts;
 - deterministic workspace cleanup and recovery tests.
+
+Current development has implemented the V3.1a lease/heartbeat foundation: unique claim fencing tokens, renewable expiry, ownership-checked worker mutations, and cancellation-safe Redis updates. V3.1b is responsible for discovering and reclaiming expired/stale claims; this slice does not requeue abandoned work by itself.
 
 **Acceptance:** fault-injection tests must demonstrate that process interruption does not silently lose or duplicate claimed work, retries remain idempotent, and abandoned workspaces/artifacts are handled predictably.
 

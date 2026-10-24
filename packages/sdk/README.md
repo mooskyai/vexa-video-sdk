@@ -23,6 +23,12 @@ Start here for a Node service, CLI-like application, worker, media API or server
 - Runtime-verified hardware acceleration with CPU fallback
 - Plugin and hosted-render integration points
 
+### V3 development: distributed-worker leases
+
+The unreleased V3 worker path extends `DistributedJobWorker` and `RedisJobTransport` with renewable leases. Each claim receives a unique `claimId`; heartbeats extend `heartbeatAt`/`expiresAt`; and save, retry, and terminal mutations are rejected when the worker no longer owns the claim. `leaseDurationMs` defaults to 30 seconds and `heartbeatIntervalMs` defaults to one third of the lease duration, capped at 10 seconds.
+
+Stale/expired claim discovery and requeue are intentionally separate recovery work; the lease foundation only establishes ownership and safe renewal/mutation semantics.
+
 ## Minimal example
 
 ```ts

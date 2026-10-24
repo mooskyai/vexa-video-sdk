@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { JobSnapshot } from "@vexa-video/core";
+import type { JobLease, JobSnapshot } from "@vexa-video/core";
 import { JobIdempotencyConflictError, isTerminalJobState } from "@vexa-video/core";
 import {
   DistributedJobQueue,
@@ -120,6 +120,8 @@ class MemoryTransport implements DistributedJobTransport {
   readonly queue: string[] = [];
   readonly cancellation = new Set<string>();
   readonly idempotency = new Map<string, { fingerprint: string; jobId: string }>();
+  heartbeatCount = 0;
+  private claimSequence = 0;
 
   async submit(snapshot: JobSnapshot, fingerprint: string): Promise<JobSnapshot> {
     const key = snapshot.descriptor.idempotencyKey;
@@ -141,26 +143,85 @@ class MemoryTransport implements DistributedJobTransport {
     return job ? structuredClone(job) : null;
   }
 
-  async claim(_workerId: string, waitMs: number): Promise<JobSnapshot | null> {
+  async claim(workerId: string, waitMs: number, leaseDurationMs: number): Promise<JobSnapshot | null> {
     const id = this.queue.shift();
     if (!id) {
       await sleep(Math.min(waitMs, 5));
       return null;
     }
-    return await this.get(id);
+    const snapshot = await this.get(id);
+    if (!snapshot) return null;
+    const acquiredAt = new Date();
+    snapshot.workerId = workerId;
+    snapshot.lease = {
+      claimId: `memory-claim-${++this.claimSequence}`,
+      workerId,
+      acquiredAt: acquiredAt.toISOString(),
+      heartbeatAt: acquiredAt.toISOString(),
+      expiresAt: new Date(acquiredAt.getTime() + leaseDurationMs).toISOString()
+    };
+    snapshot.updatedAt = acquiredAt.toISOString();
+    this.jobs.set(id, structuredClone(snapshot));
+    return snapshot;
   }
 
-  async save(snapshot: JobSnapshot): Promise<void> {
-    this.jobs.set(snapshot.descriptor.id, structuredClone(snapshot));
+  async heartbeat(
+    jobId: string,
+    claimId: string,
+    workerId: string,
+    leaseDurationMs: number
+  ): Promise<JobLease> {
+    const snapshot = this.requireLease(jobId, claimId);
+    if (snapshot.lease!.workerId !== workerId) throw new Error(`Worker lease mismatch: ${jobId}`);
+    const heartbeatAt = new Date();
+    snapshot.lease = {
+      ...snapshot.lease!,
+      heartbeatAt: heartbeatAt.toISOString(),
+      expiresAt: new Date(heartbeatAt.getTime() + leaseDurationMs).toISOString()
+    };
+    snapshot.updatedAt = heartbeatAt.toISOString();
+    this.jobs.set(jobId, structuredClone(snapshot));
+    this.heartbeatCount += 1;
+    return structuredClone(snapshot.lease!);
   }
 
-  async finish(snapshot: JobSnapshot): Promise<void> {
-    this.jobs.set(snapshot.descriptor.id, structuredClone(snapshot));
+  async save(snapshot: JobSnapshot, claimId: string): Promise<void> {
+    const current = this.requireLease(snapshot.descriptor.id, claimId);
+    const next = structuredClone(snapshot);
+    next.lease = structuredClone(current.lease!);
+    if (current.updatedAt > next.updatedAt) next.updatedAt = current.updatedAt;
+    if (current.cancellationRequested) next.cancellationRequested = true;
+    this.jobs.set(snapshot.descriptor.id, next);
+  }
+
+  async finish(snapshot: JobSnapshot, claimId: string): Promise<void> {
+    const current = this.requireLease(snapshot.descriptor.id, claimId);
+    const next = structuredClone(snapshot);
+    delete next.lease;
+    if (current.cancellationRequested && next.state !== "cancelled") {
+      next.state = "cancelled";
+      next.cancellationRequested = true;
+      delete next.result;
+    }
+    this.jobs.set(snapshot.descriptor.id, next);
     this.cancellation.delete(snapshot.descriptor.id);
   }
 
-  async scheduleRetry(snapshot: JobSnapshot, availableAtMs: number): Promise<void> {
-    this.jobs.set(snapshot.descriptor.id, structuredClone(snapshot));
+  async scheduleRetry(snapshot: JobSnapshot, availableAtMs: number, claimId: string): Promise<void> {
+    const current = this.requireLease(snapshot.descriptor.id, claimId);
+    const next = structuredClone(snapshot);
+    delete next.lease;
+    if (current.cancellationRequested) {
+      next.state = "cancelled";
+      next.cancellationRequested = true;
+      next.completedAt = new Date().toISOString();
+      next.updatedAt = next.completedAt;
+      delete next.nextAttemptAt;
+      this.jobs.set(snapshot.descriptor.id, next);
+      this.cancellation.delete(snapshot.descriptor.id);
+      return;
+    }
+    this.jobs.set(snapshot.descriptor.id, next);
     const delay = Math.max(0, availableAtMs - Date.now());
     setTimeout(() => this.queue.push(snapshot.descriptor.id), delay);
   }
@@ -175,6 +236,7 @@ class MemoryTransport implements DistributedJobTransport {
       this.queue.splice(queuedIndex, 1);
       snapshot.state = "cancelled";
       snapshot.completedAt = new Date().toISOString();
+      delete snapshot.lease;
     } else {
       this.cancellation.add(jobId);
     }
@@ -184,6 +246,15 @@ class MemoryTransport implements DistributedJobTransport {
 
   async isCancellationRequested(jobId: string): Promise<boolean> {
     return this.cancellation.has(jobId);
+  }
+
+  private requireLease(jobId: string, claimId: string): JobSnapshot {
+    const snapshot = this.jobs.get(jobId);
+    const lease = snapshot?.lease;
+    if (!snapshot || !lease || lease.claimId !== claimId || lease.expiresAt <= new Date().toISOString()) {
+      throw new Error(`Worker lease is no longer valid: ${jobId}`);
+    }
+    return snapshot;
   }
 }
 
@@ -216,13 +287,101 @@ test("distributed queue and worker share the same serializable job contract", as
   assert.equal(terminal.state, "succeeded");
   assert.deepEqual(terminal.result, { value: 12 });
   assert.equal(terminal.workerId, "distributed-test");
+  assert.equal(terminal.lease, undefined);
   await worker.stop();
+});
+
+test("distributed worker renews its lease while work is running", async () => {
+  const transport = new MemoryTransport();
+  const queue = new DistributedJobQueue(transport);
+  const worker = new DistributedJobWorker(transport, {
+    workerId: "heartbeat-worker",
+    claimWaitMs: 10,
+    cancellationPollMs: 10,
+    leaseDurationMs: 120,
+    heartbeatIntervalMs: 20
+  });
+  worker.register("lease.work", async () => {
+    await sleep(85);
+    return "done";
+  });
+  worker.start();
+
+  const submitted = await queue.submit("lease.work", {});
+  while ((await queue.get(submitted.descriptor.id)).state !== "running") await sleep(1);
+  const running = await queue.get(submitted.descriptor.id);
+  assert.equal(running.lease?.workerId, "heartbeat-worker");
+  const initialHeartbeat = running.lease?.heartbeatAt;
+
+  for (let attempt = 0; attempt < 20 && transport.heartbeatCount === 0; attempt += 1) {
+    await sleep(5);
+  }
+  const renewed = await queue.get(submitted.descriptor.id);
+  assert.ok(initialHeartbeat);
+  assert.ok(renewed.lease);
+  assert.ok(renewed.lease.heartbeatAt > initialHeartbeat);
+  assert.ok(transport.heartbeatCount >= 1);
+
+  const terminal = await queue.wait(submitted.descriptor.id, { pollIntervalMs: 10, timeoutMs: 1_000 });
+  assert.equal(terminal.state, "succeeded");
+  assert.equal(terminal.lease, undefined);
+  await worker.stop();
+});
+
+test("distributed cancellation completes under an active lease", async () => {
+  const transport = new MemoryTransport();
+  const queue = new DistributedJobQueue(transport);
+  const worker = new DistributedJobWorker(transport, {
+    workerId: "cancel-worker",
+    claimWaitMs: 10,
+    cancellationPollMs: 10,
+    leaseDurationMs: 120,
+    heartbeatIntervalMs: 20
+  });
+  worker.register("lease.cancel", async (_payload, context) => {
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(resolve, 500);
+      context.signal.addEventListener("abort", () => {
+        clearTimeout(timer);
+        const error = new Error("cancelled");
+        error.name = "AbortError";
+        reject(error);
+      }, { once: true });
+    });
+    return "late";
+  });
+  worker.start();
+
+  const submitted = await queue.submit("lease.cancel", {});
+  while ((await queue.get(submitted.descriptor.id)).state !== "running") await sleep(1);
+  const cancelled = await queue.cancel(submitted.descriptor.id);
+  assert.equal(cancelled.cancellationRequested, true);
+
+  const terminal = await queue.wait(submitted.descriptor.id, { pollIntervalMs: 10, timeoutMs: 1_000 });
+  assert.equal(terminal.state, "cancelled");
+  assert.equal(terminal.lease, undefined);
+  await worker.stop();
+});
+
+test("distributed transport rejects mutations from a stale claim", async () => {
+  const transport = new MemoryTransport();
+  const queue = new DistributedJobQueue(transport);
+  const submitted = await queue.submit("lease.guard", {});
+  const claimed = await transport.claim("lease-owner", 10, 1_000);
+  assert.equal(claimed?.descriptor.id, submitted.descriptor.id);
+  assert.ok(claimed?.lease);
+
+  await assert.rejects(
+    () => transport.save(claimed!, "stale-claim"),
+    /lease is no longer valid/i
+  );
 });
 
 class FakeRedis implements RedisCommandClient {
   readonly strings = new Map<string, string>();
   readonly lists = new Map<string, string[]>();
   readonly sorted = new Map<string, Map<string, number>>();
+  heartbeatCount = 0;
 
   async sendCommand(args: readonly string[]): Promise<unknown> {
     const command = args[0]?.toUpperCase();
@@ -290,18 +449,108 @@ class FakeRedis implements RedisCommandClient {
       return argv[1]!;
     }
     if (script.includes("ZRANGEBYSCORE")) return 0;
-    if (script.includes("redis.call('ZADD'")) {
-      this.strings.set(keys[0]!, argv[0]!);
+    if (script.includes("job.lease = {")) {
+      const raw = this.strings.get(keys[0]!);
+      if (!raw) return null;
+      const job = JSON.parse(raw) as JobSnapshot;
+      if (isTerminalJobState(job.state)) return null;
+      if (job.lease?.expiresAt && job.lease.expiresAt > argv[3]!) return null;
+      job.workerId = argv[1]!;
+      job.lease = {
+        claimId: argv[2]!,
+        workerId: argv[1]!,
+        acquiredAt: argv[3]!,
+        heartbeatAt: argv[3]!,
+        expiresAt: argv[4]!
+      };
+      job.updatedAt = argv[3]!;
+      const encoded = JSON.stringify(job);
+      this.strings.set(keys[0]!, encoded);
+      return encoded;
+    }
+    if (script.includes("job.lease.heartbeatAt = ARGV[3]")) {
+      const raw = this.strings.get(keys[0]!);
+      if (!raw) return null;
+      const job = JSON.parse(raw) as JobSnapshot;
+      if (
+        !job.lease
+        || job.lease.claimId !== argv[0]
+        || job.lease.workerId !== argv[1]
+        || job.lease.expiresAt <= argv[2]!
+      ) return null;
+      job.lease.heartbeatAt = argv[2]!;
+      job.lease.expiresAt = argv[3]!;
+      job.updatedAt = argv[2]!;
+      this.heartbeatCount += 1;
+      const encoded = JSON.stringify(job);
+      this.strings.set(keys[0]!, encoded);
+      return encoded;
+    }
+    if (script.includes("candidate.lease = current.lease")) {
+      const raw = this.strings.get(keys[0]!);
+      if (!raw) return 0;
+      const current = JSON.parse(raw) as JobSnapshot;
+      if (!current.lease || current.lease.claimId !== argv[1] || current.lease.expiresAt <= argv[2]!) return 0;
+      const candidate = JSON.parse(argv[0]!) as JobSnapshot;
+      candidate.lease = current.lease;
+      candidate.workerId = current.workerId;
+      if (current.updatedAt > candidate.updatedAt) candidate.updatedAt = current.updatedAt;
+      if (current.cancellationRequested) candidate.cancellationRequested = true;
+      this.strings.set(keys[0]!, JSON.stringify(candidate));
+      return 1;
+    }
+    if (script.includes("job.cancellationRequested = true")) {
+      const raw = this.strings.get(keys[0]!);
+      if (!raw) return null;
+      const job = JSON.parse(raw) as JobSnapshot;
+      if (isTerminalJobState(job.state)) return raw;
+      job.cancellationRequested = true;
+      job.updatedAt = argv[0]!;
+      const encoded = JSON.stringify(job);
+      this.strings.set(keys[0]!, encoded);
+      this.strings.set(keys[1]!, "1");
+      return encoded;
+    }
+    if (script.includes("redis.call('ZADD', KEYS[3], ARGV[3], ARGV[2])")) {
+      const raw = this.strings.get(keys[0]!);
+      if (!raw) return 0;
+      const current = JSON.parse(raw) as JobSnapshot;
+      if (!current.lease || current.lease.claimId !== argv[3] || current.lease.expiresAt <= argv[4]!) return 0;
+      const candidate = JSON.parse(argv[0]!) as JobSnapshot;
+      delete candidate.lease;
+      candidate.workerId = current.workerId;
       const processing = this.lists.get(keys[1]!) ?? [];
       this.lists.set(keys[1]!, processing.filter((item) => item !== argv[1]!));
+      this.strings.delete(keys[3]!);
+      if (current.cancellationRequested) {
+        candidate.state = "cancelled";
+        candidate.cancellationRequested = true;
+        candidate.completedAt = argv[4]!;
+        candidate.updatedAt = argv[4]!;
+        delete candidate.nextAttemptAt;
+        this.strings.set(keys[0]!, JSON.stringify(candidate));
+        return 1;
+      }
+      this.strings.set(keys[0]!, JSON.stringify(candidate));
       const set = this.sorted.get(keys[2]!) ?? new Map<string, number>();
       set.set(argv[1]!, Number(argv[2]));
       this.sorted.set(keys[2]!, set);
-      this.strings.delete(keys[3]!);
       return 1;
     }
-    if (script.includes("redis.call('LREM', KEYS[2], 0, ARGV[2])")) {
-      this.strings.set(keys[0]!, argv[0]!);
+    if (script.includes("candidate.lease = nil")) {
+      const raw = this.strings.get(keys[0]!);
+      if (!raw) return 0;
+      const current = JSON.parse(raw) as JobSnapshot;
+      if (!current.lease || current.lease.claimId !== argv[2] || current.lease.expiresAt <= argv[3]!) return 0;
+      const candidate = JSON.parse(argv[0]!) as JobSnapshot;
+      delete candidate.lease;
+      candidate.workerId = current.workerId;
+      if (current.cancellationRequested && candidate.state !== "cancelled") {
+        candidate.state = "cancelled";
+        candidate.cancellationRequested = true;
+        delete candidate.result;
+      }
+      this.strings.set(keys[0]!, JSON.stringify(candidate));
       const processing = this.lists.get(keys[1]!) ?? [];
       this.lists.set(keys[1]!, processing.filter((item) => item !== argv[1]!));
       this.strings.delete(keys[2]!);
@@ -330,16 +579,19 @@ test("Redis job transport provides durable idempotent submission and queued canc
   assert.equal((await queue.get(first.descriptor.id)).state, "cancelled");
 });
 
-test("Redis transport can drive a distributed worker through claim and completion", async () => {
+test("Redis transport can drive a distributed worker through claim, heartbeat, and completion", async () => {
   const redis = new FakeRedis();
   const transport = new RedisJobTransport(redis, { prefix: "test:vexa", queue: "worker" });
   const queue = new DistributedJobQueue(transport);
   const worker = new DistributedJobWorker(transport, {
     workerId: "redis-worker",
     claimWaitMs: 10,
-    cancellationPollMs: 10
+    cancellationPollMs: 10,
+    leaseDurationMs: 120,
+    heartbeatIntervalMs: 20
   });
   worker.register<{ value: number }, number>("redis.double", async ({ value }, context) => {
+    await sleep(45);
     await context.reportProgress({ percent: 50, phase: "compute" });
     return value * 2;
   });
@@ -354,5 +606,7 @@ test("Redis transport can drive a distributed worker through claim and completio
   assert.equal(terminal.result, 18);
   assert.equal(terminal.workerId, "redis-worker");
   assert.equal(terminal.progress?.percent, 100);
+  assert.equal(terminal.lease, undefined);
+  assert.ok(redis.heartbeatCount >= 1);
   await worker.stop();
 });

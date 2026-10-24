@@ -283,6 +283,8 @@ Start with the [documentation index](./docs/README.md).
 
 Version 2.0.0 is the stable programmable-video baseline. Version 3 is not a rewrite of Vexa; it builds production-platform capabilities on that baseline: worker resilience, capability-aware scheduling, render caching, advanced hardware pipelines, professional editor semantics, proxy workflows, richer graphics, AI editing, first-party cloud media adapters, Streaming 2.0, project-format evolution, collaboration, and hosted-render infrastructure.
 
+The current V3 development line adds renewable distributed-worker leases and heartbeats with ownership-checked Redis mutations. Expired-lease recovery and stale-job reconciliation remain subsequent V3.1 work rather than being implied by the lease foundation alone.
+
 See [ROADMAP.md](./ROADMAP.md) for current status and sequencing.
 
 ## Contributing and security

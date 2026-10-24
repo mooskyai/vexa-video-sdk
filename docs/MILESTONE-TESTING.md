@@ -73,3 +73,5 @@ Feature PRs do not need to reproduce the entire release matrix locally when focu
 ## Version 3 additions
 
 Each V3 stage should add fault/scale/integration tests appropriate to its new guarantee. In particular, V3.1 worker hardening should use fault injection for process death, stale leases, retries, recovery and workspace cleanup rather than relying on happy-path worker tests.
+
+V3.1a focused acceptance covers renewable heartbeats during active work, rejection of stale claim-token mutations, cancellation while a lease is active, Redis lease-aware claim/save/finish behavior, and clearing the lease when work becomes terminal. V3.1b must add explicit worker-death/expired-lease discovery and reclaim tests rather than treating heartbeat support alone as recovery.

@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
-import type { JobSnapshot } from "@vexa-video/core";
+import { createHash, randomUUID } from "node:crypto";
+import type { JobLease, JobSnapshot } from "@vexa-video/core";
 import {
   JobIdempotencyConflictError,
   JobTransportError,
@@ -71,19 +71,154 @@ end
 return #ids
 `;
 
+const CLAIM_SCRIPT = `
+local raw = redis.call('GET', KEYS[1])
+if not raw then
+  redis.call('LREM', KEYS[2], 1, ARGV[1])
+  return nil
+end
+local job = cjson.decode(raw)
+if job.state == 'succeeded' or job.state == 'failed' or job.state == 'cancelled' then
+  redis.call('LREM', KEYS[2], 1, ARGV[1])
+  return nil
+end
+if job.lease and job.lease.expiresAt and job.lease.expiresAt > ARGV[4] then
+  redis.call('LREM', KEYS[2], 1, ARGV[1])
+  return nil
+end
+job.workerId = ARGV[2]
+job.lease = {
+  claimId = ARGV[3],
+  workerId = ARGV[2],
+  acquiredAt = ARGV[4],
+  heartbeatAt = ARGV[4],
+  expiresAt = ARGV[5]
+}
+job.updatedAt = ARGV[4]
+local encoded = cjson.encode(job)
+redis.call('SET', KEYS[1], encoded)
+return encoded
+`;
+
+const HEARTBEAT_SCRIPT = `
+local raw = redis.call('GET', KEYS[1])
+if not raw then
+  return nil
+end
+local job = cjson.decode(raw)
+if not job.lease or job.lease.claimId ~= ARGV[1] or job.lease.workerId ~= ARGV[2] then
+  return nil
+end
+if not job.lease.expiresAt or job.lease.expiresAt <= ARGV[3] then
+  return nil
+end
+job.lease.heartbeatAt = ARGV[3]
+job.lease.expiresAt = ARGV[4]
+job.updatedAt = ARGV[3]
+local encoded = cjson.encode(job)
+redis.call('SET', KEYS[1], encoded)
+return encoded
+`;
+
+const SAVE_SCRIPT = `
+local raw = redis.call('GET', KEYS[1])
+if not raw then
+  return 0
+end
+local current = cjson.decode(raw)
+if not current.lease or current.lease.claimId ~= ARGV[2] then
+  return 0
+end
+if not current.lease.expiresAt or current.lease.expiresAt <= ARGV[3] then
+  return 0
+end
+local candidate = cjson.decode(ARGV[1])
+candidate.lease = current.lease
+candidate.workerId = current.workerId
+if current.updatedAt and candidate.updatedAt and current.updatedAt > candidate.updatedAt then
+  candidate.updatedAt = current.updatedAt
+end
+if current.cancellationRequested then
+  candidate.cancellationRequested = true
+end
+redis.call('SET', KEYS[1], cjson.encode(candidate))
+return 1
+`;
+
 const FINISH_SCRIPT = `
-redis.call('SET', KEYS[1], ARGV[1])
+local raw = redis.call('GET', KEYS[1])
+if not raw then
+  return 0
+end
+local current = cjson.decode(raw)
+if not current.lease or current.lease.claimId ~= ARGV[3] then
+  return 0
+end
+if not current.lease.expiresAt or current.lease.expiresAt <= ARGV[4] then
+  return 0
+end
+local candidate = cjson.decode(ARGV[1])
+candidate.lease = nil
+candidate.workerId = current.workerId
+if current.cancellationRequested and candidate.state ~= 'cancelled' then
+  candidate.state = 'cancelled'
+  candidate.cancellationRequested = true
+  candidate.result = nil
+end
+redis.call('SET', KEYS[1], cjson.encode(candidate))
 redis.call('LREM', KEYS[2], 0, ARGV[2])
 redis.call('DEL', KEYS[3])
 return 1
 `;
 
 const RETRY_SCRIPT = `
-redis.call('SET', KEYS[1], ARGV[1])
+local raw = redis.call('GET', KEYS[1])
+if not raw then
+  return 0
+end
+local current = cjson.decode(raw)
+if not current.lease or current.lease.claimId ~= ARGV[4] then
+  return 0
+end
+if not current.lease.expiresAt or current.lease.expiresAt <= ARGV[5] then
+  return 0
+end
+local candidate = cjson.decode(ARGV[1])
+candidate.lease = nil
+candidate.workerId = current.workerId
+if current.cancellationRequested then
+  candidate.state = 'cancelled'
+  candidate.cancellationRequested = true
+  candidate.completedAt = ARGV[5]
+  candidate.updatedAt = ARGV[5]
+  candidate.nextAttemptAt = nil
+  redis.call('SET', KEYS[1], cjson.encode(candidate))
+  redis.call('LREM', KEYS[2], 0, ARGV[2])
+  redis.call('DEL', KEYS[4])
+  return 1
+end
+redis.call('SET', KEYS[1], cjson.encode(candidate))
 redis.call('LREM', KEYS[2], 0, ARGV[2])
 redis.call('ZADD', KEYS[3], ARGV[3], ARGV[2])
 redis.call('DEL', KEYS[4])
 return 1
+`;
+
+const REQUEST_CANCEL_SCRIPT = `
+local raw = redis.call('GET', KEYS[1])
+if not raw then
+  return nil
+end
+local job = cjson.decode(raw)
+if job.state == 'succeeded' or job.state == 'failed' or job.state == 'cancelled' then
+  return raw
+end
+job.cancellationRequested = true
+job.updatedAt = ARGV[1]
+local encoded = cjson.encode(job)
+redis.call('SET', KEYS[1], encoded)
+redis.call('SET', KEYS[2], '1')
+return encoded
 `;
 
 export class RedisJobTransport implements DistributedJobTransport {
@@ -153,7 +288,7 @@ export class RedisJobTransport implements DistributedJobTransport {
     return parseSnapshot(await this.send(["GET", this.jobKey(jobId)]));
   }
 
-  async claim(_workerId: string, waitMs: number): Promise<JobSnapshot | null> {
+  async claim(workerId: string, waitMs: number, leaseDurationMs: number): Promise<JobSnapshot | null> {
     await this.promoteDue();
     const timeoutSeconds = Math.max(1, Math.ceil(Math.max(1, waitMs) / 1_000));
     const raw = await this.send([
@@ -164,25 +299,63 @@ export class RedisJobTransport implements DistributedJobTransport {
     ]);
     const jobId = scalar(raw);
     if (!jobId) return null;
-    const snapshot = await this.get(jobId);
-    if (!snapshot) {
-      await this.send(["LREM", this.processingKey, "0", jobId]);
-      return null;
-    }
-    if (isTerminalJobState(snapshot.state)) {
-      await this.send(["LREM", this.processingKey, "0", jobId]);
-      return null;
-    }
-    return snapshot;
+
+    const claimedAt = new Date();
+    const expiresAt = new Date(claimedAt.getTime() + leaseDurationMs);
+    return parseSnapshot(await this.send([
+      "EVAL",
+      CLAIM_SCRIPT,
+      "2",
+      this.jobKey(jobId),
+      this.processingKey,
+      jobId,
+      workerId,
+      randomUUID(),
+      claimedAt.toISOString(),
+      expiresAt.toISOString()
+    ]));
   }
 
-  async save(snapshot: JobSnapshot): Promise<void> {
-    await this.send(["SET", this.jobKey(snapshot.descriptor.id), JSON.stringify(snapshot)]);
+  async heartbeat(
+    jobId: string,
+    claimId: string,
+    workerId: string,
+    leaseDurationMs: number
+  ): Promise<JobLease> {
+    const heartbeatAt = new Date();
+    const expiresAt = new Date(heartbeatAt.getTime() + leaseDurationMs);
+    const snapshot = parseSnapshot(await this.send([
+      "EVAL",
+      HEARTBEAT_SCRIPT,
+      "1",
+      this.jobKey(jobId),
+      claimId,
+      workerId,
+      heartbeatAt.toISOString(),
+      expiresAt.toISOString()
+    ]));
+    if (!snapshot?.lease) {
+      throw new JobTransportError(`Job lease is no longer owned by worker ${workerId}: ${jobId}`);
+    }
+    return snapshot.lease;
   }
 
-  async finish(snapshot: JobSnapshot): Promise<void> {
+  async save(snapshot: JobSnapshot, claimId: string): Promise<void> {
+    const saved = integer(await this.send([
+      "EVAL",
+      SAVE_SCRIPT,
+      "1",
+      this.jobKey(snapshot.descriptor.id),
+      JSON.stringify(snapshot),
+      claimId,
+      new Date().toISOString()
+    ]));
+    this.assertLeaseMutation(saved, snapshot.descriptor.id);
+  }
+
+  async finish(snapshot: JobSnapshot, claimId: string): Promise<void> {
     const id = snapshot.descriptor.id;
-    await this.send([
+    const finished = integer(await this.send([
       "EVAL",
       FINISH_SCRIPT,
       "3",
@@ -190,13 +363,16 @@ export class RedisJobTransport implements DistributedJobTransport {
       this.processingKey,
       this.cancelKey(id),
       JSON.stringify(snapshot),
-      id
-    ]);
+      id,
+      claimId,
+      new Date().toISOString()
+    ]));
+    this.assertLeaseMutation(finished, id);
   }
 
-  async scheduleRetry(snapshot: JobSnapshot, availableAtMs: number): Promise<void> {
+  async scheduleRetry(snapshot: JobSnapshot, availableAtMs: number, claimId: string): Promise<void> {
     const id = snapshot.descriptor.id;
-    await this.send([
+    const scheduled = integer(await this.send([
       "EVAL",
       RETRY_SCRIPT,
       "4",
@@ -206,8 +382,11 @@ export class RedisJobTransport implements DistributedJobTransport {
       this.cancelKey(id),
       JSON.stringify(snapshot),
       id,
-      String(Math.max(0, Math.floor(availableAtMs)))
-    ]);
+      String(Math.max(0, Math.floor(availableAtMs))),
+      claimId,
+      new Date().toISOString()
+    ]));
+    this.assertLeaseMutation(scheduled, id);
   }
 
   async cancel(jobId: string): Promise<JobSnapshot | null> {
@@ -217,19 +396,24 @@ export class RedisJobTransport implements DistributedJobTransport {
     snapshot.cancellationRequested = true;
     snapshot.updatedAt = new Date().toISOString();
 
-    if (snapshot.state === "queued") {
+    if (snapshot.state === "queued" && !snapshot.lease) {
       const removed = integer(await this.send(["LREM", this.queueKey, "0", jobId]));
       if (removed > 0) return await this.finishCancelledOutsideProcessing(snapshot);
     }
 
-    if (snapshot.state === "retrying") {
+    if (snapshot.state === "retrying" && !snapshot.lease) {
       const removed = integer(await this.send(["ZREM", this.delayedKey, jobId]));
       if (removed > 0) return await this.finishCancelledOutsideProcessing(snapshot);
     }
 
-    await this.send(["SET", this.cancelKey(jobId), "1"]);
-    await this.save(snapshot);
-    return snapshot;
+    return parseSnapshot(await this.send([
+      "EVAL",
+      REQUEST_CANCEL_SCRIPT,
+      "2",
+      this.jobKey(jobId),
+      this.cancelKey(jobId),
+      new Date().toISOString()
+    ]));
   }
 
   async isCancellationRequested(jobId: string): Promise<boolean> {
@@ -252,9 +436,16 @@ export class RedisJobTransport implements DistributedJobTransport {
     snapshot.completedAt = new Date().toISOString();
     snapshot.updatedAt = snapshot.completedAt;
     delete snapshot.nextAttemptAt;
-    await this.save(snapshot);
+    delete snapshot.lease;
+    await this.send(["SET", this.jobKey(snapshot.descriptor.id), JSON.stringify(snapshot)]);
     await this.send(["DEL", this.cancelKey(snapshot.descriptor.id)]);
     return snapshot;
+  }
+
+  private assertLeaseMutation(result: number, jobId: string): void {
+    if (result !== 1) {
+      throw new JobTransportError(`Job lease is no longer valid for mutation: ${jobId}`);
+    }
   }
 
   private jobKey(jobId: string): string {

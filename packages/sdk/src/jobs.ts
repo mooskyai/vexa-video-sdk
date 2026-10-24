@@ -3,6 +3,7 @@ import type {
   JobDescriptor,
   JobEvent,
   JobFailure,
+  JobLease,
   JobProgress,
   JobRetryPolicy,
   JobSnapshot,
@@ -543,10 +544,11 @@ export class JobQueue {
 export interface DistributedJobTransport {
   submit(snapshot: JobSnapshot, fingerprint: string): Promise<JobSnapshot>;
   get(jobId: string): Promise<JobSnapshot | null>;
-  claim(workerId: string, waitMs: number): Promise<JobSnapshot | null>;
-  save(snapshot: JobSnapshot): Promise<void>;
-  finish(snapshot: JobSnapshot): Promise<void>;
-  scheduleRetry(snapshot: JobSnapshot, availableAtMs: number): Promise<void>;
+  claim(workerId: string, waitMs: number, leaseDurationMs: number): Promise<JobSnapshot | null>;
+  heartbeat(jobId: string, claimId: string, workerId: string, leaseDurationMs: number): Promise<JobLease>;
+  save(snapshot: JobSnapshot, claimId: string): Promise<void>;
+  finish(snapshot: JobSnapshot, claimId: string): Promise<void>;
+  scheduleRetry(snapshot: JobSnapshot, availableAtMs: number, claimId: string): Promise<void>;
   cancel(jobId: string): Promise<JobSnapshot | null>;
   isCancellationRequested(jobId: string): Promise<boolean>;
 }
@@ -615,6 +617,8 @@ export interface DistributedJobWorkerOptions {
   concurrency?: number;
   claimWaitMs?: number;
   cancellationPollMs?: number;
+  leaseDurationMs?: number;
+  heartbeatIntervalMs?: number;
 }
 
 export class DistributedJobWorker {
@@ -623,6 +627,8 @@ export class DistributedJobWorker {
   private readonly concurrency: number;
   private readonly claimWaitMs: number;
   private readonly cancellationPollMs: number;
+  private readonly leaseDurationMs: number;
+  private readonly heartbeatIntervalMs: number;
   private stopping = false;
   private loops: Promise<void>[] = [];
 
@@ -634,6 +640,8 @@ export class DistributedJobWorker {
     this.concurrency = options.concurrency ?? 1;
     this.claimWaitMs = options.claimWaitMs ?? 1_000;
     this.cancellationPollMs = options.cancellationPollMs ?? 250;
+    this.leaseDurationMs = options.leaseDurationMs ?? 30_000;
+    this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? Math.min(10_000, Math.floor(this.leaseDurationMs / 3));
     if (!Number.isInteger(this.concurrency) || this.concurrency <= 0 || this.concurrency > 64) {
       throw new InvalidJobError("Distributed worker concurrency must be an integer between 1 and 64.");
     }
@@ -642,6 +650,18 @@ export class DistributedJobWorker {
     }
     if (!Number.isFinite(this.cancellationPollMs) || this.cancellationPollMs < 10) {
       throw new InvalidJobError("Distributed worker cancellationPollMs must be at least 10ms.");
+    }
+    if (!Number.isFinite(this.leaseDurationMs) || this.leaseDurationMs < 100) {
+      throw new InvalidJobError("Distributed worker leaseDurationMs must be at least 100ms.");
+    }
+    if (
+      !Number.isFinite(this.heartbeatIntervalMs)
+      || this.heartbeatIntervalMs < 10
+      || this.heartbeatIntervalMs >= this.leaseDurationMs
+    ) {
+      throw new InvalidJobError(
+        "Distributed worker heartbeatIntervalMs must be at least 10ms and less than leaseDurationMs."
+      );
     }
   }
 
@@ -670,13 +690,18 @@ export class DistributedJobWorker {
 
   private async loop(): Promise<void> {
     while (!this.stopping) {
-      const snapshot = await this.transport.claim(this.workerId, this.claimWaitMs);
+      const snapshot = await this.transport.claim(this.workerId, this.claimWaitMs, this.leaseDurationMs);
       if (!snapshot) continue;
       await this.execute(snapshot);
     }
   }
 
   private async execute(snapshot: JobSnapshot): Promise<void> {
+    const lease = snapshot.lease;
+    if (!lease || lease.workerId !== this.workerId) {
+      throw new InvalidJobError("Distributed transport returned a claimed job without a matching worker lease.");
+    }
+    const claimId = lease.claimId;
     const registration = this.handlers.get(snapshot.descriptor.type);
     snapshot.state = "running";
     snapshot.attempt += 1;
@@ -685,18 +710,47 @@ export class DistributedJobWorker {
     snapshot.updatedAt = now();
     delete snapshot.nextAttemptAt;
     delete snapshot.error;
-    await this.transport.save(snapshot);
+    await this.transport.save(snapshot, claimId);
 
     if (!registration) {
       snapshot.state = "failed";
       snapshot.error = failureOf(new InvalidJobError(`No distributed handler is registered for type: ${snapshot.descriptor.type}`), snapshot.attempt);
       snapshot.completedAt = now();
       snapshot.updatedAt = snapshot.completedAt;
-      await this.transport.finish(snapshot);
+      await this.transport.finish(snapshot, claimId);
       return;
     }
 
     const controller = new AbortController();
+    let leaseFailed = false;
+    let heartbeatInFlight = false;
+    let heartbeatTask = Promise.resolve();
+
+    const renewLease = (): void => {
+      if (heartbeatInFlight || leaseFailed) return;
+      heartbeatInFlight = true;
+      heartbeatTask = this.transport
+        .heartbeat(snapshot.descriptor.id, claimId, this.workerId, this.leaseDurationMs)
+        .then((renewed) => {
+          if (renewed.claimId !== claimId || renewed.workerId !== this.workerId) {
+            throw new InvalidJobError("Distributed transport returned a heartbeat for a different worker lease.");
+          }
+          snapshot.lease = renewed;
+        })
+        .catch(() => {
+          leaseFailed = true;
+          controller.abort();
+        })
+        .finally(() => {
+          heartbeatInFlight = false;
+        });
+    };
+
+    const stopHeartbeat = async (): Promise<void> => {
+      clearInterval(heartbeat);
+      await heartbeatTask;
+    };
+
     if (snapshot.cancellationRequested || await this.transport.isCancellationRequested(snapshot.descriptor.id)) {
       controller.abort();
     }
@@ -707,6 +761,9 @@ export class DistributedJobWorker {
     }, this.cancellationPollMs);
     poll.unref?.();
 
+    const heartbeat = setInterval(renewLease, this.heartbeatIntervalMs);
+    heartbeat.unref?.();
+
     try {
       const result = await registration.handler(snapshot.descriptor.payload, {
         job: cloneSnapshot(snapshot),
@@ -714,9 +771,12 @@ export class DistributedJobWorker {
         reportProgress: async (update) => {
           snapshot.progress = normalizeProgress(update);
           snapshot.updatedAt = snapshot.progress.updatedAt;
-          await this.transport.save(snapshot);
+          await this.transport.save(snapshot, claimId);
         }
       });
+
+      await stopHeartbeat();
+      if (leaseFailed) return;
 
       if (controller.signal.aborted || await this.transport.isCancellationRequested(snapshot.descriptor.id)) {
         snapshot.state = "cancelled";
@@ -728,14 +788,17 @@ export class DistributedJobWorker {
       }
       snapshot.completedAt = now();
       snapshot.updatedAt = snapshot.completedAt;
-      await this.transport.finish(snapshot);
+      await this.transport.finish(snapshot, claimId);
     } catch (error) {
+      await stopHeartbeat();
+      if (leaseFailed) return;
+
       if (controller.signal.aborted || isCancellationError(error) || await this.transport.isCancellationRequested(snapshot.descriptor.id)) {
         snapshot.state = "cancelled";
         snapshot.cancellationRequested = true;
         snapshot.completedAt = now();
         snapshot.updatedAt = snapshot.completedAt;
-        await this.transport.finish(snapshot);
+        await this.transport.finish(snapshot, claimId);
         return;
       }
 
@@ -748,7 +811,7 @@ export class DistributedJobWorker {
         snapshot.error = failureOf(error, snapshot.attempt);
         snapshot.nextAttemptAt = new Date(Date.now() + delay).toISOString();
         snapshot.updatedAt = now();
-        await this.transport.scheduleRetry(snapshot, Date.now() + delay);
+        await this.transport.scheduleRetry(snapshot, Date.now() + delay, claimId);
         return;
       }
 
@@ -756,9 +819,10 @@ export class DistributedJobWorker {
       snapshot.error = failureOf(error, snapshot.attempt);
       snapshot.completedAt = now();
       snapshot.updatedAt = snapshot.completedAt;
-      await this.transport.finish(snapshot);
+      await this.transport.finish(snapshot, claimId);
     } finally {
       clearInterval(poll);
+      clearInterval(heartbeat);
     }
   }
 }
