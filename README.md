@@ -285,7 +285,7 @@ Version 2.0.0 is the stable programmable-video baseline. Version 3 is not a rewr
 
 The current V3 development line adds renewable distributed-worker leases and heartbeats with ownership-checked Redis mutations. Expired-lease recovery and stale-job reconciliation remain subsequent V3.1 work rather than being implied by the lease foundation alone.
 
-See [ROADMAP.md](./ROADMAP.md) for current status and sequencing.
+See [ROADMAP.md](./ROADMAP.md) for current status and sequencing. The unreleased V3.1 branch adds Redis worker leases, heartbeats, and bounded stale-claim recovery. For upgrades from earlier V3 development builds, stop old worker processes before enabling recovery; side effects remain at-least-once and should use stable idempotent artifact identities.
 
 ## Contributing and security
 

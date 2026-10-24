@@ -8,11 +8,13 @@ All notable public changes to Vexa Video SDK are documented here. Public `@vexa-
 
 - V3 distributed-worker lease ownership with unique claim fencing tokens, renewable heartbeats, expiry timestamps, and lease-aware Redis mutation guards.
 - worker configuration for lease duration and heartbeat cadence, with fail-closed behavior when a heartbeat can no longer renew ownership.
+- V3.1b bounded Redis stale-claim recovery, including safe requeue of expired claims, terminal cancellation cleanup, and explicit exhaustion failure context.
 
 ### Changed
 
 - `DistributedJobTransport` is now lease-aware: claims receive a lease duration, heartbeats renew ownership, and worker save/finish/retry mutations must present the active claim token.
 - Redis cancellation preserves active lease state atomically so progress writes and heartbeats cannot erase a cancellation request.
+- Redis now acquires queued job IDs and assigns leases in the same atomic Lua command, and periodically scans bounded portions of the processing list for expired ownership.
 
 ## [2.0.0] — 2026-10-17
 

@@ -103,7 +103,9 @@ Version 2 provides:
 
 The current V3 development line extends the same serializable job contract with a lease attached to an active distributed claim. A lease carries a unique `claimId`, owning `workerId`, acquisition time, latest heartbeat time, and expiry time. Redis treats that lease as authoritative: heartbeat, progress save, retry, and finish mutations must present the active claim token, and control-plane cancellation is merged without overwriting lease state.
 
-A worker that cannot renew its lease fails closed: it aborts its handler signal and does not publish a result through the lost claim. This slice does not yet scan or reclaim expired processing entries. Stale-claim detection/requeue and broader reconciliation remain the next V3.1 recovery work.
+A worker that cannot renew its lease fails closed: it aborts its handler signal and does not publish a result through the lost claim. V3.1b makes dequeue-plus-lease assignment one atomic Redis Lua operation (rather than `BRPOPLPUSH` followed by a separate lease write), closing the unleased claim crash window for new workers. Existing processing entries are checked in bounded periodic scans; a Lua script rechecks expiry and ownership before requeuing, cancelling, or failing an exhausted job.
+
+**Execution semantics:** lease fencing prevents stale workers from committing Redis job state after ownership changes. It does not make arbitrary media output, uploads, or other external handler side effects exactly once; those require idempotent artifact identities and later reconciliation. During deployment from V3.1a, stop old workers before enabling V3.1b recovery (no mixed claim protocols). Broader reconciliation and dead-letter storage remain future work.
 
 ## Storage
 

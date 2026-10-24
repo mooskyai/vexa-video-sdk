@@ -66,7 +66,7 @@ Add operational guarantees around the existing worker/job model:
 - artifact-retention policy contracts;
 - deterministic workspace cleanup and recovery tests.
 
-Current development has implemented the V3.1a lease/heartbeat foundation: unique claim fencing tokens, renewable expiry, ownership-checked worker mutations, and cancellation-safe Redis updates. V3.1b is responsible for discovering and reclaiming expired/stale claims; this slice does not requeue abandoned work by itself.
+Current development includes the V3.1a lease/heartbeat foundation and V3.1b bounded stale-claim recovery: atomic Redis claim-and-lease acquisition, periodic inspection of processing entries, fenced expiry checks, safe requeue, and cancellation/exhaustion terminal cleanup. The current slice does **not** implement general retry reconciliation, dead-letter storage, or exactly-once external side effects; those remain later V3.1 work.
 
 **Acceptance:** fault-injection tests must demonstrate that process interruption does not silently lose or duplicate claimed work, retries remain idempotent, and abandoned workspaces/artifacts are handled predictably.
 

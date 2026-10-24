@@ -408,6 +408,12 @@ class FakeRedis implements RedisCommandClient {
     if (command === "ZREM") {
       return this.sorted.get(args[1]!)?.delete(args[2]!) ? 1 : 0;
     }
+    if (command === "LRANGE") {
+      const list = this.lists.get(args[1]!) ?? [];
+      const start = Number(args[2]);
+      const end = Number(args[3]);
+      return list.slice(start, end < 0 ? undefined : end + 1);
+    }
     if (command === "BRPOPLPUSH") {
       const source = this.lists.get(args[1]!) ?? [];
       const value = source.pop();
@@ -449,6 +455,74 @@ class FakeRedis implements RedisCommandClient {
       return argv[1]!;
     }
     if (script.includes("ZRANGEBYSCORE")) return 0;
+    if (script.includes("redis.call('RPOP', KEYS[1])")) {
+      const queue = this.lists.get(keys[0]!) ?? [];
+      for (let index = 0; index < 100; index += 1) {
+        const id = queue.pop();
+        if (!id) return null;
+        const key = `${keys[2]!}${id}`;
+        const raw = this.strings.get(key);
+        if (!raw) continue;
+        const job = JSON.parse(raw) as JobSnapshot;
+        if ((job.state !== "queued" && job.state !== "retrying") || job.lease) continue;
+        job.workerId = argv[0]!;
+        job.lease = {
+          claimId: argv[1]!, workerId: argv[0]!, acquiredAt: argv[2]!,
+          heartbeatAt: argv[2]!, expiresAt: argv[3]!
+        };
+        job.updatedAt = argv[2]!;
+        this.strings.set(key, JSON.stringify(job));
+        const processing = this.lists.get(keys[1]!) ?? [];
+        processing.unshift(id);
+        this.lists.set(keys[1]!, processing);
+        return JSON.stringify(job);
+      }
+      return null;
+    }
+    if (script.includes("JOB_STALE_LEASE_EXHAUSTED")) {
+      const id = argv[0]!;
+      const raw = this.strings.get(keys[0]!);
+      const processing = this.lists.get(keys[1]!) ?? [];
+      const cleanup = (status: string) => {
+        this.lists.set(keys[1]!, processing.filter((item) => item !== id));
+        this.strings.delete(keys[3]!);
+        return status;
+      };
+      if (!raw) return cleanup("cleaned");
+      const job = JSON.parse(raw) as JobSnapshot;
+      if (isTerminalJobState(job.state)) return cleanup("cleaned");
+      if (job.lease?.expiresAt && job.lease.expiresAt > argv[1]!) return "active";
+      delete job.lease;
+      delete job.workerId;
+      job.updatedAt = argv[1]!;
+      delete job.nextAttemptAt;
+      let status = "requeued";
+      if (job.cancellationRequested || this.strings.get(keys[3]!) === "1") {
+        job.state = "cancelled";
+        job.cancellationRequested = true;
+        job.completedAt = argv[1]!;
+        status = "cancelled";
+      } else if (job.attempt >= job.descriptor.retry.maxAttempts) {
+        job.state = "failed";
+        job.completedAt = argv[1]!;
+        job.error = {
+          name: "JobExecutionError", code: "JOB_STALE_LEASE_EXHAUSTED",
+          message: "Worker lease expired after the configured maximum attempts.",
+          attempt: job.attempt, at: argv[1]!
+        };
+        status = "exhausted";
+      } else {
+        job.state = "queued";
+      }
+      this.strings.set(keys[0]!, JSON.stringify(job));
+      cleanup(status);
+      if (status === "requeued") {
+        const queue = this.lists.get(keys[2]!) ?? [];
+        queue.unshift(id);
+        this.lists.set(keys[2]!, queue);
+      }
+      return status;
+    }
     if (script.includes("job.lease = {")) {
       const raw = this.strings.get(keys[0]!);
       if (!raw) return null;
@@ -609,4 +683,110 @@ test("Redis transport can drive a distributed worker through claim, heartbeat, a
   assert.equal(terminal.lease, undefined);
   assert.ok(redis.heartbeatCount >= 1);
   await worker.stop();
+});
+
+test("Redis recovery ignores active leases and atomically fences expired claims", async () => {
+  const redis = new FakeRedis();
+  const transport = new RedisJobTransport(redis, { prefix: "test:vexa", queue: "reclaim" });
+  const queue = new DistributedJobQueue(transport);
+  const submitted = await queue.submit("recovery.work", {}, {
+    retry: { maxAttempts: 2, backoffMs: 0, maxBackoffMs: 0 }
+  });
+  const claimed = await transport.claim("crashed-worker", 10, 100);
+  assert.ok(claimed?.lease);
+  assert.equal(redis.lists.get("test:vexa:reclaim:queue")?.length, 0);
+  assert.deepEqual(redis.lists.get("test:vexa:reclaim:processing"), [submitted.descriptor.id]);
+  claimed!.state = "running";
+  claimed!.attempt = 1;
+  await transport.save(claimed!, claimed!.lease!.claimId);
+  assert.equal((await transport.recoverStaleClaims()).active, 1);
+  await sleep(115);
+  const recovered = await transport.recoverStaleClaims();
+  assert.equal(recovered.requeued, 1);
+  assert.equal((await queue.get(submitted.descriptor.id)).state, "queued");
+  await assert.rejects(
+    () => transport.save(claimed!, claimed!.lease!.claimId),
+    /lease is no longer valid/i
+  );
+  await assert.rejects(
+    () => transport.finish(claimed!, claimed!.lease!.claimId),
+    /lease is no longer valid/i
+  );
+  await assert.rejects(
+    () => transport.scheduleRetry(claimed!, Date.now(), claimed!.lease!.claimId),
+    /lease is no longer valid/i
+  );
+  const newClaim = await transport.claim("replacement-worker", 10, 100);
+  assert.ok(newClaim?.lease);
+  assert.notEqual(newClaim?.lease?.claimId, claimed!.lease!.claimId);
+  assert.equal(newClaim?.attempt, 1);
+  assert.equal((await transport.recoverStaleClaims()).active, 1);
+});
+
+test("Redis recovery finishes expired cancellation instead of requeueing", async () => {
+  const redis = new FakeRedis();
+  const transport = new RedisJobTransport(redis, { prefix: "test:vexa", queue: "cancel-crash" });
+  const queue = new DistributedJobQueue(transport);
+  const submitted = await queue.submit("recovery.cancel", {});
+  const claim = await transport.claim("crashed", 10, 100);
+  assert.ok(claim?.lease);
+  await queue.cancel(submitted.descriptor.id);
+  await sleep(115);
+  const outcome = await transport.recoverStaleClaims();
+  assert.equal(outcome.cancelled, 1);
+  const final = await queue.get(submitted.descriptor.id);
+  assert.equal(final.state, "cancelled");
+  assert.equal(final.lease, undefined);
+  assert.equal((redis.lists.get("test:vexa:cancel-crash:queue") ?? []).length, 0);
+});
+
+test("Redis recovery exhausts a crashed last attempt with useful failure context", async () => {
+  const redis = new FakeRedis();
+  const transport = new RedisJobTransport(redis, { prefix: "test:vexa", queue: "exhaust" });
+  const queue = new DistributedJobQueue(transport);
+  const submitted = await queue.submit("recovery.exhaust", {});
+  const claim = await transport.claim("crashed", 10, 100);
+  assert.ok(claim?.lease);
+  claim!.state = "running";
+  claim!.attempt = 1;
+  await transport.save(claim!, claim!.lease!.claimId);
+  await sleep(115);
+  assert.equal((await transport.recoverStaleClaims()).exhausted, 1);
+  const failed = await queue.get(submitted.descriptor.id);
+  assert.equal(failed.state, "failed");
+  assert.equal(failed.error?.code, "JOB_STALE_LEASE_EXHAUSTED");
+  assert.equal(failed.attempt, 1);
+  assert.equal(failed.lease, undefined);
+});
+
+test("Redis replacement worker autonomously recovers a crashed worker claim", async () => {
+  const redis = new FakeRedis();
+  const transport = new RedisJobTransport(redis, {
+    prefix: "test:vexa", queue: "restart", recoveryIntervalMs: 10
+  });
+  const queue = new DistributedJobQueue(transport);
+  const submitted = await queue.submit("recovery.restart", { value: 7 }, {
+    retry: { maxAttempts: 2, backoffMs: 0, maxBackoffMs: 0 }
+  });
+  const abandoned = await transport.claim("dead", 10, 100);
+  assert.ok(abandoned?.lease);
+  abandoned!.state = "running";
+  abandoned!.attempt = 1;
+  await transport.save(abandoned!, abandoned!.lease!.claimId);
+  await sleep(115);
+  const worker = new DistributedJobWorker(transport, {
+    workerId: "replacement", claimWaitMs: 10, cancellationPollMs: 10,
+    leaseDurationMs: 200, heartbeatIntervalMs: 40
+  });
+  worker.register<{ value: number }, number>("recovery.restart", async ({ value }) => value * 2);
+  worker.start();
+  try {
+    const result = await queue.wait(submitted.descriptor.id, { pollIntervalMs: 10, timeoutMs: 2_000 });
+    assert.equal(result.state, "succeeded");
+    assert.equal(result.result, 14);
+    assert.equal(result.attempt, 2);
+    assert.equal(result.lease, undefined);
+  } finally {
+    await worker.stop();
+  }
 });

@@ -18,6 +18,20 @@ export interface RedisCommandClient {
 export interface RedisJobTransportOptions {
   prefix?: string;
   queue?: string;
+  /** Maximum delay between bounded processing-list recovery scans. Defaults to 1 second. */
+  recoveryIntervalMs?: number;
+  /** Maximum processing entries inspected per sweep. Defaults to 100. */
+  recoveryBatchSize?: number;
+}
+
+/** Outcome counters from a bounded, ownership-fenced recovery sweep. */
+export interface RedisJobRecoveryResult {
+  scanned: number;
+  requeued: number;
+  cancelled: number;
+  exhausted: number;
+  cleaned: number;
+  active: number;
 }
 
 function scalar(value: unknown): string | null {
@@ -71,33 +85,34 @@ end
 return #ids
 `;
 
-const CLAIM_SCRIPT = `
-local raw = redis.call('GET', KEYS[1])
-if not raw then
-  redis.call('LREM', KEYS[2], 1, ARGV[1])
-  return nil
+// Claiming and registering the lease happen in a single Redis command. A process
+// crash can no longer strand a newly moved ID without an ownership record.
+const CLAIM_NEXT_SCRIPT = `
+for _ = 1, 100 do
+  local id = redis.call('RPOP', KEYS[1])
+  if not id then return nil end
+  local key = KEYS[3] .. id
+  local raw = redis.call('GET', key)
+  if raw then
+    local job = cjson.decode(raw)
+    if (job.state == 'queued' or job.state == 'retrying') and not job.lease then
+      job.workerId = ARGV[1]
+      job.lease = {
+        claimId = ARGV[2],
+        workerId = ARGV[1],
+        acquiredAt = ARGV[3],
+        heartbeatAt = ARGV[3],
+        expiresAt = ARGV[4]
+      }
+      job.updatedAt = ARGV[3]
+      local encoded = cjson.encode(job)
+      redis.call('SET', key, encoded)
+      redis.call('LPUSH', KEYS[2], id)
+      return encoded
+    end
+  end
 end
-local job = cjson.decode(raw)
-if job.state == 'succeeded' or job.state == 'failed' or job.state == 'cancelled' then
-  redis.call('LREM', KEYS[2], 1, ARGV[1])
-  return nil
-end
-if job.lease and job.lease.expiresAt and job.lease.expiresAt > ARGV[4] then
-  redis.call('LREM', KEYS[2], 1, ARGV[1])
-  return nil
-end
-job.workerId = ARGV[2]
-job.lease = {
-  claimId = ARGV[3],
-  workerId = ARGV[2],
-  acquiredAt = ARGV[4],
-  heartbeatAt = ARGV[4],
-  expiresAt = ARGV[5]
-}
-job.updatedAt = ARGV[4]
-local encoded = cjson.encode(job)
-redis.call('SET', KEYS[1], encoded)
-return encoded
+return nil
 `;
 
 const HEARTBEAT_SCRIPT = `
@@ -221,11 +236,67 @@ redis.call('SET', KEYS[2], '1')
 return encoded
 `;
 
+// The claim token and expiration check are performed in the same Redis script as
+// requeue/terminal cleanup. Only a truly expired (or legacy orphan) claim moves.
+const RECOVER_EXPIRED_SCRIPT = `
+local raw = redis.call('GET', KEYS[1])
+if not raw then
+  redis.call('LREM', KEYS[2], 0, ARGV[1])
+  redis.call('DEL', KEYS[4])
+  return 'cleaned'
+end
+local job = cjson.decode(raw)
+if job.state == 'succeeded' or job.state == 'failed' or job.state == 'cancelled' then
+  redis.call('LREM', KEYS[2], 0, ARGV[1])
+  redis.call('DEL', KEYS[4])
+  return 'cleaned'
+end
+if job.lease and job.lease.expiresAt and job.lease.expiresAt > ARGV[2] then
+  return 'active'
+end
+job.lease = nil
+job.workerId = nil
+job.updatedAt = ARGV[2]
+local status = 'requeued'
+if job.cancellationRequested or redis.call('GET', KEYS[4]) == '1' then
+  job.state = 'cancelled'
+  job.cancellationRequested = true
+  job.completedAt = ARGV[2]
+  job.nextAttemptAt = nil
+  status = 'cancelled'
+elseif job.attempt >= job.descriptor.retry.maxAttempts then
+  job.state = 'failed'
+  job.completedAt = ARGV[2]
+  job.nextAttemptAt = nil
+  job.error = {
+    name = 'JobExecutionError',
+    code = 'JOB_STALE_LEASE_EXHAUSTED',
+    message = 'Worker lease expired after the configured maximum attempts.',
+    attempt = job.attempt,
+    at = ARGV[2]
+  }
+  status = 'exhausted'
+else
+  job.state = 'queued'
+  job.nextAttemptAt = nil
+end
+redis.call('SET', KEYS[1], cjson.encode(job))
+redis.call('LREM', KEYS[2], 0, ARGV[1])
+redis.call('DEL', KEYS[4])
+if status == 'requeued' then redis.call('LPUSH', KEYS[3], ARGV[1]) end
+return status
+`;
+
 export class RedisJobTransport implements DistributedJobTransport {
   private readonly prefix: string;
   private readonly queueKey: string;
   private readonly processingKey: string;
   private readonly delayedKey: string;
+  private readonly recoveryIntervalMs: number;
+  private readonly recoveryBatchSize: number;
+  private recoveryCursor = 0;
+  private lastRecoveryAt = 0;
+  private recoveryInFlight: Promise<void> | undefined;
 
   constructor(
     private readonly client: RedisCommandClient,
@@ -240,6 +311,14 @@ export class RedisJobTransport implements DistributedJobTransport {
     this.queueKey = `${this.prefix}:queue`;
     this.processingKey = `${this.prefix}:processing`;
     this.delayedKey = `${this.prefix}:delayed`;
+    this.recoveryIntervalMs = options.recoveryIntervalMs ?? 1_000;
+    this.recoveryBatchSize = options.recoveryBatchSize ?? 100;
+    if (!Number.isInteger(this.recoveryIntervalMs) || this.recoveryIntervalMs < 10) {
+      throw new JobTransportError("Redis recoveryIntervalMs must be an integer of at least 10ms.");
+    }
+    if (!Number.isInteger(this.recoveryBatchSize) || this.recoveryBatchSize < 1 || this.recoveryBatchSize > 1_000) {
+      throw new JobTransportError("Redis recoveryBatchSize must be between 1 and 1,000.");
+    }
   }
 
   async submit(snapshot: JobSnapshot, fingerprint: string): Promise<JobSnapshot> {
@@ -290,30 +369,22 @@ export class RedisJobTransport implements DistributedJobTransport {
 
   async claim(workerId: string, waitMs: number, leaseDurationMs: number): Promise<JobSnapshot | null> {
     await this.promoteDue();
-    const timeoutSeconds = Math.max(1, Math.ceil(Math.max(1, waitMs) / 1_000));
-    const raw = await this.send([
-      "BRPOPLPUSH",
-      this.queueKey,
-      this.processingKey,
-      String(timeoutSeconds)
-    ]);
-    const jobId = scalar(raw);
-    if (!jobId) return null;
-
-    const claimedAt = new Date();
-    const expiresAt = new Date(claimedAt.getTime() + leaseDurationMs);
-    return parseSnapshot(await this.send([
-      "EVAL",
-      CLAIM_SCRIPT,
-      "2",
-      this.jobKey(jobId),
-      this.processingKey,
-      jobId,
-      workerId,
-      randomUUID(),
-      claimedAt.toISOString(),
-      expiresAt.toISOString()
-    ]));
+    await this.maybeRecover();
+    const deadline = Date.now() + Math.max(0, waitMs);
+    do {
+      const acquiredAt = new Date();
+      const expiresAt = new Date(acquiredAt.getTime() + leaseDurationMs);
+      const snapshot = parseSnapshot(await this.send([
+        "EVAL", CLAIM_NEXT_SCRIPT, "3",
+        this.queueKey, this.processingKey, `${this.prefix}:job:`,
+        workerId, randomUUID(), acquiredAt.toISOString(), expiresAt.toISOString()
+      ]));
+      if (snapshot) return snapshot;
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+      await new Promise<void>((resolve) => setTimeout(resolve, Math.min(50, remaining)));
+    } while (true);
+    return null;
   }
 
   async heartbeat(
@@ -418,6 +489,60 @@ export class RedisJobTransport implements DistributedJobTransport {
 
   async isCancellationRequested(jobId: string): Promise<boolean> {
     return scalar(await this.send(["GET", this.cancelKey(jobId)])) === "1";
+  }
+
+  /** Bounded recovery pass; safe for multiple workers to invoke concurrently. */
+  async recoverStaleClaims(batchSize = this.recoveryBatchSize): Promise<RedisJobRecoveryResult> {
+    if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 1_000) {
+      throw new JobTransportError("Redis recovery batch size must be between 1 and 1,000.");
+    }
+    const fetchPage = async (offset: number): Promise<string[]> => {
+      const value = await this.send([
+        "LRANGE", this.processingKey, String(offset), String(offset + batchSize - 1)
+      ]);
+      if (!Array.isArray(value)) throw new JobTransportError("Redis LRANGE returned an invalid processing list.");
+      return value.map((entry) => {
+        const id = scalar(entry);
+        if (!id) throw new JobTransportError("Redis processing list contains an invalid job ID.");
+        return id;
+      });
+    };
+    let ids = await fetchPage(this.recoveryCursor);
+    if (ids.length === 0 && this.recoveryCursor > 0) {
+      this.recoveryCursor = 0;
+      ids = await fetchPage(0);
+    }
+    this.recoveryCursor += ids.length;
+    const summary: RedisJobRecoveryResult = {
+      scanned: ids.length, requeued: 0, cancelled: 0, exhausted: 0, cleaned: 0, active: 0
+    };
+    for (const jobId of ids) {
+      const status = scalar(await this.send([
+        "EVAL", RECOVER_EXPIRED_SCRIPT, "4",
+        this.jobKey(jobId), this.processingKey, this.queueKey, this.cancelKey(jobId),
+        jobId, new Date().toISOString()
+      ]));
+      if (status === "requeued" || status === "cancelled" || status === "exhausted"
+        || status === "cleaned" || status === "active") {
+        summary[status] += 1;
+      } else {
+        throw new JobTransportError(`Unknown stale-claim recovery status: ${status ?? "null"}`);
+      }
+    }
+    return summary;
+  }
+
+  private async maybeRecover(): Promise<void> {
+    if (this.recoveryInFlight) return await this.recoveryInFlight;
+    if (Date.now() - this.lastRecoveryAt < this.recoveryIntervalMs) return;
+    this.lastRecoveryAt = Date.now();
+    const task = this.recoverStaleClaims().then(() => undefined);
+    this.recoveryInFlight = task;
+    try {
+      await task;
+    } finally {
+      this.recoveryInFlight = undefined;
+    }
   }
 
   private async promoteDue(): Promise<void> {
