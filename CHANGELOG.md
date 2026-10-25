@@ -14,6 +14,7 @@ All notable public changes to Vexa Video SDK are documented here. Public `@vexa-
 - V3.1e worker-level claim/execution/lease-loss diagnostics, read-only activity counters, and retryable transport-error backoff.
 - V3.1f explicit single-queued-job orphan reconciliation and dry-run-first bounded managed workspace reclamation.
 - V3.1g opt-in, bounded, dry-run-first dead-letter retention with atomic Redis index/envelope removal; job records remain untouched.
+- V3.1h opt-in real Redis acceptance tests with independent worker-process termination, lease fencing, cancellation recovery, and concurrent retry reconciliation.
 
 ### Changed
 

@@ -21,6 +21,7 @@
     "format:check": "node ./scripts/check-format.mjs",
     "test": "node --import tsx --test \"packages/**/*.test.ts\"",
     "test:watch": "node --import tsx --test --watch \"packages/**/*.test.ts\"",
+    "test:redis": "node --import tsx --test packages/sdk/test/redis-live.acceptance.ts",
     "typecheck": "tsc -b --pretty false",
     "check": "npm run typecheck && npm test",
     "example:probe": "node --import tsx examples/probe/src/index.ts",

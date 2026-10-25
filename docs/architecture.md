@@ -115,6 +115,8 @@ V3.1f adds `reconcileQueuedOrphan(jobId)` as an explicit single-ID Lua reconcili
 
 V3.1g adds a separately triggered `pruneDeadLetters({minAgeMs, limit, dryRun})` retention operation. Its Redis Lua transaction samples at most `limit` old index members and, only when `dryRun: false`, removes indexed envelopes. Archive age is determined by sorted-index scores. It does not mutate `:job:<id>` snapshots, idempotency keys, retries, or media. Retention is not automatic; operators should export failures before deletion.
 
+V3.1h's test-only RESP2 client exercises the unmodified production Redis transport against a dedicated loopback Redis 7 instance. A child Node process acquires a claim, is force-terminated, and a replacement client recovers the expired lease; separate tests cover concurrent claim exclusivity, cancellation following process death and concurrent retry promotion. Tests use random per-run prefixes, never FLUSHDB/FLUSHALL, and remove only their own keys. This is an explicit integration gate, not part of the normal `npm run verify` or a guarantee of exactly-once external side effects.
+
 Arbitrary media output, uploads and other external handler side effects are still at-least-once, not exactly once; use idempotent artifact identities and later reconciliation. Stop old V3 worker processes before deploying protocol changes. Pre-existing failures are not retroactively backfilled into the dead-letter index.
 
 ## Storage

@@ -29,7 +29,8 @@ Version 2 already provides local/Redis jobs, retries, idempotency, cancellation,
 - **V3.1e — worker diagnostics + error-loop resilience:** adds opt-in claim, execution and lease-loss events; bounded backoff on claim/execute transport failures; read-only local counters and active-job IDs. A failed claim no longer permanently exits a worker loop. Lease loss still aborts the handler signal and cannot commit job state.
 - **V3.1f — targeted orphan/workspace recovery:** opt-in atomic single-ID repair for unleased queued records missing known Redis references; dry-run-first, bounded operator cleanup for aged Vexa workspace directories. No automatic scans, dead-letter replay or active lease takeover.
 - **V3.1g — dead-letter retention controls:** explicit bounded oldest-first retention with a one-day minimum age and dry-run default; actual pruning removes only the dead-letter index and failure envelope, leaving durable job snapshots and external artifacts untouched.
-- **Later V3.1 slices:** comprehensive orphan reconciliation, operator-controlled replay, broader artifact retention, metrics/tracing integrations, workspace/artifact cleanup and real Redis process-failure acceptance.
+- **V3.1h — real Redis fault-injection acceptance:** separate opt-in integration suite using a dedicated loopback Redis 7 server, independent clients, forcibly terminated worker process, lease fencing, crash cancellation, and concurrent retry promotion. No live Redis dependency in the default unit suite; run the acceptance command explicitly.
+- **Later V3.1 slices:** comprehensive orphan reconciliation, operator-controlled replay, broader artifact retention, metrics/tracing integrations, workspace/artifact cleanup and external artifact finalization.
 
 ### Add
 

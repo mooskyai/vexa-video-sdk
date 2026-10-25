@@ -41,6 +41,8 @@ V3.1f adds `await transport.reconcileQueuedOrphan(jobId)` for one known, unlease
 
 V3.1g: inspect `await transport.pruneDeadLetters({ minAgeMs: 7 * 86400000, limit: 100 })` first, then explicitly set `dryRun: false` to remove the oldest qualifying Redis failure envelopes and index entries. Minimum age is one day; batch limit defaults to 100 (maximum 1,000). This action is irreversible for the archived failure envelope and has no scheduler side effects: original job snapshots, retries, idempotency and published artifacts remain unchanged. Export important dead letters before pruning; no automatic retention loop or replay is provided.
 
+V3.1h real Redis acceptance (Redis 7 on localhost): start `docker run -d --name vexa-v31h-redis -p 127.0.0.1:6389:6379 redis:7-alpine`, set `$env:VEXA_TEST_REDIS_URL = "redis://127.0.0.1:6389"` in PowerShell, then run `npm run test:redis`. The command fails if the endpoint is missing or is not loopback. Four tests exercise real Lua transactions, cross-process death and recovery, owner fencing, cancellation and delayed-retry races. The suite deletes only randomly prefixed test keys; it never flushes a database. Stop and remove the dedicated container after testing (`docker rm -f vexa-v31h-redis`). `npm run verify` remains the fast 442-test gate; the live Redis gate must pass separately before V3.1h sign-off.
+
 ## Minimal example
 
 ```ts
