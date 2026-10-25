@@ -3,8 +3,10 @@ import { lookup } from "node:dns/promises";
 import { createReadStream, createWriteStream } from "node:fs";
 import {
   copyFile,
+  lstat,
   mkdir,
   mkdtemp,
+  readdir,
   realpath,
   rename,
   rm,
@@ -73,6 +75,23 @@ export interface ResolvedMediaSource {
   readonly managed: boolean;
   readonly sizeBytes: number | null;
   cleanup(): Promise<void>;
+}
+
+/** Explicit, dry-run-first operator sweep; never run destructive sweeps beside active workers. */
+export interface AbandonedWorkspaceCleanupOptions {
+  root: string;
+  prefix: string;
+  minAgeMs: number;
+  maxEntries?: number;
+  dryRun?: boolean;
+}
+
+export interface AbandonedWorkspaceCleanupResult {
+  scanned: number;
+  eligiblePaths: readonly string[];
+  removedPaths: readonly string[];
+  skipped: number;
+  dryRun: boolean;
 }
 
 function validatePositiveInteger(value: number | undefined, label: string): void {
@@ -399,6 +418,51 @@ export class MediaWorkspace {
     await mkdir(root, { recursive: true });
     const prefix = (options.prefix ?? "vexa-media-").replace(/[^a-zA-Z0-9._-]/gu, "-") || "vexa-media-";
     return new MediaWorkspace(await mkdtemp(join(root, prefix)));
+  }
+
+  /** Operator-led cleanup of old, named managed directories. Dry run is the default. */
+  static async reclaimAbandoned(options: AbandonedWorkspaceCleanupOptions): Promise<AbandonedWorkspaceCleanupResult> {
+    const { root, prefix, minAgeMs } = options;
+    const maxEntries = options.maxEntries ?? 100;
+    const dryRun = options.dryRun !== false;
+    if (!root?.trim() || !prefix?.startsWith("vexa-") || prefix.length < 8
+      || !/^[a-zA-Z0-9._-]+$/u.test(prefix)) {
+      throw new InvalidStorageError("Workspace reclamation requires an explicit root and vexa- managed prefix.");
+    }
+    if (!Number.isSafeInteger(minAgeMs) || minAgeMs < 60_000) {
+      throw new InvalidStorageError("Workspace reclamation minAgeMs must be at least 60,000.");
+    }
+    if (!Number.isInteger(maxEntries) || maxEntries < 1 || maxEntries > 1_000) {
+      throw new InvalidStorageError("Workspace reclamation maxEntries must be between 1 and 1,000.");
+    }
+    const canonicalRoot = await realpath(resolve(root));
+    const entries = (await readdir(canonicalRoot, { withFileTypes: true }))
+      .filter((entry) => entry.name.startsWith(prefix))
+      .sort((left, right) => left.name.localeCompare(right.name))
+      .slice(0, maxEntries);
+    const eligiblePaths: string[] = [];
+    const removedPaths: string[] = [];
+    let skipped = 0;
+    const cutoff = Date.now() - minAgeMs;
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.isSymbolicLink()) {
+        skipped += 1;
+        continue;
+      }
+      const candidate = join(canonicalRoot, entry.name);
+      const info = await lstat(candidate);
+      if (!info.isDirectory() || info.isSymbolicLink() || info.mtimeMs > cutoff
+        || await realpath(candidate) !== candidate) {
+        skipped += 1;
+        continue;
+      }
+      eligiblePaths.push(candidate);
+      if (!dryRun) {
+        await rm(candidate, { recursive: true, force: false });
+        removedPaths.push(candidate);
+      }
+    }
+    return { scanned: entries.length, eligiblePaths, removedPaths, skipped, dryRun };
   }
 
   file(relativePath: string): string {

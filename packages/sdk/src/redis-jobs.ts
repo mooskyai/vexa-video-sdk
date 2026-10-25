@@ -49,9 +49,14 @@ export interface RedisJobQueueDiagnostics {
   deadLetters: number;
 }
 
+/** Explicit single-job orphan correction is never a background key scan. */
+export type RedisJobOrphanResult =
+  | "requeued" | "indexed" | "missing" | "terminal" | "leased" | "ineligible";
+
 export type RedisJobDiagnosticEvent =
   | { operation: "retry-reconciliation"; at: string; result: RedisRetryReconciliationResult }
-  | { operation: "stale-recovery"; at: string; result: RedisJobRecoveryResult };
+  | { operation: "stale-recovery"; at: string; result: RedisJobRecoveryResult }
+  | { operation: "orphan-reconciliation"; at: string; jobId: string; result: RedisJobOrphanResult };
 
 /** Persistent failure record; V3.1c does not automatically replay failed jobs. */
 export interface RedisJobDeadLetter {
@@ -358,6 +363,27 @@ if status == 'requeued' then redis.call('LPUSH', KEYS[3], ARGV[1]) end
 return status
 `;
 
+// Opt-in per-ID repair only. LPOS requires Redis 6.0.6+; no unbounded scans,
+// unknown work execution, early retry promotion or dead-letter replays.
+const RECONCILE_QUEUED_ORPHAN_SCRIPT = `
+-- V3_1F_RECONCILE_QUEUED_ORPHAN
+local raw = redis.call('GET', KEYS[1])
+if not raw then return 'missing' end
+local job = cjson.decode(raw)
+if job.state == 'succeeded' or job.state == 'failed' or job.state == 'cancelled' then
+  return 'terminal'
+end
+if job.lease then return 'leased' end
+if job.state ~= 'queued' or job.cancellationRequested then return 'ineligible' end
+if redis.call('LPOS', KEYS[2], ARGV[1])
+  or redis.call('LPOS', KEYS[3], ARGV[1])
+  or redis.call('ZSCORE', KEYS[4], ARGV[1]) then
+  return 'indexed'
+end
+redis.call('LPUSH', KEYS[2], ARGV[1])
+return 'requeued'
+`;
+
 export class RedisJobTransport implements DistributedJobTransport {
   private readonly prefix: string;
   private readonly queueKey: string;
@@ -548,6 +574,23 @@ export class RedisJobTransport implements DistributedJobTransport {
 
   async isCancellationRequested(jobId: string): Promise<boolean> {
     return scalar(await this.send(["GET", this.cancelKey(jobId)])) === "1";
+  }
+
+  /** Repair one explicitly supplied orphaned queued job, without touching leases or retries. */
+  async reconcileQueuedOrphan(jobId: string): Promise<RedisJobOrphanResult> {
+    if (!jobId.trim()) throw new JobTransportError("Orphan reconciliation requires a job ID.");
+    const result = scalar(await this.send([
+      "EVAL", RECONCILE_QUEUED_ORPHAN_SCRIPT, "4",
+      this.jobKey(jobId), this.queueKey, this.processingKey, this.delayedKey, jobId
+    ]));
+    if (result !== "requeued" && result !== "indexed" && result !== "missing"
+      && result !== "terminal" && result !== "leased" && result !== "ineligible") {
+      throw new JobTransportError(`Invalid orphan-reconciliation status: ${result ?? "null"}`);
+    }
+    this.emitDiagnostic({
+      operation: "orphan-reconciliation", at: new Date().toISOString(), jobId, result
+    });
+    return result;
   }
 
   /** An atomic bounded sweep of due retries, pruning invalid delayed entries. */

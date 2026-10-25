@@ -27,6 +27,7 @@ Version 2 already provides local/Redis jobs, retries, idempotency, cancellation,
 - **V3.1c — durable dead letters:** implemented in this development slice. Successful terminal-failure transitions and expired-lease exhaustion atomically persist an indexed failure envelope containing the terminal snapshot and reason; bounded inspection does not alter jobs or retry them.
 - **V3.1d — retry reconciliation + operational diagnostics:** implemented. Redis validates each due retry against current state; cancellation and index removal are atomic, and bounded queue diagnostics/events expose operational state.
 - **V3.1e — worker diagnostics + error-loop resilience:** adds opt-in claim, execution and lease-loss events; bounded backoff on claim/execute transport failures; read-only local counters and active-job IDs. A failed claim no longer permanently exits a worker loop. Lease loss still aborts the handler signal and cannot commit job state.
+- **V3.1f — targeted orphan/workspace recovery:** opt-in atomic single-ID repair for unleased queued records missing known Redis references; dry-run-first, bounded operator cleanup for aged Vexa workspace directories. No automatic scans, dead-letter replay or active lease takeover.
 - **Later V3.1 slices:** comprehensive orphan reconciliation, operator-controlled replay, retention, metrics/tracing integrations, workspace/artifact cleanup and real Redis process-failure acceptance.
 
 ### Add

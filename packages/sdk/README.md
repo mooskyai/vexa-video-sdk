@@ -37,6 +37,8 @@ V3.1d adds `await transport.reconcileDueRetries(batchSize)` (default 100, max 1,
 
 V3.1e adds `new DistributedJobWorker(transport, { errorBackoffMs: 250, onDiagnostic: (event) => { ... } })`. The worker emits synchronous `claim-error`, `execution-error`, `started`, and `lease-lost` events; a throwing listener is isolated. `worker.getDiagnostics()` returns local claim/execute/lease-loss counts and active job IDs. A claim or execution-path transport failure backs off before retrying the worker loop, while a lost lease still fails closed. Use this for worker telemetry; it does not enable replay, global metrics or exactly-once handler side effects.
 
+V3.1f adds `await transport.reconcileQueuedOrphan(jobId)` for one known, unleased queued job missing its ready/processing/delayed index entry. This operator-triggered atomic action uses `LPOS` (Redis 6.0.6+) and never bypasses retry delays or active lease fencing. For workspaces, inspect `await MediaWorkspace.reclaimAbandoned({ root, prefix: "vexa-media-", minAgeMs: 86400000 })` first (dry-run default). Only after stopping affected workers should an operator set `dryRun: false`. At most 100 matching names are scanned per call by default (max 1,000); mtime is not proof of abandonment.
+
 ## Minimal example
 
 ```ts

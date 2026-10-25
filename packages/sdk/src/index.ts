@@ -18,9 +18,9 @@ export type {
 export { JobQueue, JobHandle, DistributedJobQueue, DistributedJobWorker } from "./jobs.js";
 export type { JobHandler, JobHandlerContext, JobHandlerOptions, JobProgressUpdate, LocalJobQueueOptions, JobListOptions, WaitForJobOptions, DistributedJobTransport, DistributedJobWorkerOptions, DistributedWorkerDiagnostics, DistributedWorkerDiagnosticEvent } from "./jobs.js";
 export { RedisJobTransport } from "./redis-jobs.js";
-export type { RedisCommandClient, RedisJobTransportOptions, RedisJobRecoveryResult, RedisJobDeadLetter, RedisRetryReconciliationResult, RedisJobQueueDiagnostics, RedisJobDiagnosticEvent } from "./redis-jobs.js";
+export type { RedisCommandClient, RedisJobTransportOptions, RedisJobRecoveryResult, RedisJobDeadLetter, RedisRetryReconciliationResult, RedisJobQueueDiagnostics, RedisJobDiagnosticEvent, RedisJobOrphanResult } from "./redis-jobs.js";
 export { Storage, MediaWorkspace, parseStorageSource } from "./storage.js";
-export type { StorageAdapter, StorageAdapterHandlers, StorageOptions, ResolvedMediaSource } from "./storage.js";
+export type { StorageAdapter, StorageAdapterHandlers, StorageOptions, ResolvedMediaSource, AbandonedWorkspaceCleanupOptions, AbandonedWorkspaceCleanupResult } from "./storage.js";
 export { Hardware } from "./hardware.js";
 export { Streaming } from "./streaming.js";
 export { Captions } from "./captions.js";

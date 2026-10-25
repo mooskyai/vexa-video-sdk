@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { createReadStream } from "node:fs";
-import { access, readFile, stat, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { InvalidStorageError, RemoteMediaRejectedError } from "@vexa-video/core";
 import { runProcess } from "@vexa-video/ffmpeg";
-import { Storage, parseStorageSource } from "../src/storage.js";
+import { MediaWorkspace, Storage, parseStorageSource } from "../src/storage.js";
 import { Video } from "../src/video.js";
 
 async function withHttpServer<T>(
@@ -113,6 +113,43 @@ test("managed workspaces prevent path escape and clean up recursively", async ()
   const root = workspace.path;
   await workspace.cleanup();
   await assert.rejects(access(root));
+});
+
+test("abandoned managed-workspace reclamation is dry-run first and bounded", async () => {
+  const root = await mkdtemp(join(tmpdir(), "vexa-reclaim-test-"));
+  try {
+    const abandoned = await MediaWorkspace.create({ root, prefix: "vexa-reclaim-" });
+    const active = await MediaWorkspace.create({ root, prefix: "vexa-reclaim-" });
+    const unrelated = await MediaWorkspace.create({ root, prefix: "vexa-other-" });
+    const oldTime = new Date(Date.now() - 5 * 60_000);
+    await utimes(abandoned.path, oldTime, oldTime);
+    await utimes(unrelated.path, oldTime, oldTime);
+    const opts = { root, prefix: "vexa-reclaim-", minAgeMs: 60_000 };
+    const preview = await MediaWorkspace.reclaimAbandoned(opts);
+    assert.deepEqual(preview.eligiblePaths, [abandoned.path]);
+    assert.deepEqual(preview.removedPaths, []);
+    assert.equal(preview.dryRun, true);
+    assert.equal((await stat(abandoned.path)).isDirectory(), true);
+    const cleaned = await MediaWorkspace.reclaimAbandoned({ ...opts, dryRun: false });
+    assert.deepEqual(cleaned.removedPaths, [abandoned.path]);
+    await assert.rejects(access(abandoned.path));
+    assert.equal((await stat(active.path)).isDirectory(), true);
+    assert.equal((await stat(unrelated.path)).isDirectory(), true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("workspace reclamation refuses broad prefixes, short ages and invalid scan bounds", async () => {
+  await assert.rejects(() => MediaWorkspace.reclaimAbandoned({
+    root: tmpdir(), prefix: "tmp-", minAgeMs: 60_000
+  }), InvalidStorageError);
+  await assert.rejects(() => MediaWorkspace.reclaimAbandoned({
+    root: tmpdir(), prefix: "vexa-media-", minAgeMs: 0
+  }), InvalidStorageError);
+  await assert.rejects(() => MediaWorkspace.reclaimAbandoned({
+    root: tmpdir(), prefix: "vexa-media-", minAgeMs: 60_000, maxEntries: 0
+  }), InvalidStorageError);
 });
 
 test("object-storage adapters delegate S3 downloads and uploads without cloud SDK dependencies", async () => {

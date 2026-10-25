@@ -12,6 +12,7 @@ All notable public changes to Vexa Video SDK are documented here. Public `@vexa-
 - V3.1c durable Redis dead-letter entries for terminal worker failures and stale-lease exhaustion, with bounded read-only inspection APIs.
 - V3.1d bounded retry reconciliation, queue diagnostics, and optional structured operational events.
 - V3.1e worker-level claim/execution/lease-loss diagnostics, read-only activity counters, and retryable transport-error backoff.
+- V3.1f explicit single-queued-job orphan reconciliation and dry-run-first bounded managed workspace reclamation.
 
 ### Changed
 

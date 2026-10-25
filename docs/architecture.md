@@ -111,6 +111,8 @@ V3.1d introduces an atomic queued/delayed cancellation transition. Redis also ve
 
 V3.1e hardens the distributed worker loop: transient claim or execution-path errors emit structured worker-local diagnostics and back off before polling again instead of terminating a worker task. `getDiagnostics()` exposes worker-local counts and current active job IDs; opt-in `onDiagnostic` events are synchronous and contain no payload/stack trace. A renewal failure emits `lease-lost` and aborts the handler, with no attempt to commit stale results. This does not guarantee idempotence for external side effects or replace Redis recovery.
 
+V3.1f adds `reconcileQueuedOrphan(jobId)` as an explicit single-ID Lua reconciliation: only unleased `queued` records absent from ready, processing and delayed indexes can be restored (requires Redis 6.0.6+ for `LPOS`). No keyspace sweep, retry acceleration, failed-job replay or lease takeover occurs. `MediaWorkspace.reclaimAbandoned()` requires an explicit workspace root, `vexa-` prefix, age and entry bound; it defaults to dry-run. Destructive sweeps must be operator-confirmed with affected workers stopped, since directory age cannot prove abandonment.
+
 Arbitrary media output, uploads and other external handler side effects are still at-least-once, not exactly once; use idempotent artifact identities and later reconciliation. Stop old V3 worker processes before deploying protocol changes. Pre-existing failures are not retroactively backfilled into the dead-letter index.
 
 ## Storage

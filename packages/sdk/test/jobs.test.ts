@@ -444,6 +444,22 @@ class FakeRedis implements RedisCommandClient {
     const keys = args.slice(3, 3 + keyCount);
     const argv = args.slice(3 + keyCount);
 
+    if (script.includes("-- V3_1F_RECONCILE_QUEUED_ORPHAN")) {
+      const id = argv[0]!;
+      const raw = this.strings.get(keys[0]!);
+      if (!raw) return "missing";
+      const job = JSON.parse(raw) as JobSnapshot;
+      if (isTerminalJobState(job.state)) return "terminal";
+      if (job.lease) return "leased";
+      if (job.state !== "queued" || job.cancellationRequested) return "ineligible";
+      if ((this.lists.get(keys[1]!) ?? []).includes(id)
+        || (this.lists.get(keys[2]!) ?? []).includes(id)
+        || this.sorted.get(keys[3]!)?.has(id)) return "indexed";
+      const queue = this.lists.get(keys[1]!) ?? [];
+      queue.unshift(id);
+      this.lists.set(keys[1]!, queue);
+      return "requeued";
+    }
     if (script.includes("local existing = redis.call('GET', KEYS[3])")) {
       const existing = this.strings.get(keys[2]!);
       if (existing) return existing;
@@ -706,6 +722,49 @@ class FakeRedis implements RedisCommandClient {
     throw new Error("Unsupported fake Redis Lua script.");
   }
 }
+
+test("Redis queued orphan repair restores a missing queue index only once", async () => {
+  const redis = new FakeRedis();
+  const diagnostics: string[] = [];
+  const transport = new RedisJobTransport(redis, {
+    prefix: "test:vexa", queue: "orphan-repair",
+    onDiagnostic: (event) => {
+      if (event.operation === "orphan-reconciliation") diagnostics.push(event.result);
+    }
+  });
+  const queue = new DistributedJobQueue(transport);
+  const job = await queue.submit("orphan.work", {});
+  const key = "test:vexa:orphan-repair:queue";
+  redis.lists.set(key, []); // Simulate a missing ready-list reference.
+  assert.equal(await transport.reconcileQueuedOrphan(job.descriptor.id), "requeued");
+  assert.equal(await transport.reconcileQueuedOrphan(job.descriptor.id), "indexed");
+  assert.deepEqual(redis.lists.get(key), [job.descriptor.id]);
+  assert.deepEqual(diagnostics, ["requeued", "indexed"]);
+  assert.equal((await transport.claim("replacement", 10, 500))?.descriptor.id, job.descriptor.id);
+});
+
+test("Redis orphan repair never resurrects active, delayed, cancelled or missing jobs", async () => {
+  const redis = new FakeRedis();
+  const transport = new RedisJobTransport(redis, { prefix: "test:vexa", queue: "orphan-fenced" });
+  const queue = new DistributedJobQueue(transport);
+  assert.equal(await transport.reconcileQueuedOrphan("missing"), "missing");
+  await assert.rejects(() => transport.reconcileQueuedOrphan(" "), /requires a job ID/);
+  const running = await queue.submit("orphan.running", {});
+  const claim = await transport.claim("owner", 10, 500);
+  assert.equal(claim?.descriptor.id, running.descriptor.id);
+  assert.equal(await transport.reconcileQueuedOrphan(running.descriptor.id), "leased");
+  const queued = await queue.submit("orphan.delayed", {});
+  // Even a missing queue entry cannot be restored when another index owns it.
+  const ready = "test:vexa:orphan-fenced:queue";
+  redis.lists.set(ready, []);
+  redis.sorted.set("test:vexa:orphan-fenced:delayed", new Map([[queued.descriptor.id, Date.now() + 60_000]]));
+  assert.equal(await transport.reconcileQueuedOrphan(queued.descriptor.id), "indexed");
+  assert.deepEqual(redis.lists.get(ready), []);
+  const cancelled = await queue.submit("orphan.cancelled", {});
+  await queue.cancel(cancelled.descriptor.id);
+  assert.equal(await transport.reconcileQueuedOrphan(cancelled.descriptor.id), "terminal");
+  assert.deepEqual(redis.lists.get(ready), []);
+});
 
 test("Redis job transport provides durable idempotent submission and queued cancellation", async () => {
   const redis = new FakeRedis();
