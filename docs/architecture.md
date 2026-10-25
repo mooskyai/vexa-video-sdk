@@ -113,6 +113,8 @@ V3.1e hardens the distributed worker loop: transient claim or execution-path err
 
 V3.1f adds `reconcileQueuedOrphan(jobId)` as an explicit single-ID Lua reconciliation: only unleased `queued` records absent from ready, processing and delayed indexes can be restored (requires Redis 6.0.6+ for `LPOS`). No keyspace sweep, retry acceleration, failed-job replay or lease takeover occurs. `MediaWorkspace.reclaimAbandoned()` requires an explicit workspace root, `vexa-` prefix, age and entry bound; it defaults to dry-run. Destructive sweeps must be operator-confirmed with affected workers stopped, since directory age cannot prove abandonment.
 
+V3.1g adds a separately triggered `pruneDeadLetters({minAgeMs, limit, dryRun})` retention operation. Its Redis Lua transaction samples at most `limit` old index members and, only when `dryRun: false`, removes indexed envelopes. Archive age is determined by sorted-index scores. It does not mutate `:job:<id>` snapshots, idempotency keys, retries, or media. Retention is not automatic; operators should export failures before deletion.
+
 Arbitrary media output, uploads and other external handler side effects are still at-least-once, not exactly once; use idempotent artifact identities and later reconciliation. Stop old V3 worker processes before deploying protocol changes. Pre-existing failures are not retroactively backfilled into the dead-letter index.
 
 ## Storage

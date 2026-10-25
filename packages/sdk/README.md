@@ -39,6 +39,8 @@ V3.1e adds `new DistributedJobWorker(transport, { errorBackoffMs: 250, onDiagnos
 
 V3.1f adds `await transport.reconcileQueuedOrphan(jobId)` for one known, unleased queued job missing its ready/processing/delayed index entry. This operator-triggered atomic action uses `LPOS` (Redis 6.0.6+) and never bypasses retry delays or active lease fencing. For workspaces, inspect `await MediaWorkspace.reclaimAbandoned({ root, prefix: "vexa-media-", minAgeMs: 86400000 })` first (dry-run default). Only after stopping affected workers should an operator set `dryRun: false`. At most 100 matching names are scanned per call by default (max 1,000); mtime is not proof of abandonment.
 
+V3.1g: inspect `await transport.pruneDeadLetters({ minAgeMs: 7 * 86400000, limit: 100 })` first, then explicitly set `dryRun: false` to remove the oldest qualifying Redis failure envelopes and index entries. Minimum age is one day; batch limit defaults to 100 (maximum 1,000). This action is irreversible for the archived failure envelope and has no scheduler side effects: original job snapshots, retries, idempotency and published artifacts remain unchanged. Export important dead letters before pruning; no automatic retention loop or replay is provided.
+
 ## Minimal example
 
 ```ts

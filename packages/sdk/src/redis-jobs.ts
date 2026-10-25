@@ -53,10 +53,27 @@ export interface RedisJobQueueDiagnostics {
 export type RedisJobOrphanResult =
   | "requeued" | "indexed" | "missing" | "terminal" | "leased" | "ineligible";
 
+/** Results for an explicit, bounded archive-index retention pass. */
+export interface RedisDeadLetterPruneResult {
+  inspected: number;
+  removed: number;
+  dryRun: boolean;
+}
+
+export interface RedisDeadLetterPruneOptions {
+  /** At least one day old. Retention uses the archive index score, not job age. */
+  minAgeMs: number;
+  /** Entries examined per call, 1-1000; defaults to 100. */
+  limit?: number;
+  /** Must explicitly set false to remove records; defaults to true. */
+  dryRun?: boolean;
+}
+
 export type RedisJobDiagnosticEvent =
   | { operation: "retry-reconciliation"; at: string; result: RedisRetryReconciliationResult }
   | { operation: "stale-recovery"; at: string; result: RedisJobRecoveryResult }
-  | { operation: "orphan-reconciliation"; at: string; jobId: string; result: RedisJobOrphanResult };
+  | { operation: "orphan-reconciliation"; at: string; jobId: string; result: RedisJobOrphanResult }
+  | { operation: "dead-letter-prune"; at: string; result: RedisDeadLetterPruneResult };
 
 /** Persistent failure record; V3.1c does not automatically replay failed jobs. */
 export interface RedisJobDeadLetter {
@@ -105,6 +122,22 @@ const SUBMIT_SCRIPT = `
 redis.call('SET', KEYS[1], ARGV[1])
 redis.call('LPUSH', KEYS[2], ARGV[2])
 return ARGV[2]
+`;
+
+// Retire indexed dead-letter envelopes only. Job records, idempotency keys,
+// retry state, and media artifacts are never touched. Default is dry-run.
+const PRUNE_DEAD_LETTERS_SCRIPT = `
+-- DEAD_LETTER_PRUNE
+local ids = redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', ARGV[1], 'LIMIT', 0, tonumber(ARGV[2]))
+if ARGV[3] == '1' then return {#ids, 0} end
+local removed = 0
+for _, id in ipairs(ids) do
+  if redis.call('ZREM', KEYS[1], id) == 1 then
+    redis.call('DEL', KEYS[2] .. id)
+    removed = removed + 1
+  end
+end
+return {#ids, removed}
 `;
 
 // A delayed index alone cannot resurrect a cancelled, terminal or missing job.
@@ -635,6 +668,40 @@ export class RedisJobTransport implements DistributedJobTransport {
       capturedAt: new Date().toISOString(), queued: counts[0]!,
       processing: counts[1]!, delayed: counts[2]!, deadLetters: counts[3]!
     };
+  }
+
+  /** Explicit dry-run-first retention pass. Does not change job state or replay work. */
+  async pruneDeadLetters(options: RedisDeadLetterPruneOptions): Promise<RedisDeadLetterPruneResult> {
+    if (!Number.isSafeInteger(options.minAgeMs) || options.minAgeMs < 86_400_000) {
+      throw new JobTransportError("Dead-letter minAgeMs must be an integer of at least one day.");
+    }
+    const limit = options.limit ?? 100;
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1_000) {
+      throw new JobTransportError("Dead-letter prune limit must be between 1 and 1,000.");
+    }
+    if (options.dryRun !== undefined && typeof options.dryRun !== "boolean") {
+      throw new JobTransportError("Dead-letter dryRun must be a boolean.");
+    }
+    const dryRun = options.dryRun !== false;
+    const nowMs = Date.now();
+    const raw = await this.send([
+      "EVAL", PRUNE_DEAD_LETTERS_SCRIPT, "2",
+      this.deadIndexKey, `${this.prefix}:dead:entry:`,
+      String(nowMs - options.minAgeMs), String(limit), dryRun ? "1" : "0"
+    ]);
+    if (!Array.isArray(raw) || raw.length !== 2) {
+      throw new JobTransportError("Redis dead-letter retention returned invalid counters.");
+    }
+    const inspected = integer(raw[0]);
+    const removed = integer(raw[1]);
+    if (!Number.isSafeInteger(inspected) || !Number.isSafeInteger(removed)
+      || inspected < 0 || inspected > limit || removed < 0 || removed > inspected
+      || (dryRun && removed !== 0)) {
+      throw new JobTransportError("Redis dead-letter retention returned inconsistent counters.");
+    }
+    const result = { inspected, removed, dryRun };
+    this.emitDiagnostic({ operation: "dead-letter-prune", at: new Date(nowMs).toISOString(), result });
+    return result;
   }
 
   /** Read one immutable dead-letter record without mutating the job or scheduling a replay. */

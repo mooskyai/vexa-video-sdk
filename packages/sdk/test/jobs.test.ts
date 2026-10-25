@@ -477,6 +477,21 @@ class FakeRedis implements RedisCommandClient {
       this.lists.set(keys[1]!, list);
       return argv[1]!;
     }
+    if (script.includes("-- DEAD_LETTER_PRUNE")) {
+      const index = this.sorted.get(keys[0]!) ?? new Map<string, number>();
+      const ids = [...index.entries()]
+        .filter(([, score]) => score <= Number(argv[0]))
+        .sort(([a, as], [b, bs]) => as - bs || a.localeCompare(b))
+        .slice(0, Number(argv[1])).map(([id]) => id);
+      if (argv[2] === "1") return [ids.length, 0];
+      let removed = 0;
+      for (const id of ids) {
+        if (!index.delete(id)) continue;
+        this.strings.delete(`${keys[1]!}${id}`);
+        removed += 1;
+      }
+      return [ids.length, removed];
+    }
     if (script.includes("ZRANGEBYSCORE")) {
       const delayed = this.sorted.get(keys[0]!) ?? new Map<string, number>();
       const due = [...delayed].filter(([, score]) => score <= Number(argv[0]))
@@ -1213,4 +1228,79 @@ test("distributed worker exposes active jobs and validates error backoff", async
     await worker.stop();
   }
   assert.deepEqual(worker.getDiagnostics().activeJobIds, []);
+});
+
+function archiveForRetention(redis: FakeRedis, prefix: string, id: string, recordedAtMs: number): void {
+  const jobKey = `${prefix}:job:${id}`;
+  const snapshot = JSON.parse(redis.strings.get(jobKey)!) as JobSnapshot;
+  snapshot.state = "failed";
+  snapshot.attempt = 1;
+  snapshot.updatedAt = new Date(recordedAtMs).toISOString();
+  snapshot.completedAt = snapshot.updatedAt;
+  redis.strings.set(jobKey, JSON.stringify(snapshot));
+  redis.strings.set(`${prefix}:dead:entry:${id}`, JSON.stringify({
+    jobId: id, recordedAt: snapshot.updatedAt, reason: "retry-exhausted", snapshot
+  }));
+  const index = redis.sorted.get(`${prefix}:dead:index`) ?? new Map<string, number>();
+  index.set(id, recordedAtMs);
+  redis.sorted.set(`${prefix}:dead:index`, index);
+}
+
+test("Redis dead-letter retention defaults to dry-run and preserves archive records", async () => {
+  const redis = new FakeRedis();
+  const prefix = "test:vexa:retention-dry";
+  const transport = new RedisJobTransport(redis, { prefix: "test:vexa", queue: "retention-dry" });
+  const job = await new DistributedJobQueue(transport).submit("retention.dry", {});
+  archiveForRetention(redis, prefix, job.descriptor.id, Date.now() - 172_800_000);
+  assert.deepEqual(await transport.pruneDeadLetters({ minAgeMs: 86_400_000 }), {
+    inspected: 1, removed: 0, dryRun: true
+  });
+  assert.equal((await transport.getDeadLetter(job.descriptor.id))?.jobId, job.descriptor.id);
+  assert.equal((await transport.getQueueDiagnostics()).deadLetters, 1);
+});
+
+test("Redis retention prunes an old page but preserves recent archives and job snapshots", async () => {
+  const redis = new FakeRedis();
+  const prefix = "test:vexa:retention-batch";
+  const transport = new RedisJobTransport(redis, { prefix: "test:vexa", queue: "retention-batch" });
+  const queue = new DistributedJobQueue(transport);
+  const jobs = await Promise.all([queue.submit("retention.one", {}), queue.submit("retention.two", {}), queue.submit("retention.three", {})]);
+  archiveForRetention(redis, prefix, jobs[0]!.descriptor.id, Date.now() - 259_200_000);
+  archiveForRetention(redis, prefix, jobs[1]!.descriptor.id, Date.now() - 172_800_000);
+  archiveForRetention(redis, prefix, jobs[2]!.descriptor.id, Date.now() - 3_600_000);
+  assert.deepEqual(await transport.pruneDeadLetters({ minAgeMs: 86_400_000, limit: 1, dryRun: false }), {
+    inspected: 1, removed: 1, dryRun: false
+  });
+  assert.equal(await transport.getDeadLetter(jobs[0]!.descriptor.id), null);
+  assert.ok(await transport.getDeadLetter(jobs[1]!.descriptor.id));
+  assert.ok(await transport.getDeadLetter(jobs[2]!.descriptor.id));
+  assert.equal((await queue.get(jobs[0]!.descriptor.id)).state, "failed");
+  assert.deepEqual(await transport.pruneDeadLetters({ minAgeMs: 86_400_000, dryRun: false }), {
+    inspected: 1, removed: 1, dryRun: false
+  });
+  assert.deepEqual(await transport.pruneDeadLetters({ minAgeMs: 86_400_000, dryRun: false }), {
+    inspected: 0, removed: 0, dryRun: false
+  });
+  assert.equal((await transport.getQueueDiagnostics()).deadLetters, 1);
+});
+
+test("Redis retention rejects unsafe ages, limits and flags", async () => {
+  const transport = new RedisJobTransport(new FakeRedis());
+  await assert.rejects(() => transport.pruneDeadLetters({ minAgeMs: 0 }), /minAgeMs/);
+  await assert.rejects(() => transport.pruneDeadLetters({ minAgeMs: 86_399_999 }), /minAgeMs/);
+  await assert.rejects(() => transport.pruneDeadLetters({ minAgeMs: Number.NaN }), /minAgeMs/);
+  await assert.rejects(() => transport.pruneDeadLetters({ minAgeMs: 86_400_000, limit: 0 }), /limit/);
+  await assert.rejects(() => transport.pruneDeadLetters({ minAgeMs: 86_400_000, limit: 1_001 }), /limit/);
+  await assert.rejects(() => transport.pruneDeadLetters({ minAgeMs: 86_400_000, dryRun: "no" as unknown as boolean }), /dryRun/);
+});
+
+test("Redis dead-letter pruning isolates diagnostic callback failures", async () => {
+  const events: string[] = [];
+  const transport = new RedisJobTransport(new FakeRedis(), {
+    onDiagnostic: (event) => { events.push(event.operation); throw new Error("telemetry unavailable"); }
+  });
+  assert.deepEqual(await transport.pruneDeadLetters({ minAgeMs: 86_400_000 }), {
+    inspected: 0, removed: 0, dryRun: true
+  });
+  assert.deepEqual(events, ["dead-letter-prune"]);
 });
