@@ -127,6 +127,8 @@ V3.1l stores a Redis-server-time creation marker alongside newly committed recei
 
 V3.1m layers bounded operator diagnostics over V3.1l dry-run retirement: explicit destination candidates (max 100) are preflight-validated, inspected serially without keyspace scans or destructive Redis operations, classified using the existing provider-authoritative absence and reference checks, and summarized with redacted per-entry provider failures. Optional diagnostic callbacks cannot alter the result if they throw. Findings are snapshots, not a distributed lock or permission to retire active outputs.
 
+V3.1n exposes synchronous, optional `onMetric` and `onSpan` sinks on `DistributedJobWorker`. Monotonic elapsed time produces attempt duration samples, while completed spans include explicit outcome and job/claim correlation. Metrics only tag stable job type/outcome (never job or claim identifiers), and no payload, exception text or stack is exported by these hooks. Exporters are application-owned: callbacks that throw cannot disrupt job mutations, but high-volume exporters should use nonblocking bounded queues. Span completion reflects observed worker attempts, not exactly-once remote storage publication.
+
 Arbitrary media output, uploads and other external handler side effects are still at-least-once, not exactly once; use idempotent artifact identities and later reconciliation. Stop old V3 worker processes before deploying protocol changes. Pre-existing failures are not retroactively backfilled into the dead-letter index.
 
 ## Storage

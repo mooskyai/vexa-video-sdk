@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { performance } from "node:perf_hooks";
 import type {
   JobDescriptor,
   JobEvent,
@@ -633,6 +634,39 @@ export interface DistributedWorkerDiagnosticEvent {
   message?: string;
 }
 
+/** Exporter-agnostic worker attempt result; no job input, error text or stack trace. */
+export type DistributedWorkerAttemptOutcome =
+  | "succeeded" | "failed" | "cancelled" | "retrying" | "lease-lost" | "error";
+
+/** Counter or duration sample. Attributes deliberately exclude job/claim IDs. */
+export interface DistributedWorkerMetric {
+  readonly name:
+    | "vexa.worker.claim.errors"
+    | "vexa.worker.execution.errors"
+    | "vexa.worker.lease.losses"
+    | "vexa.worker.attempts"
+    | "vexa.worker.attempt.duration_ms";
+  readonly kind: "counter" | "histogram";
+  readonly value: number;
+  readonly attributes: Readonly<{
+    jobType?: string;
+    outcome?: DistributedWorkerAttemptOutcome;
+  }>;
+}
+
+/** Completed attempt record for application-provided tracing exporters. */
+export interface DistributedWorkerSpan {
+  readonly name: "vexa.worker.attempt";
+  readonly workerId: string;
+  readonly jobId: string;
+  readonly claimId?: string;
+  readonly jobType: string;
+  readonly startedAt: string;
+  readonly endedAt: string;
+  readonly durationMs: number;
+  readonly outcome: DistributedWorkerAttemptOutcome;
+}
+
 export interface DistributedJobWorkerOptions {
   workerId?: string;
   concurrency?: number;
@@ -644,6 +678,10 @@ export interface DistributedJobWorkerOptions {
   errorBackoffMs?: number;
   /** Optional synchronous observability hook; exceptions are isolated. */
   onDiagnostic?: (event: DistributedWorkerDiagnosticEvent) => void;
+  /** Opt-in metric sink; synchronous callbacks only, exporter errors are isolated. */
+  onMetric?: (metric: DistributedWorkerMetric) => void;
+  /** Opt-in completed-attempt span sink; synchronous callbacks only. */
+  onSpan?: (span: DistributedWorkerSpan) => void;
 }
 
 export class DistributedJobWorker {
@@ -656,6 +694,8 @@ export class DistributedJobWorker {
   private readonly heartbeatIntervalMs: number;
   private readonly errorBackoffMs: number;
   private readonly onDiagnostic: DistributedJobWorkerOptions["onDiagnostic"];
+  private readonly onMetric: DistributedJobWorkerOptions["onMetric"];
+  private readonly onSpan: DistributedJobWorkerOptions["onSpan"];
   private readonly activeJobIds = new Set<string>();
   private claimErrors = 0;
   private executionErrors = 0;
@@ -675,6 +715,8 @@ export class DistributedJobWorker {
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? Math.min(10_000, Math.floor(this.leaseDurationMs / 3));
     this.errorBackoffMs = options.errorBackoffMs ?? 250;
     this.onDiagnostic = options.onDiagnostic;
+    this.onMetric = options.onMetric;
+    this.onSpan = options.onSpan;
     if (!Number.isInteger(this.errorBackoffMs) || this.errorBackoffMs < 10 || this.errorBackoffMs > 60_000) {
       throw new InvalidJobError("Distributed worker errorBackoffMs must be an integer between 10 and 60000.");
     }
@@ -745,6 +787,14 @@ export class DistributedJobWorker {
     }
   }
 
+  private emitMetric(metric: DistributedWorkerMetric): void {
+    try { this.onMetric?.(metric); } catch { /* Telemetry must not affect job state. */ }
+  }
+
+  private emitSpan(span: DistributedWorkerSpan): void {
+    try { this.onSpan?.(span); } catch { /* Telemetry must not affect job state. */ }
+  }
+
   private async backoffOnError(): Promise<void> {
     if (this.stopping) return;
     await new Promise<void>((resolve) => setTimeout(resolve, this.errorBackoffMs));
@@ -757,26 +807,47 @@ export class DistributedJobWorker {
         snapshot = await this.transport.claim(this.workerId, this.claimWaitMs, this.leaseDurationMs);
       } catch (error) {
         this.claimErrors += 1;
+        this.emitMetric({ name: "vexa.worker.claim.errors", kind: "counter", value: 1, attributes: {} });
         this.emitDiagnostic({ type: "claim-error", message: error instanceof Error ? error.message : String(error) });
         await this.backoffOnError();
         continue;
       }
       if (!snapshot) continue;
       const jobId = snapshot.descriptor.id;
+      const claimId = snapshot.lease?.claimId;
+      const jobType = snapshot.descriptor.type;
+      const startedAt = now();
+      const started = performance.now();
+      let outcome: DistributedWorkerAttemptOutcome = "error";
+      let needsBackoff = false;
       this.activeJobIds.add(jobId);
       try {
         await this.execute(snapshot);
+        outcome = snapshot.state === "succeeded" || snapshot.state === "failed"
+          || snapshot.state === "cancelled" || snapshot.state === "retrying"
+          ? snapshot.state : "lease-lost";
       } catch (error) {
         this.executionErrors += 1;
+        this.emitMetric({ name: "vexa.worker.execution.errors", kind: "counter", value: 1,
+          attributes: { jobType } });
         this.emitDiagnostic({
           type: "execution-error", jobId,
           ...(snapshot.lease ? { claimId: snapshot.lease.claimId } : {}),
           message: error instanceof Error ? error.message : String(error)
         });
-        await this.backoffOnError();
+        needsBackoff = true;
       } finally {
+        const durationMs = Math.max(0, performance.now() - started);
+        const attributes = { jobType, outcome };
+        this.emitMetric({ name: "vexa.worker.attempts", kind: "counter", value: 1, attributes });
+        this.emitMetric({ name: "vexa.worker.attempt.duration_ms", kind: "histogram",
+          value: durationMs, attributes });
+        this.emitSpan({ name: "vexa.worker.attempt", workerId: this.workerId, jobId,
+          ...(claimId ? { claimId } : {}), jobType, startedAt, endedAt: now(),
+          durationMs, outcome });
         this.activeJobIds.delete(jobId);
       }
+      if (needsBackoff) await this.backoffOnError();
     }
   }
 
@@ -825,6 +896,8 @@ export class DistributedJobWorker {
         .catch((error: unknown) => {
           leaseFailed = true;
           this.lostLeases += 1;
+          this.emitMetric({ name: "vexa.worker.lease.losses", kind: "counter", value: 1,
+            attributes: { jobType: snapshot.descriptor.type } });
           this.emitDiagnostic({
             type: "lease-lost", jobId: snapshot.descriptor.id, claimId,
             message: error instanceof Error ? error.message : String(error)

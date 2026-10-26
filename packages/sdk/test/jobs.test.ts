@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { JobLease, JobSnapshot } from "@vexa-video/core";
 import { JobIdempotencyConflictError, isTerminalJobState } from "@vexa-video/core";
+import type { DistributedWorkerMetric, DistributedWorkerSpan } from "../src/index.js";
 import {
   DistributedJobQueue,
   DistributedJobWorker,
@@ -1303,4 +1304,98 @@ test("Redis dead-letter pruning isolates diagnostic callback failures", async ()
     inspected: 0, removed: 0, dryRun: true
   });
   assert.deepEqual(events, ["dead-letter-prune"]);
+});
+
+test("V3.1n worker reports provider-neutral success metrics and a completed span", async () => {
+  const transport = new MemoryTransport();
+  const queue = new DistributedJobQueue(transport);
+  const metrics: DistributedWorkerMetric[] = [];
+  const spans: DistributedWorkerSpan[] = [];
+  const worker = new DistributedJobWorker(transport, {
+    claimWaitMs: 10, onMetric: (metric) => { metrics.push(metric); },
+    onSpan: (span) => { spans.push(span); }
+  });
+  worker.register("telemetry.success", async () => "ok");
+  const job = await queue.submit("telemetry.success", { secret: "never-export" });
+  worker.start();
+  try {
+    assert.equal((await queue.wait(job.descriptor.id, { pollIntervalMs: 10, timeoutMs: 1_000 })).state, "succeeded");
+  } finally { await worker.stop(); }
+  assert.equal(spans.length, 1);
+  assert.equal(spans[0]!.outcome, "succeeded");
+  assert.equal(spans[0]!.jobId, job.descriptor.id);
+  assert.equal(spans[0]!.jobType, "telemetry.success");
+  assert.ok(spans[0]!.durationMs >= 0);
+  assert.ok(Date.parse(spans[0]!.startedAt) <= Date.parse(spans[0]!.endedAt));
+  assert.equal(metrics.filter((metric) => metric.name === "vexa.worker.attempts").length, 1);
+  assert.equal(metrics.find((metric) => metric.kind === "histogram")?.value, spans[0]!.durationMs);
+  assert.ok(!JSON.stringify(metrics).includes(job.descriptor.id));
+  assert.ok(!JSON.stringify(metrics).includes("never-export"));
+  assert.ok(!JSON.stringify(spans).includes("never-export"));
+});
+
+test("V3.1n worker traces a terminal failed attempt without leaking error messages", async () => {
+  const transport = new MemoryTransport();
+  const queue = new DistributedJobQueue(transport);
+  const spans: DistributedWorkerSpan[] = [];
+  const worker = new DistributedJobWorker(transport, {
+    claimWaitMs: 10, onSpan: (span) => { spans.push(span); }
+  });
+  worker.register("telemetry.failure", async () => { throw new Error("sensitive-provider-error"); });
+  const job = await queue.submit("telemetry.failure", {});
+  worker.start();
+  try {
+    assert.equal((await queue.wait(job.descriptor.id, { pollIntervalMs: 10, timeoutMs: 1_000 })).state, "failed");
+  } finally { await worker.stop(); }
+  assert.deepEqual(spans.map((span) => span.outcome), ["failed"]);
+  assert.ok(!JSON.stringify(spans).includes("sensitive-provider-error"));
+});
+
+test("V3.1n worker isolates throwing telemetry exporters and preserves completed jobs", async () => {
+  const transport = new MemoryTransport();
+  const queue = new DistributedJobQueue(transport);
+  let metricCalls = 0, spanCalls = 0;
+  const worker = new DistributedJobWorker(transport, {
+    claimWaitMs: 10,
+    onMetric: () => { metricCalls += 1; throw new Error("metric exporter offline"); },
+    onSpan: () => { spanCalls += 1; throw new Error("span exporter offline"); }
+  });
+  worker.register("telemetry.isolated", async () => "committed");
+  const job = await queue.submit("telemetry.isolated", {});
+  worker.start();
+  try {
+    assert.equal((await queue.wait(job.descriptor.id, { pollIntervalMs: 10, timeoutMs: 1_000 })).result,
+      "committed");
+  } finally { await worker.stop(); }
+  assert.equal(metricCalls, 2);
+  assert.equal(spanCalls, 1);
+  assert.equal(worker.getDiagnostics().executionErrors, 0);
+});
+
+test("V3.1n worker exports lease-loss counter and a fenced attempt span", async () => {
+  class LostLeaseTransport extends MemoryTransport {
+    override async heartbeat(): Promise<JobLease> { throw new Error("fenced"); }
+  }
+  const transport = new LostLeaseTransport();
+  const queue = new DistributedJobQueue(transport);
+  const metrics: DistributedWorkerMetric[] = [];
+  const spans: DistributedWorkerSpan[] = [];
+  const worker = new DistributedJobWorker(transport, {
+    claimWaitMs: 10, cancellationPollMs: 10, leaseDurationMs: 120,
+    heartbeatIntervalMs: 20, onMetric: (metric) => { metrics.push(metric); },
+    onSpan: (span) => { spans.push(span); }
+  });
+  worker.register("telemetry.lease", async (_payload, context) => {
+    await new Promise<void>((resolve) => context.signal.addEventListener("abort", () => resolve(), { once: true }));
+    return "must-not-publish";
+  });
+  const job = await queue.submit("telemetry.lease", {});
+  worker.start();
+  try {
+    for (let i = 0; i < 100 && worker.getDiagnostics().lostLeases === 0; i += 1) await sleep(10);
+    assert.equal(worker.getDiagnostics().lostLeases, 1);
+    assert.equal((await queue.get(job.descriptor.id)).result, undefined);
+  } finally { await worker.stop(); }
+  assert.deepEqual(spans.map((span) => span.outcome), ["lease-lost"]);
+  assert.equal(metrics.filter((metric) => metric.name === "vexa.worker.lease.losses").length, 1);
 });

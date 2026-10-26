@@ -43,6 +43,8 @@ V3.1g: inspect `await transport.pruneDeadLetters({ minAgeMs: 7 * 86400000, limit
 
 V3.1h real Redis acceptance (Redis 7 on localhost): start `docker run -d --name vexa-v31h-redis -p 127.0.0.1:6389:6379 redis:7-alpine`, set `$env:VEXA_TEST_REDIS_URL = "redis://127.0.0.1:6389"` in PowerShell, then run `npm run test:redis`. V3.1m extends this opt-in suite to twelve live Redis tests; the standard `npm run verify` remains separate. The hosted receipt hook and `RedisHostedCompositionReceiptStore` are exported from `@vexa-video/renderer`, not SDK.
 
+V3.1n worker observability: pass `onMetric: (metric) => { ... }` and `onSpan: (span) => { ... }` to `new DistributedJobWorker(transport, options)`. Counter names cover claim/execution failures, lost leases and observed attempts; histograms report attempt duration in milliseconds. Completed spans include start/end times, outcome, worker/job/claim IDs and job type. **Metric attributes never include job/claim IDs.** Neither callback receives job payloads, stack traces or error messages. Implement aggregation, redaction, backpressure and exporter delivery in the application; hooks are synchronous, best effort and cannot change worker outcomes.
+
 ## Minimal example
 
 ```ts

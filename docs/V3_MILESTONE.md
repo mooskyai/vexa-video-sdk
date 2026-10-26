@@ -35,7 +35,8 @@ Version 2 already provides local/Redis jobs, retries, idempotency, cancellation,
 - **V3.1k — unrecorded remote artifact reconciliation:** operator- or provider-opt-in exact-destination inspection recovers remote objects published before receipt persistence. Proof of matching request fingerprint, external verification and Redis compare-and-set are mandatory; no automatic scan or remote mutation.
 - **V3.1l — targeted stale-receipt retirement:** dry-run-first deletion of one old Redis receipt after authoritative remote absence, explicit unreferenced evidence and atomic age/value checks. Legacy receipts without an age marker are retained; external objects are never deleted.
 - **V3.1m — bounded receipt lifecycle diagnostics:** read-only inspection of up to 100 explicitly known destination/payload candidates; categorized dry-run eligibility, redacted provider failures, structured counts and isolated diagnostic observers. No automatic discovery or deletion.
-- **Later V3.1 slices:** comprehensive orphan discovery, operator-controlled replay, broader artifact retention, metrics/tracing integrations, workspace/artifact cleanup and external artifact finalization.
+- **V3.1n — vendor-neutral worker observability:** optional synchronous metric and completed-attempt span sinks for distributed jobs. Report claim/execution/lease counters and attempt outcomes/durations, separate job IDs from metric dimensions, and isolate exporters. No telemetry vendor dependency, persistence or sampling pipeline is bundled.
+- **Later V3.1 slices:** comprehensive orphan discovery, operator-controlled replay, broader artifact retention, workspace/artifact cleanup and external artifact finalization.
 
 ### Add
 

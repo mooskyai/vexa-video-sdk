@@ -20,6 +20,7 @@ All notable public changes to Vexa Video SDK are documented here. Public `@vexa-
 - V3.1k opt-in reconciliation of remote artifacts published before receipt persistence, requiring provider fingerprint evidence and atomic Redis adoption.
 - V3.1l opt-in, dry-run-first, age-gated removal of one missing unreferenced Redis publication receipt with atomic compare-and-delete; remote objects are never deleted.
 - V3.1m bounded, read-only operator inspection of known publication destinations, structured status counts, per-entry redacted errors and isolated diagnostics; no sweeps or deletion.
+- V3.1n opt-in exporter-neutral worker counters, duration histograms and completed-attempt spans, with synchronous sink failure isolation and no metrics cardinality from job IDs.
 
 ### Changed
 
