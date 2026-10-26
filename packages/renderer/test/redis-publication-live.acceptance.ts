@@ -199,6 +199,62 @@ test("live Redis: referenced and recently recorded receipts cannot be retired", 
   } finally { client.close(); }
 });
 
+
+test("live Redis: bounded inspection is read-only for aged and missing receipts", { timeout: 15_000 }, async () => {
+  const file = join(root, "inspection-old.mp4");
+  await writeFile(file, "video");
+  const payload = request(71, pathToFileURL(file).href);
+  const missing = request(72, pathToFileURL(join(root, "inspection-absent.mp4")).href);
+  const client = await LiveRedisClient.open();
+  try {
+    const adapter = new RedisHostedCompositionReceiptStore(client, {
+      prefix,
+      verifyArtifact: () => true,
+      inspectArtifact: () => null,
+      isReceiptUnreferenced: () => true
+    });
+    await adapter.recordPublishedArtifact(receipt(payload), payload.output, payload, context(payload));
+    const key = `${prefix}:publication:${createHash("sha256").update(payload.output.destination!).digest("hex")}`;
+    await client.sendCommand(["SET", `${key}:recordedAt`, String(Date.now() - 3 * 86_400_000)]);
+    await rm(file);
+    const report = await adapter.inspectKnownReceipts([
+      { output: payload.output, payload, context: context(payload) },
+      { output: missing.output, payload: missing, context: context(missing) }
+    ], { minAgeMs: 86_400_000 });
+    assert.deepEqual(report.entries.map(entry => entry.status), ["eligible", "missing"]);
+    assert.equal(await client.sendCommand(["EXISTS", key]), 1);
+    assert.equal(await client.sendCommand(["EXISTS", `${key}:recordedAt`]), 1);
+  } finally { client.close(); }
+});
+
+test("live Redis: inspection reports referenced receipts and isolates provider errors", { timeout: 15_000 }, async () => {
+  const file = join(root, "inspection-referenced.mp4");
+  await writeFile(file, "video");
+  const payload = request(73, pathToFileURL(file).href);
+  const client = await LiveRedisClient.open();
+  try {
+    const present = new RedisHostedCompositionReceiptStore(client, {
+      prefix, verifyArtifact: () => true, inspectArtifact: () => null,
+      isReceiptUnreferenced: () => false
+    });
+    await present.recordPublishedArtifact(receipt(payload), payload.output, payload, context(payload));
+    const good = await present.inspectKnownReceipts([
+      { output: payload.output, payload, context: context(payload) }
+    ], { minAgeMs: 86_400_000 });
+    assert.equal(good.entries[0]?.status, "referenced");
+    const broken = new RedisHostedCompositionReceiptStore(client, {
+      prefix, verifyArtifact: () => true, inspectArtifact: () => { throw new Error("provider offline"); },
+      isReceiptUnreferenced: () => true
+    });
+    const report = await broken.inspectKnownReceipts([
+      { output: payload.output, payload, context: context(payload) }
+    ], { minAgeMs: 86_400_000 });
+    assert.equal(report.entries[0]?.status, "error");
+    assert.equal(JSON.stringify(report).includes("provider offline"), false);
+    assert.deepEqual(await present.lookupPublishedArtifact(payload.output, payload, context(payload)), receipt(payload));
+  } finally { client.close(); }
+});
+
 test.after(async () => {
   const client = await LiveRedisClient.open();
   try { await removeTestKeys(client, prefix); } finally { client.close(); }

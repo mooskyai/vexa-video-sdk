@@ -54,6 +54,8 @@ V3.1k adds opt-in `store.reconcileUnrecordedArtifact(output, payload, context)`.
 
 V3.1l adds `store.retireMissingReceipt(output, payload, context, { minAgeMs: 86400000 })`. It defaults to a **dry run** (`eligible` means no deletion); `dryRun: false` permits deleting the one aged Redis receipt only after `inspectArtifact` authoritatively returns `null` and `isReceiptUnreferenced` confirms no active jobs, leases or external consumers. Both callbacks are required and must fail closed on errors. Redis rechecks the stored value and server-time age atomically. The minimum age is 24 hours. Receipts created before V3.1l lack an age marker and return `untracked`, never auto-backfilled. Remote media is never deleted; coordinate with producers because the callbacks are not a transactional lock.
 
+V3.1m adds `store.inspectKnownReceipts([{ output, payload, context }], { minAgeMs: 86400000, onDiagnostic })` for up to 100 explicitly supplied, unique destinations. It applies the V3.1l dry-run authority checks and returns immutable per-destination statuses plus aggregate counts. Provider callback errors are redacted to `INSPECTION_FAILED` and cannot hide the status of other candidates; diagnostic observer exceptions are ignored. Inputs are prevalidated before Redis access, no keys are enumerated, and no receipts or remote objects are mutated. `eligible` is an operator finding, not an authorization to run cleanup without coordinating producers and validating live references.
+
 ## Version 2 vs Version 3
 
 Version 2 provides portable hosted-render contracts and job/storage integration. It does **not** claim a complete multi-tenant hosted platform.

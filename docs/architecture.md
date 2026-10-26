@@ -125,6 +125,8 @@ V3.1k introduces explicit `reconcileUnrecordedArtifact()` for the upload-before-
 
 V3.1l stores a Redis-server-time creation marker alongside newly committed receipts without changing immutable receipt CAS payloads. `retireMissingReceipt()` is dry-run first, scoped to one known destination, requires provider-confirmed remote absence and a caller-supplied job/reference guard, and atomically rechecks age and raw receipt contents before removing only receipt/marker keys. Older records without markers are not eligible. Operators must prevent new publication/lease races; no remote media deletion is performed.
 
+V3.1m layers bounded operator diagnostics over V3.1l dry-run retirement: explicit destination candidates (max 100) are preflight-validated, inspected serially without keyspace scans or destructive Redis operations, classified using the existing provider-authoritative absence and reference checks, and summarized with redacted per-entry provider failures. Optional diagnostic callbacks cannot alter the result if they throw. Findings are snapshots, not a distributed lock or permission to retire active outputs.
+
 Arbitrary media output, uploads and other external handler side effects are still at-least-once, not exactly once; use idempotent artifact identities and later reconciliation. Stop old V3 worker processes before deploying protocol changes. Pre-existing failures are not retroactively backfilled into the dead-letter index.
 
 ## Storage

@@ -278,3 +278,85 @@ test("V3.1l atomic retire fences a replaced receipt", async () => {
     { minAgeMs: 86_400_000, dryRun: false })).status, "changed");
   assert.equal(redis.entries.size, 2);
 });
+
+
+test("V3.1m bounded inspection summarizes known missing and eligible receipts without deleting", async () => {
+  const redis = new MemoryRedis();
+  const first = request();
+  const other = { ...request(33), output: { artifactId: "tenant/other", destination: "s3://renders/tenant/other.mp4" } };
+  const adapter = new RedisHostedCompositionReceiptStore(redis, {
+    prefix: "vexa:test:tenant-a", verifyArtifact: () => true,
+    inspectArtifact: () => null, isReceiptUnreferenced: () => true
+  });
+  await adapter.recordPublishedArtifact(receipt(first), first.output, first, context(first));
+  const stamp = [...redis.entries.keys()].find(key => key.endsWith(":recordedAt"))!;
+  redis.entries.set(stamp, String(Date.now() - 5 * 86_400_000));
+  const before = new Map(redis.entries);
+  const report = await adapter.inspectKnownReceipts([
+    { output: first.output, payload: first, context: context(first) },
+    { output: other.output, payload: other, context: context(other) }
+  ], { minAgeMs: 86_400_000 });
+  assert.equal(report.inspected, 2);
+  assert.equal(report.counts.eligible, 1);
+  assert.equal(report.counts.missing, 1);
+  assert.deepEqual(report.entries.map(item => item.status), ["eligible", "missing"]);
+  assert.deepEqual(redis.entries, before);
+});
+
+test("V3.1m batch preflight rejects duplicates, oversized batches and mismatched identities", async () => {
+  const redis = new MemoryRedis(), payload = request();
+  const item = { output: payload.output, payload, context: context(payload) };
+  const adapter = store(redis);
+  await assert.rejects(() => adapter.inspectKnownReceipts([], { minAgeMs: 86_400_000 }), /1 to 100/);
+  const candidates = Array.from({ length: 101 }, () => item);
+  await assert.rejects(() => adapter.inspectKnownReceipts(candidates, { minAgeMs: 86_400_000 }), /1 to 100/);
+  const inspectable = new RedisHostedCompositionReceiptStore(redis, {
+    prefix: "vexa:test:tenant-a", verifyArtifact: () => true,
+    inspectArtifact: () => null, isReceiptUnreferenced: () => true
+  });
+  await assert.rejects(() => inspectable.inspectKnownReceipts([item, item],
+    { minAgeMs: 86_400_000 }), /repeat/);
+  await assert.rejects(() => inspectable.inspectKnownReceipts([
+    { ...item, context: { ...item.context, fingerprint: "bad" } }
+  ], { minAgeMs: 86_400_000 }), /identities/);
+  await assert.rejects(() => inspectable.inspectKnownReceipts([item],
+    { minAgeMs: 100 }), /one day/);
+  assert.equal(redis.entries.size, 0);
+});
+
+test("V3.1m provider failures are redacted per entry and diagnostic observers are isolated", async () => {
+  const redis = new MemoryRedis(), first = request();
+  const second = { ...request(91), output: { artifactId: "tenant/next", destination: "s3://renders/tenant/next.mp4" } };
+  const adapter = new RedisHostedCompositionReceiptStore(redis, {
+    prefix: "vexa:test:tenant-a", verifyArtifact: () => true,
+    inspectArtifact: () => { throw new Error("private provider credential text"); },
+    isReceiptUnreferenced: () => true
+  });
+  await adapter.recordPublishedArtifact(receipt(first), first.output, first, context(first));
+  const report = await adapter.inspectKnownReceipts([
+    { output: first.output, payload: first, context: context(first) },
+    { output: second.output, payload: second, context: context(second) }
+  ], { minAgeMs: 86_400_000, onDiagnostic: () => { throw new Error("observer failure"); } });
+  assert.deepEqual(report.entries.map(e => e.status), ["error", "missing"]);
+  assert.equal(report.entries[0]?.errorCode, "INSPECTION_FAILED");
+  assert.equal(JSON.stringify(report).includes("private provider credential text"), false);
+  assert.equal(report.counts.error, 1);
+  assert.equal(redis.entries.size, 2);
+});
+
+test("V3.1m aborted inspection stops without mutation and preserves referenced receipts", async () => {
+  const redis = new MemoryRedis(), payload = request();
+  const adapter = new RedisHostedCompositionReceiptStore(redis, {
+    prefix: "vexa:test:tenant-a", verifyArtifact: () => true,
+    inspectArtifact: () => null, isReceiptUnreferenced: () => false
+  });
+  await adapter.recordPublishedArtifact(receipt(payload), payload.output, payload, context(payload));
+  const candidate = { output: payload.output, payload, context: context(payload) };
+  const report = await adapter.inspectKnownReceipts([candidate], { minAgeMs: 86_400_000 });
+  assert.equal(report.entries[0]?.status, "referenced");
+  const controller = new AbortController(); controller.abort();
+  await assert.rejects(() => adapter.inspectKnownReceipts([
+    { ...candidate, context: context(payload, controller.signal) }
+  ], { minAgeMs: 86_400_000 }), /aborted/);
+  assert.equal(redis.entries.size, 2);
+});

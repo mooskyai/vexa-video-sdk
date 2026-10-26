@@ -73,6 +73,13 @@ import {
 import { Storage, type JobHandler, type JobHandlerContext, type JobHandlerOptions } from "@vexa-video/sdk";
 export { RedisHostedCompositionReceiptStore } from "./redis-publication-receipts.js";
 export type { RedisHostedPublicationReceiptOptions } from "./redis-publication-receipts.js";
+export type {
+  HostedReceiptInspectionCandidate,
+  HostedReceiptInspectionEntry,
+  HostedReceiptInspectionOptions,
+  HostedReceiptInspectionReport,
+  HostedReceiptInspectionStatus
+} from "./redis-publication-receipts.js";
 
 export const VEXA_RENDER_PLAN_SCHEMA_VERSION = 1 as const;
 export const VEXA_EXECUTABLE_COMPOSITIONS_EXPORT = "vexaExecutableCompositions" as const;

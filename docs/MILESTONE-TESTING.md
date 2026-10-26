@@ -97,3 +97,5 @@ V3.1j adds four Redis receipt adapter unit tests and two opt-in real-Redis tests
 V3.1k adds four unit tests for opt-in unrecorded-artifact recovery, mismatch rejection, provider failure and cancellation, plus two real-Redis tests proving cross-client adoption and competing-request fencing. Expected gates are 454 unit-suite tests via `npm run verify` and 8 real-Redis tests via `npm run test:redis`; real object-store crash injection is not covered by the file-backed provider fixture.
 
 V3.1l adds four unit tests for dry-run, age threshold, missing/present/reference gates, cancellation/validation and changed-raw fencing, plus two live Redis tests. Expected gates are 458 regular tests and 10 live Redis tests. No remote deletion, sweeper, provider lock or legacy timestamp backfill is provided.
+
+V3.1m adds four unit tests and two opt-in live Redis checks for 100-candidate bounds, duplicate/identity rejection, read-only summaries, reference safety, per-item redacted failures and observer isolation. Expected totals: 462 tests via `npm run verify` and 12 via `npm run test:redis`. These tests are not an external-object-store sweep or a global producer lock.

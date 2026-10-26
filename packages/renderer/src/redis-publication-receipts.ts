@@ -46,6 +46,37 @@ export interface HostedReceiptRetirementResult {
   readonly dryRun: boolean;
 }
 
+/** An explicitly provided artifact candidate; no Redis keyspace enumeration is performed. */
+export interface HostedReceiptInspectionCandidate {
+  readonly output: HostedCompositionOutputReference;
+  readonly payload: HostedCompositionRenderPayload;
+  readonly context: HostedCompositionPublicationContext;
+}
+
+export type HostedReceiptInspectionStatus =
+  | "missing" | "untracked" | "too-new" | "present" | "referenced" | "eligible" | "changed" | "error";
+
+export interface HostedReceiptInspectionEntry {
+  readonly artifactId: string;
+  readonly destination: string;
+  readonly status: HostedReceiptInspectionStatus;
+  /** Deliberately omit provider error details from operator output. */
+  readonly errorCode?: "INSPECTION_FAILED";
+}
+
+export interface HostedReceiptInspectionReport {
+  readonly inspected: number;
+  readonly counts: Readonly<Record<HostedReceiptInspectionStatus, number>>;
+  readonly entries: readonly HostedReceiptInspectionEntry[];
+}
+
+export interface HostedReceiptInspectionOptions {
+  /** Minimum eligible age, one day or greater. The method never mutates Redis. */
+  readonly minAgeMs: number;
+  /** Optional synchronous telemetry callback; failures must not stop inspection. */
+  readonly onDiagnostic?: (entry: HostedReceiptInspectionEntry) => void;
+}
+
 interface StoredPublicationReceipt extends HostedCompositionPublicationReceipt {
   readonly schemaVersion: 1;
   readonly destination: string;
@@ -251,6 +282,69 @@ export class RedisHostedCompositionReceiptStore {
       throw new Error("Redis hosted receipt retirement returned an unexpected result.");
     }
     return { status: result as HostedReceiptRetirementResult["status"], dryRun };
+  };
+
+  /**
+   * Bounded read-only operator diagnostics for explicitly supplied destinations.
+   * Uses the existing dry-run Redis retirement checks. Does not discover keys,
+   * mutate receipts, delete remote objects or implicitly authorize retirement.
+   */
+  readonly inspectKnownReceipts = async (
+    candidates: readonly HostedReceiptInspectionCandidate[],
+    options: HostedReceiptInspectionOptions
+  ): Promise<HostedReceiptInspectionReport> => {
+    if (!Array.isArray(candidates) || candidates.length < 1 || candidates.length > 100) {
+      throw new TypeError("Hosted receipt inspection requires 1 to 100 known candidates.");
+    }
+    if (!options || !Number.isSafeInteger(options.minAgeMs) || options.minAgeMs < 86_400_000
+      || (options.onDiagnostic !== undefined && typeof options.onDiagnostic !== "function")) {
+      throw new TypeError("Hosted receipt inspection requires minAgeMs >= one day and an optional onDiagnostic function.");
+    }
+    if (!this.options.inspectArtifact || !this.options.isReceiptUnreferenced) {
+      throw new Error("Hosted receipt inspection requires inspectArtifact and isReceiptUnreferenced providers.");
+    }
+    // Preflight the full batch to avoid partial diagnostics from malformed caller input.
+    const seen = new Set<string>();
+    for (const candidate of candidates) {
+      if (!candidate || !candidate.output || !candidate.payload || !candidate.context
+        || !candidate.output.destination || candidate.output.destination !== candidate.payload.output.destination
+        || candidate.output.artifactId !== candidate.payload.output.artifactId
+        || candidate.context.fingerprint !== fingerprintHostedCompositionPublication(candidate.payload)) {
+        throw new TypeError("Hosted receipt inspection requires matching request and destination identities.");
+      }
+      if (candidate.context.signal.aborted) throw new Error("Hosted receipt inspection aborted.");
+      const key = this.key(candidate.output);
+      if (seen.has(key)) throw new TypeError("Hosted receipt inspection cannot repeat a destination.");
+      seen.add(key);
+    }
+    const counts: Record<HostedReceiptInspectionStatus, number> = {
+      missing: 0, untracked: 0, "too-new": 0, present: 0,
+      referenced: 0, eligible: 0, changed: 0, error: 0
+    };
+    const entries: HostedReceiptInspectionEntry[] = [];
+    for (const candidate of candidates) {
+      const { output, payload, context } = candidate;
+      if (context.signal.aborted) throw new Error("Hosted receipt inspection aborted.");
+      let entry: HostedReceiptInspectionEntry;
+      try {
+        const result = await this.retireMissingReceipt(output, payload, context, {
+          minAgeMs: options.minAgeMs, dryRun: true
+        });
+        // A dry run never returns "removed"; reject unexpected protocol results.
+        if (result.status === "removed") throw new Error("Unexpected destructive receipt inspection result.");
+        entry = Object.freeze({ artifactId: output.artifactId, destination: output.destination!,
+          status: result.status });
+      } catch {
+        if (context.signal.aborted) throw new Error("Hosted receipt inspection aborted.");
+        entry = Object.freeze({ artifactId: output.artifactId, destination: output.destination!,
+          status: "error", errorCode: "INSPECTION_FAILED" });
+      }
+      counts[entry.status] += 1;
+      entries.push(entry);
+      try { options.onDiagnostic?.(entry); } catch { /* Observer failures are isolated. */ }
+    }
+    return Object.freeze({ inspected: entries.length, counts: Object.freeze(counts),
+      entries: Object.freeze(entries) });
   };
 
   readonly recordPublishedArtifact = async (
