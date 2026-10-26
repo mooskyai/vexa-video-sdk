@@ -119,6 +119,8 @@ V3.1h's test-only RESP2 client exercises the unmodified Redis transport against 
 
 V3.1i adds optional hosted-render publication receipts. The worker hashes the normalized request payload with sorted JSON keys, passes its fingerprint to provider hooks, checks an existing provider receipt before renderer construction, and reuses a matching receipt on retry. Mismatched receipts or lookup errors fail closed. An optional writer records the receipt after publication but before committing the job result; neither receipt persistence nor remote upload is atomic with Redis, so provider publication must remain idempotent at a stable artifact identity. This slice does not implement remote provider transactions or automated artifact sweeps.
 
+V3.1j supplies `RedisHostedCompositionReceiptStore`: a tenant-scoped, destination-hashed Redis key indexes an immutable request fingerprint and artifact receipt, and Lua atomically rejects conflicting writes from competing workers. Provider `verifyArtifact` must confirm remote existence/identity before saving and on every reuse; a missing object or validation failure stops work rather than blindly publishing. Neither a Redis receipt nor lease fencing prevents an upload racing ahead of a conflicting receipt write; providers still need conditional/object-versioned publication and cleanup policies.
+
 Arbitrary media output, uploads and other external handler side effects are still at-least-once, not exactly once; use idempotent artifact identities and later reconciliation. Stop old V3 worker processes before deploying protocol changes. Pre-existing failures are not retroactively backfilled into the dead-letter index.
 
 ## Storage

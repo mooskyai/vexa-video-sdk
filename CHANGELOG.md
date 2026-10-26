@@ -16,6 +16,7 @@ All notable public changes to Vexa Video SDK are documented here. Public `@vexa-
 - V3.1g opt-in, bounded, dry-run-first dead-letter retention with atomic Redis index/envelope removal; job records remain untouched.
 - V3.1h opt-in real Redis acceptance tests with independent worker-process termination, lease fencing, cancellation recovery, and concurrent retry reconciliation.
 - V3.1i opt-in provider publication receipts for retry-safe hosted artifact recovery, fingerprint validation, and fail-closed lookup errors.
+- V3.1j Redis-backed provider receipt hooks with destination-keyed atomic write-once semantics and mandatory external artifact validation on write and lookup.
 
 ### Changed
 

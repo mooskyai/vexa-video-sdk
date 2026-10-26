@@ -41,7 +41,7 @@ V3.1f adds `await transport.reconcileQueuedOrphan(jobId)` for one known, unlease
 
 V3.1g: inspect `await transport.pruneDeadLetters({ minAgeMs: 7 * 86400000, limit: 100 })` first, then explicitly set `dryRun: false` to remove the oldest qualifying Redis failure envelopes and index entries. Minimum age is one day; batch limit defaults to 100 (maximum 1,000). This action is irreversible for the archived failure envelope and has no scheduler side effects: original job snapshots, retries, idempotency and published artifacts remain unchanged. Export important dead letters before pruning; no automatic retention loop or replay is provided.
 
-V3.1h real Redis acceptance (Redis 7 on localhost): start `docker run -d --name vexa-v31h-redis -p 127.0.0.1:6389:6379 redis:7-alpine`, set `$env:VEXA_TEST_REDIS_URL = "redis://127.0.0.1:6389"` in PowerShell, then run `npm run test:redis`. The four live Lua/process tests must pass separately from the 442-test `npm run verify` gate. Provider-backed hosted artifact recovery in V3.1i is exported from `@vexa-video/renderer`, not SDK.
+V3.1h real Redis acceptance (Redis 7 on localhost): start `docker run -d --name vexa-v31h-redis -p 127.0.0.1:6389:6379 redis:7-alpine`, set `$env:VEXA_TEST_REDIS_URL = "redis://127.0.0.1:6389"` in PowerShell, then run `npm run test:redis`. V3.1j extends this opt-in suite to six live Redis tests; the standard `npm run verify` remains separate. The hosted receipt hook and `RedisHostedCompositionReceiptStore` are exported from `@vexa-video/renderer`, not SDK.
 
 ## Minimal example
 

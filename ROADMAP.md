@@ -66,7 +66,7 @@ Add operational guarantees around the existing worker/job model:
 - artifact-retention policy contracts;
 - deterministic workspace cleanup and recovery tests.
 
-Current development includes V3.1a lease/heartbeat fencing, V3.1b atomic claim and stale recovery, V3.1c indexed durable dead letters, V3.1d atomic cancellation/retry reconciliation, V3.1e worker-loop resilience and diagnostics, V3.1f targeted queued-orphan repair/workspace reclamation, V3.1g operator-triggered dead-letter retention, and V3.1h live Redis process-death acceptance. V3.1i adds opt-in hosted artifact receipt lookup/recording using a retry-stable request fingerprint. Broad orphan discovery, replay, provider-atomic publication and external artifact finalization remain later work; handler side effects are not exactly once.
+Current development includes V3.1a lease/heartbeat fencing, V3.1b atomic claim and stale recovery, V3.1c indexed durable dead letters, V3.1d atomic cancellation/retry reconciliation, V3.1e worker-loop resilience and diagnostics, V3.1f targeted queued-orphan repair/workspace reclamation, V3.1g operator-triggered dead-letter retention, and V3.1h live Redis process-death acceptance. V3.1i adds opt-in hosted artifact receipt hooks; V3.1j supplies destination-keyed Redis compare-and-set persistence with provider verification and real Redis acceptance. Broad orphan discovery, replay, provider-atomic publication and external artifact finalization remain later work; handler side effects are not exactly once.
 
 **Acceptance:** fault-injection tests must demonstrate that process interruption does not silently lose or duplicate claimed work, retries remain idempotent, and abandoned workspaces/artifacts are handled predictably.
 

@@ -91,3 +91,5 @@ V3.1g retention tests cover no-op dry runs, oldest-first batch limits, recent fa
 V3.1h real-Redis acceptance is opt-in and is **not** included in `npm run verify`. Launch Redis 7 on loopback, set `VEXA_TEST_REDIS_URL=redis://127.0.0.1:6389` and run `npm run test:redis`. All four process death, fencing, cancellation, and retry race tests must pass.
 
 V3.1i tests deterministic publication fingerprints, persisted-receipt reuse after a simulated post-publication failure, mismatched receipt rejection, and fail-closed provider lookup errors. These tests use a fake provider; validating provider-backed durable receipts and publication under real process crashes is a separate acceptance gate.
+
+V3.1j adds four Redis receipt adapter unit tests and two opt-in real-Redis tests for cross-client durability, concurrent compare-and-set, remote-object disappearance and cancellation guards. `npm run verify` runs the unit tests; `npm run test:redis` runs six real Redis tests in total. Provider storage crash injection and a durable backup policy remain separate acceptance requirements.
