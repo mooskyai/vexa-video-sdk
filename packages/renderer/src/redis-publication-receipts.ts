@@ -16,6 +16,16 @@ export interface RedisHostedPublicationReceiptOptions {
     output: HostedCompositionOutputReference,
     context: HostedCompositionPublicationContext
   ) => boolean | Promise<boolean>;
+  /**
+   * Optional authoritative remote inspection used ONLY by reconcileUnrecordedArtifact().
+   * Return null only if the destination does not exist. An existing object must supply its
+   * independently verified request fingerprint; never infer it from the caller's request.
+   */
+  readonly inspectArtifact?: (
+    output: HostedCompositionOutputReference,
+    payload: HostedCompositionRenderPayload,
+    context: HostedCompositionPublicationContext
+  ) => HostedCompositionPublicationReceipt | null | Promise<HostedCompositionPublicationReceipt | null>;
 }
 
 interface StoredPublicationReceipt extends HostedCompositionPublicationReceipt {
@@ -116,6 +126,36 @@ export class RedisHostedCompositionReceiptStore {
     }
     if (context.signal.aborted) throw new Error("Hosted publication lookup aborted.");
     return { fingerprint: record.fingerprint, artifact: record.artifact };
+  };
+
+  /**
+   * Explicit crash-window repair: remote upload succeeded but no Redis receipt was saved.
+   * Read existing Redis state first, then demand provider evidence of remote ownership.
+   * Atomic receipt CAS rejects a conflicting concurrent repair; no remote object is modified.
+   */
+  readonly reconcileUnrecordedArtifact = async (
+    output: HostedCompositionOutputReference,
+    payload: HostedCompositionRenderPayload,
+    context: HostedCompositionPublicationContext
+  ): Promise<HostedCompositionPublicationReceipt | null> => {
+    if (!this.options.inspectArtifact) {
+      throw new Error("Hosted publication reconciliation requires an authoritative inspectArtifact provider.");
+    }
+    if (context.signal.aborted) throw new Error("Hosted publication reconciliation aborted.");
+    const recorded = await this.lookupPublishedArtifact(output, payload, context);
+    if (recorded) return recorded;
+    if (context.signal.aborted) throw new Error("Hosted publication reconciliation aborted.");
+    const remote = await this.options.inspectArtifact(output, payload, context);
+    if (context.signal.aborted) throw new Error("Hosted publication reconciliation aborted.");
+    if (remote === null) return null;
+    validateReceipt(remote, output, context, payload);
+    // Reconciliation may only adopt the exact remote destination, never an alias or sibling object.
+    if (remote.artifact.url !== output.destination) {
+      throw new Error("Hosted publication reconciliation found a different remote destination.");
+    }
+    await this.recordPublishedArtifact(remote, output, payload, context);
+    // Fail closed if the remote vanished after the CAS or a concurrent writer changed ownership.
+    return await this.lookupPublishedArtifact(output, payload, context);
   };
 
   readonly recordPublishedArtifact = async (

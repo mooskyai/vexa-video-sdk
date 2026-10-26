@@ -32,7 +32,8 @@ Version 2 already provides local/Redis jobs, retries, idempotency, cancellation,
 - **V3.1h — real Redis fault-injection acceptance:** independent clients and process kill/recovery integration tests via a dedicated Redis instance.
 - **V3.1i — external publication receipt recovery:** optional provider-backed lookup and recording of fingerprinted published artifacts; retries can reuse matching receipts without rerendering or republishing, while mismatches and lookup failures abort publication. Receipt recording is not atomic with remote upload or Redis completion.
 - **V3.1j — durable Redis receipt adapter:** provider hooks backed by destination-keyed Redis atomic compare-and-set, tenant-scoped keys, remote-object verification and cross-client Redis tests. Receipt storage does not serialize provider uploads or eliminate the upload/receipt crash window.
-- **Later V3.1 slices:** comprehensive orphan reconciliation, operator-controlled replay, broader artifact retention, metrics/tracing integrations, workspace/artifact cleanup and external artifact finalization.
+- **V3.1k — unrecorded remote artifact reconciliation:** operator- or provider-opt-in exact-destination inspection recovers remote objects published before receipt persistence. Proof of matching request fingerprint, external verification and Redis compare-and-set are mandatory; no automatic scan or remote mutation.
+- **Later V3.1 slices:** comprehensive orphan discovery, operator-controlled replay, broader artifact retention, metrics/tracing integrations, workspace/artifact cleanup and external artifact finalization.
 
 ### Add
 

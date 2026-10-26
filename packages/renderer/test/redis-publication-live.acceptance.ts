@@ -84,6 +84,68 @@ test("live Redis: competing publication receipts cannot replace a committed dest
   } finally { a.close(); b.close(); }
 });
 
+
+
+test("live Redis: missing receipt is recovered from provider evidence across clients", { timeout: 15_000 }, async () => {
+  const recoveryFile = join(root, "orphan-upload.mp4");
+  await writeFile(recoveryFile, "video");
+  const payload = request(12, pathToFileURL(recoveryFile).href);
+  const saved = receipt(payload);
+  const writer = await LiveRedisClient.open();
+  try {
+    const adapter = new RedisHostedCompositionReceiptStore(writer, {
+      prefix,
+      inspectArtifact: async () => {
+        assert.equal((await stat(recoveryFile)).size, 5);
+        return saved;
+      },
+      verifyArtifact: async () => (await stat(recoveryFile)).size === 5
+    });
+    assert.deepEqual(await adapter.reconcileUnrecordedArtifact(
+      payload.output, payload, context(payload)
+    ), saved);
+  } finally { writer.close(); }
+  const reader = await LiveRedisClient.open();
+  try {
+    assert.deepEqual(await store(reader, recoveryFile).lookupPublishedArtifact(
+      payload.output, payload, context(payload)
+    ), saved);
+    await rm(recoveryFile);
+    await assert.rejects(() => store(reader, recoveryFile).lookupPublishedArtifact(
+      payload.output, payload, context(payload)
+    ), /unverified/);
+  } finally { reader.close(); }
+});
+
+test("live Redis: conflicting recovery attempts cannot adopt another request's destination", { timeout: 15_000 }, async () => {
+  const recoveryFile = join(root, "competing-orphan.mp4");
+  await writeFile(recoveryFile, "video");
+  const destination = pathToFileURL(recoveryFile).href;
+  const owner = request(20, destination), stranger = request(21, destination);
+  const a = await LiveRedisClient.open(), b = await LiveRedisClient.open();
+  try {
+    const config = {
+      prefix,
+      inspectArtifact: async () => receipt(owner),
+      verifyArtifact: async () => (await stat(recoveryFile)).size === 5
+    };
+    const [accepted, denied] = await Promise.allSettled([
+      new RedisHostedCompositionReceiptStore(a, config).reconcileUnrecordedArtifact(
+        owner.output, owner, context(owner)
+      ),
+      new RedisHostedCompositionReceiptStore(b, config).reconcileUnrecordedArtifact(
+        stranger.output, stranger, context(stranger)
+      )
+    ]);
+    assert.equal(accepted.status, "fulfilled");
+    assert.equal(denied.status, "rejected");
+    assert.match(String((denied as PromiseRejectedResult).reason), /identity/);
+    assert.deepEqual(await store(a, recoveryFile).lookupPublishedArtifact(
+      owner.output, owner, context(owner)
+    ), receipt(owner));
+  } finally { a.close(); b.close(); }
+});
+
 test.after(async () => {
   const client = await LiveRedisClient.open();
   try { await removeTestKeys(client, prefix); } finally { client.close(); }

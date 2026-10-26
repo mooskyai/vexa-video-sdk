@@ -104,3 +104,84 @@ test("Redis hosted receipts refuse cancellation, unsafe namespaces and malformed
   redis.entries.set(key, "garbled");
   await assert.rejects(() => store(redis).lookupPublishedArtifact(payload.output, payload, context(payload)), /invalid JSON/);
 });
+
+
+test("V3.1k reconstructs a missing receipt from authoritative remote metadata", async () => {
+  const redis = new MemoryRedis();
+  const payload = request();
+  let inspected = 0;
+  let verified = 0;
+  const adapter = new RedisHostedCompositionReceiptStore(redis, {
+    prefix: "vexa:test:tenant-a",
+    inspectArtifact: () => { inspected += 1; return receipt(payload); },
+    verifyArtifact: () => { verified += 1; return true; }
+  });
+  assert.deepEqual(await adapter.reconcileUnrecordedArtifact(payload.output, payload, context(payload)), receipt(payload));
+  assert.deepEqual(await adapter.reconcileUnrecordedArtifact(payload.output, payload, context(payload)), receipt(payload));
+  assert.equal(inspected, 1);
+  assert.ok(verified >= 3);
+  assert.equal(redis.entries.size, 1);
+});
+
+test("V3.1k refuses to adopt a remote artifact for different inputs or destination", async () => {
+  const redis = new MemoryRedis();
+  const payload = request();
+  const wrong = request(99);
+  const badIdentity = new RedisHostedCompositionReceiptStore(redis, {
+    prefix: "vexa:test:tenant-a", inspectArtifact: () => receipt(wrong), verifyArtifact: () => true
+  });
+  await assert.rejects(() => badIdentity.reconcileUnrecordedArtifact(
+    payload.output, payload, context(payload)
+  ), /identity/);
+  const wrongDestination = new RedisHostedCompositionReceiptStore(redis, {
+    prefix: "vexa:test:tenant-a", inspectArtifact: () => ({ ...receipt(payload), artifact: {
+      ...receipt(payload).artifact, url: "s3://renders/tenant/other.mp4"
+    } }), verifyArtifact: () => true
+  });
+  await assert.rejects(() => wrongDestination.reconcileUnrecordedArtifact(
+    payload.output, payload, context(payload)
+  ), /different remote destination/);
+  assert.equal(redis.entries.size, 0);
+});
+
+test("V3.1k refuses unverifiable and unavailable remote artifacts", async () => {
+  const redis = new MemoryRedis();
+  const payload = request();
+  const missing = new RedisHostedCompositionReceiptStore(redis, {
+    prefix: "vexa:test:tenant-a", inspectArtifact: () => null, verifyArtifact: () => true
+  });
+  assert.equal(await missing.reconcileUnrecordedArtifact(payload.output, payload, context(payload)), null);
+  const unverified = new RedisHostedCompositionReceiptStore(redis, {
+    prefix: "vexa:test:tenant-a", inspectArtifact: () => receipt(payload), verifyArtifact: () => false
+  });
+  await assert.rejects(() => unverified.reconcileUnrecordedArtifact(
+    payload.output, payload, context(payload)
+  ), /unverified/);
+  const offline = new RedisHostedCompositionReceiptStore(redis, {
+    prefix: "vexa:test:tenant-a", inspectArtifact: () => { throw new Error("provider unavailable"); },
+    verifyArtifact: () => true
+  });
+  await assert.rejects(() => offline.reconcileUnrecordedArtifact(
+    payload.output, payload, context(payload)
+  ), /provider unavailable/);
+  assert.equal(redis.entries.size, 0);
+});
+
+test("V3.1k requires opt-in remote inspection and refuses cancellation", async () => {
+  const redis = new MemoryRedis();
+  const payload = request();
+  await assert.rejects(() => store(redis).reconcileUnrecordedArtifact(
+    payload.output, payload, context(payload)
+  ), /inspectArtifact/);
+  let inspected = 0;
+  const adapter = new RedisHostedCompositionReceiptStore(redis, {
+    prefix: "vexa:test:tenant-a", inspectArtifact: () => { inspected += 1; return receipt(payload); },
+    verifyArtifact: () => true
+  });
+  const controller = new AbortController(); controller.abort();
+  await assert.rejects(() => adapter.reconcileUnrecordedArtifact(
+    payload.output, payload, context(payload, controller.signal)
+  ), /aborted/);
+  assert.equal(inspected, 0);
+  assert.equal(redis.entries.size, 0);
+});

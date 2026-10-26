@@ -121,6 +121,8 @@ V3.1i adds optional hosted-render publication receipts. The worker hashes the no
 
 V3.1j supplies `RedisHostedCompositionReceiptStore`: a tenant-scoped, destination-hashed Redis key indexes an immutable request fingerprint and artifact receipt, and Lua atomically rejects conflicting writes from competing workers. Provider `verifyArtifact` must confirm remote existence/identity before saving and on every reuse; a missing object or validation failure stops work rather than blindly publishing. Neither a Redis receipt nor lease fencing prevents an upload racing ahead of a conflicting receipt write; providers still need conditional/object-versioned publication and cleanup policies.
 
+V3.1k introduces explicit `reconcileUnrecordedArtifact()` for the upload-before-receipt crash window. It checks any existing Redis receipt first, invokes an opt-in authoritative `inspectArtifact` callback for the exact destination, refuses mismatched request fingerprints/destinations, verifies the remote object, persists through the existing Lua CAS and reads back with fresh provider verification. Returning `null` is permitted only when the provider establishes the remote object is absent. This is not a keyspace sweep or exactly-once protocol; provider metadata, stable conditional uploads, and manual handling of conflicts remain necessary.
+
 Arbitrary media output, uploads and other external handler side effects are still at-least-once, not exactly once; use idempotent artifact identities and later reconciliation. Stop old V3 worker processes before deploying protocol changes. Pre-existing failures are not retroactively backfilled into the dead-letter index.
 
 ## Storage
