@@ -123,6 +123,8 @@ V3.1j supplies `RedisHostedCompositionReceiptStore`: a tenant-scoped, destinatio
 
 V3.1k introduces explicit `reconcileUnrecordedArtifact()` for the upload-before-receipt crash window. It checks any existing Redis receipt first, invokes an opt-in authoritative `inspectArtifact` callback for the exact destination, refuses mismatched request fingerprints/destinations, verifies the remote object, persists through the existing Lua CAS and reads back with fresh provider verification. Returning `null` is permitted only when the provider establishes the remote object is absent. This is not a keyspace sweep or exactly-once protocol; provider metadata, stable conditional uploads, and manual handling of conflicts remain necessary.
 
+V3.1l stores a Redis-server-time creation marker alongside newly committed receipts without changing immutable receipt CAS payloads. `retireMissingReceipt()` is dry-run first, scoped to one known destination, requires provider-confirmed remote absence and a caller-supplied job/reference guard, and atomically rechecks age and raw receipt contents before removing only receipt/marker keys. Older records without markers are not eligible. Operators must prevent new publication/lease races; no remote media deletion is performed.
+
 Arbitrary media output, uploads and other external handler side effects are still at-least-once, not exactly once; use idempotent artifact identities and later reconciliation. Stop old V3 worker processes before deploying protocol changes. Pre-existing failures are not retroactively backfilled into the dead-letter index.
 
 ## Storage

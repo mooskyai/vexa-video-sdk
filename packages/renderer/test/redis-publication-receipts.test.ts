@@ -10,9 +10,22 @@ class MemoryRedis {
     if (args[0] === "GET") return this.entries.get(args[1]!) ?? null;
     if (args[0] === "EVAL" && args[1]?.includes("VEXA_PUBLICATION_RECEIPT_CAS")) {
       const old = this.entries.get(args[3]!);
-      if (old !== undefined) return old === args[4] ? "unchanged" : "conflict";
-      this.entries.set(args[3]!, args[4]!);
+      if (old !== undefined) return old === args[5] ? "unchanged" : "conflict";
+      this.entries.set(args[3]!, args[5]!);
+      this.entries.set(args[4]!, String(Date.now()));
       return "created";
+    }
+    if (args[0] === "EVAL" && args[1]?.includes("VEXA_PUBLICATION_RECEIPT_RETIRE")) {
+      const old = this.entries.get(args[3]!);
+      if (old === undefined) return "missing";
+      if (old !== args[5]) return "changed";
+      const stamp = this.entries.get(args[4]!);
+      if (!stamp || !/^\d+$/u.test(stamp)) return "untracked";
+      if (Date.now() - Number(stamp) < Number(args[6])) return "too-new";
+      if (args[7] === "1") return "eligible";
+      this.entries.delete(args[3]!);
+      this.entries.delete(args[4]!);
+      return "removed";
     }
     throw new Error("Unexpected Redis command.");
   }
@@ -52,7 +65,7 @@ test("Redis hosted receipts persist across store instances and duplicate records
   await first.recordPublishedArtifact(receipt(payload), payload.output, payload, context(payload));
   await store(redis).recordPublishedArtifact(receipt(payload), payload.output, payload, context(payload));
   assert.deepEqual(await store(redis).lookupPublishedArtifact(payload.output, payload, context(payload)), receipt(payload));
-  assert.equal(redis.entries.size, 1);
+  assert.equal(redis.entries.size, 2);
 });
 
 test("Redis hosted receipt CAS rejects changed inputs for the same remote destination", async () => {
@@ -120,7 +133,7 @@ test("V3.1k reconstructs a missing receipt from authoritative remote metadata", 
   assert.deepEqual(await adapter.reconcileUnrecordedArtifact(payload.output, payload, context(payload)), receipt(payload));
   assert.equal(inspected, 1);
   assert.ok(verified >= 3);
-  assert.equal(redis.entries.size, 1);
+  assert.equal(redis.entries.size, 2);
 });
 
 test("V3.1k refuses to adopt a remote artifact for different inputs or destination", async () => {
@@ -184,4 +197,84 @@ test("V3.1k requires opt-in remote inspection and refuses cancellation", async (
   ), /aborted/);
   assert.equal(inspected, 0);
   assert.equal(redis.entries.size, 0);
+});
+
+
+test("V3.1l dry-run is safe and only explicitly retires an aged missing receipt", async () => {
+  const redis = new MemoryRedis(); const payload = request();
+  const adapter = new RedisHostedCompositionReceiptStore(redis, {
+    prefix: "vexa:test:tenant-a", verifyArtifact: () => true,
+    inspectArtifact: () => null, isReceiptUnreferenced: () => true
+  });
+  await adapter.recordPublishedArtifact(receipt(payload), payload.output, payload, context(payload));
+  const stamp = [...redis.entries.keys()].find(k => k.endsWith(":recordedAt"))!;
+  redis.entries.set(stamp, String(Date.now() - 3 * 86_400_000));
+  const age = { minAgeMs: 86_400_000 };
+  assert.deepEqual(await adapter.retireMissingReceipt(payload.output, payload, context(payload), age),
+    { status: "eligible", dryRun: true });
+  assert.equal(redis.entries.size, 2);
+  assert.deepEqual(await adapter.retireMissingReceipt(payload.output, payload, context(payload),
+    { ...age, dryRun: false }), { status: "removed", dryRun: false });
+  assert.equal(redis.entries.size, 0);
+});
+
+test("V3.1l refuses live, referenced, young and legacy receipts", async () => {
+  const redis = new MemoryRedis(); const payload = request();
+  let remotePresent = true, unreferenced = true;
+  const adapter = new RedisHostedCompositionReceiptStore(redis, {
+    prefix: "vexa:test:tenant-a", verifyArtifact: () => true,
+    inspectArtifact: () => remotePresent ? receipt(payload) : null,
+    isReceiptUnreferenced: () => unreferenced
+  });
+  await adapter.recordPublishedArtifact(receipt(payload), payload.output, payload, context(payload));
+  const run = () => adapter.retireMissingReceipt(payload.output, payload, context(payload),
+    { minAgeMs: 86_400_000, dryRun: false });
+  assert.equal((await run()).status, "present"); remotePresent = false;
+  unreferenced = false; assert.equal((await run()).status, "referenced");
+  unreferenced = true; assert.equal((await run()).status, "too-new");
+  const stamp = [...redis.entries.keys()].find(k => k.endsWith(":recordedAt"))!;
+  redis.entries.delete(stamp);
+  assert.equal((await run()).status, "untracked");
+  assert.equal(redis.entries.size, 1);
+});
+
+test("V3.1l refuses invalid policies, missing authority, and cancellation", async () => {
+  const redis = new MemoryRedis(); const payload = request();
+  await assert.rejects(() => store(redis).retireMissingReceipt(payload.output, payload, context(payload),
+    { minAgeMs: 86_400_000 }), /inspectArtifact/);
+  const adapter = new RedisHostedCompositionReceiptStore(redis, {
+    prefix: "vexa:test:tenant-a", verifyArtifact: () => true,
+    inspectArtifact: () => null, isReceiptUnreferenced: () => true
+  });
+  await assert.rejects(() => adapter.retireMissingReceipt(payload.output, payload, context(payload),
+    { minAgeMs: 5000 }), /one day/);
+  await assert.rejects(() => adapter.retireMissingReceipt(payload.output, payload, context(payload),
+    { minAgeMs: 86_400_000, dryRun: "false" as unknown as boolean }), /boolean dryRun/);
+  const controller = new AbortController(); controller.abort();
+  await assert.rejects(() => adapter.retireMissingReceipt(payload.output, payload,
+    context(payload, controller.signal), { minAgeMs: 86_400_000 }), /aborted/);
+  assert.equal(redis.entries.size, 0);
+});
+
+test("V3.1l atomic retire fences a replaced receipt", async () => {
+  const redis = new MemoryRedis(); const payload = request();
+  const adapter = new RedisHostedCompositionReceiptStore(redis, {
+    prefix: "vexa:test:tenant-a", verifyArtifact: () => true,
+    inspectArtifact: () => null, isReceiptUnreferenced: () => true
+  });
+  await adapter.recordPublishedArtifact(receipt(payload), payload.output, payload, context(payload));
+  const stamp = [...redis.entries.keys()].find(k => k.endsWith(":recordedAt"))!;
+  redis.entries.set(stamp, String(Date.now() - 4 * 86_400_000));
+  const key = [...redis.entries.keys()].find(k => !k.endsWith(":recordedAt"))!;
+  const original = redis.entries.get(key)!;
+  const oldSend = redis.sendCommand.bind(redis);
+  redis.sendCommand = async (args: readonly string[]): Promise<unknown> => {
+    if (args[0] === "EVAL" && args[1]?.includes("VEXA_PUBLICATION_RECEIPT_RETIRE")) {
+      redis.entries.set(key, `${original} `);
+    }
+    return oldSend(args);
+  };
+  assert.equal((await adapter.retireMissingReceipt(payload.output, payload, context(payload),
+    { minAgeMs: 86_400_000, dryRun: false })).status, "changed");
+  assert.equal(redis.entries.size, 2);
 });

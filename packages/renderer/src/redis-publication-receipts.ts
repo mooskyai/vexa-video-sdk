@@ -26,6 +26,24 @@ export interface RedisHostedPublicationReceiptOptions {
     payload: HostedCompositionRenderPayload,
     context: HostedCompositionPublicationContext
   ) => HostedCompositionPublicationReceipt | null | Promise<HostedCompositionPublicationReceipt | null>;
+  /** Required for explicit receipt retirement: check current jobs, leases and external references. */
+  readonly isReceiptUnreferenced?: (
+    receipt: HostedCompositionPublicationReceipt,
+    output: HostedCompositionOutputReference,
+    context: HostedCompositionPublicationContext
+  ) => boolean | Promise<boolean>;
+}
+
+export interface HostedReceiptRetirementOptions {
+  /** Safe integer, at least 24 hours; required for each explicit retirement. */
+  readonly minAgeMs: number;
+  /** Defaults to true; only false may delete a Redis receipt. Never deletes remote objects. */
+  readonly dryRun?: boolean;
+}
+
+export interface HostedReceiptRetirementResult {
+  readonly status: "missing" | "untracked" | "too-new" | "present" | "referenced" | "eligible" | "removed" | "changed";
+  readonly dryRun: boolean;
 }
 
 interface StoredPublicationReceipt extends HostedCompositionPublicationReceipt {
@@ -43,7 +61,26 @@ if previous then
   return 'conflict'
 end
 redis.call('SET', KEYS[1], ARGV[1])
+local stamp = redis.call('TIME')
+redis.call('SET', KEYS[2], tostring(stamp[1] * 1000 + math.floor(stamp[2] / 1000)))
 return 'created'
+`;
+
+// Compare raw value and age again inside Redis before deleting both keys.
+// Old receipts without a timestamp cannot be removed by this operation.
+const RETIRE_RECEIPT_SCRIPT = `
+-- VEXA_PUBLICATION_RECEIPT_RETIRE
+local stored = redis.call('GET', KEYS[1])
+if not stored then return 'missing' end
+if stored ~= ARGV[1] then return 'changed' end
+local stamp = redis.call('GET', KEYS[2])
+if not stamp or not string.match(stamp, '^%d+$') then return 'untracked' end
+local now = redis.call('TIME')
+local elapsed = now[1] * 1000 + math.floor(now[2] / 1000) - tonumber(stamp)
+if elapsed < tonumber(ARGV[2]) then return 'too-new' end
+if ARGV[3] == '1' then return 'eligible' end
+redis.call('DEL', KEYS[1], KEYS[2])
+return 'removed'
 `;
 
 function canonicalize(value: unknown): unknown {
@@ -96,6 +133,10 @@ export class RedisHostedCompositionReceiptStore {
     // Index by destination rather than fingerprint: changed requests cannot overwrite the same URL.
     const hash = createHash("sha256").update(output.destination).digest("hex");
     return `${this.options.prefix}:publication:${hash}`;
+  }
+
+  private timestampKey(output: HostedCompositionOutputReference): string {
+    return `${this.key(output)}:recordedAt`;
   }
 
   readonly lookupPublishedArtifact = async (
@@ -158,6 +199,60 @@ export class RedisHostedCompositionReceiptStore {
     return await this.lookupPublishedArtifact(output, payload, context);
   };
 
+  /**
+   * Explicit dry-run-first retirement of ONE Redis receipt whose remote artifact is gone.
+   * Never deletes media or sweeps keys. Caller must coordinate with active producers and
+   * provide an authoritative unreferenced check; neither callback is a global lock.
+   */
+  readonly retireMissingReceipt = async (
+    output: HostedCompositionOutputReference,
+    payload: HostedCompositionRenderPayload,
+    context: HostedCompositionPublicationContext,
+    options: HostedReceiptRetirementOptions
+  ): Promise<HostedReceiptRetirementResult> => {
+    if (!options || !Number.isSafeInteger(options.minAgeMs) || options.minAgeMs < 86_400_000
+      || (options.dryRun !== undefined && typeof options.dryRun !== "boolean")) {
+      throw new TypeError("Hosted receipt retirement requires minAgeMs >= one day and boolean dryRun.");
+    }
+    if (!this.options.inspectArtifact || !this.options.isReceiptUnreferenced) {
+      throw new Error("Hosted receipt retirement requires inspectArtifact and isReceiptUnreferenced providers.");
+    }
+    const dryRun = options.dryRun ?? true;
+    const checkCancellation = () => {
+      if (context.signal.aborted) throw new Error("Hosted receipt retirement aborted.");
+    };
+    checkCancellation();
+    const raw = await this.client.sendCommand(["GET", this.key(output)]);
+    checkCancellation();
+    if (raw === null) return { status: "missing", dryRun };
+    if (typeof raw !== "string" && !Buffer.isBuffer(raw)) {
+      throw new Error("Redis hosted publication receipt has an invalid response.");
+    }
+    let stored: StoredPublicationReceipt;
+    try { stored = JSON.parse(String(raw)) as StoredPublicationReceipt; }
+    catch { throw new Error("Redis hosted publication receipt contains invalid JSON."); }
+    if (!stored || stored.schemaVersion !== 1 || stored.destination !== output.destination
+      || stored.artifactId !== output.artifactId || stored.artifact?.url !== output.destination) {
+      throw new Error("Redis hosted publication receipt conflicts with the requested destination.");
+    }
+    validateReceipt(stored, output, context, payload);
+    const remote = await this.options.inspectArtifact(output, payload, context);
+    checkCancellation();
+    if (remote !== null) return { status: "present", dryRun };
+    const safe = await this.options.isReceiptUnreferenced(stored, output, context);
+    checkCancellation();
+    if (safe !== true) return { status: "referenced", dryRun };
+    const result = await this.client.sendCommand([
+      "EVAL", RETIRE_RECEIPT_SCRIPT, "2", this.key(output), this.timestampKey(output),
+      String(raw), String(options.minAgeMs), dryRun ? "1" : "0"
+    ]);
+    checkCancellation();
+    if (!["missing", "changed", "untracked", "too-new", "eligible", "removed"].includes(String(result))) {
+      throw new Error("Redis hosted receipt retirement returned an unexpected result.");
+    }
+    return { status: result as HostedReceiptRetirementResult["status"], dryRun };
+  };
+
   readonly recordPublishedArtifact = async (
     receipt: HostedCompositionPublicationReceipt,
     output: HostedCompositionOutputReference,
@@ -179,7 +274,7 @@ export class RedisHostedCompositionReceiptStore {
     };
     const encoded = JSON.stringify(canonicalize(record));
     const result = await this.client.sendCommand([
-      "EVAL", RECORD_RECEIPT_SCRIPT, "1", this.key(output), encoded
+      "EVAL", RECORD_RECEIPT_SCRIPT, "2", this.key(output), this.timestampKey(output), encoded
     ]);
     if (result !== "created" && result !== "unchanged") {
       if (result === "conflict") throw new Error("Redis hosted publication receipt conflicts with a previous publication.");

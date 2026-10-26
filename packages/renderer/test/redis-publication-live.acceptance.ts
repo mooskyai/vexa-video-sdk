@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -144,6 +144,59 @@ test("live Redis: conflicting recovery attempts cannot adopt another request's d
       owner.output, owner, context(owner)
     ), receipt(owner));
   } finally { a.close(); b.close(); }
+});
+
+
+
+test("live Redis: old missing receipt requires dry-run then explicit retirement", { timeout: 15_000 }, async () => {
+  const file = join(root, "expired-receipt.mp4");
+  await writeFile(file, "video");
+  const payload = request(31, pathToFileURL(file).href);
+  const client = await LiveRedisClient.open();
+  try {
+    const adapter = new RedisHostedCompositionReceiptStore(client, {
+      prefix,
+      verifyArtifact: async () => { try { return (await stat(file)).size === 5; } catch { return false; } },
+      inspectArtifact: async () => { try { await stat(file); return receipt(payload); } catch { return null; } },
+      isReceiptUnreferenced: () => true
+    });
+    await adapter.recordPublishedArtifact(receipt(payload), payload.output, payload, context(payload));
+    const key = `${prefix}:publication:${createHash("sha256").update(payload.output.destination!).digest("hex")}`;
+    await client.sendCommand(["SET", `${key}:recordedAt`, String(Date.now() - 5 * 86_400_000)]);
+    await rm(file);
+    const args = { minAgeMs: 2 * 86_400_000 };
+    assert.equal((await adapter.retireMissingReceipt(payload.output, payload, context(payload), args)).status,
+      "eligible");
+    assert.equal(await client.sendCommand(["EXISTS", key]), 1);
+    assert.equal((await adapter.retireMissingReceipt(payload.output, payload, context(payload),
+      { ...args, dryRun: false })).status, "removed");
+    assert.equal(await client.sendCommand(["EXISTS", key]), 0);
+  } finally { client.close(); }
+});
+
+test("live Redis: referenced and recently recorded receipts cannot be retired", { timeout: 15_000 }, async () => {
+  const file = join(root, "protected-receipt.mp4");
+  await writeFile(file, "video");
+  const payload = request(32, pathToFileURL(file).href);
+  const client = await LiveRedisClient.open();
+  try {
+    let active = true;
+    const adapter = new RedisHostedCompositionReceiptStore(client, {
+      prefix,
+      verifyArtifact: () => true,
+      inspectArtifact: () => null,
+      isReceiptUnreferenced: () => !active
+    });
+    await adapter.recordPublishedArtifact(receipt(payload), payload.output, payload, context(payload));
+    const args = { minAgeMs: 86_400_000, dryRun: false };
+    assert.equal((await adapter.retireMissingReceipt(payload.output, payload, context(payload), args)).status,
+      "referenced");
+    active = false;
+    assert.equal((await adapter.retireMissingReceipt(payload.output, payload, context(payload), args)).status,
+      "too-new");
+    assert.deepEqual(await adapter.lookupPublishedArtifact(payload.output, payload, context(payload)),
+      receipt(payload));
+  } finally { client.close(); }
 });
 
 test.after(async () => {

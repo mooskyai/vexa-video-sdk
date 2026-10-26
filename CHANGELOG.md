@@ -18,6 +18,7 @@ All notable public changes to Vexa Video SDK are documented here. Public `@vexa-
 - V3.1i opt-in provider publication receipts for retry-safe hosted artifact recovery, fingerprint validation, and fail-closed lookup errors.
 - V3.1j Redis-backed provider receipt hooks with destination-keyed atomic write-once semantics and mandatory external artifact validation on write and lookup.
 - V3.1k opt-in reconciliation of remote artifacts published before receipt persistence, requiring provider fingerprint evidence and atomic Redis adoption.
+- V3.1l opt-in, dry-run-first, age-gated removal of one missing unreferenced Redis publication receipt with atomic compare-and-delete; remote objects are never deleted.
 
 ### Changed
 
