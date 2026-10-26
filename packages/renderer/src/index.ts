@@ -1,5 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import {
+  fingerprintHostedCompositionPublication,
+  type HostedCompositionPublicationReceipt
+} from "./publication-recovery.js";
+export type { HostedCompositionPublicationReceipt } from "./publication-recovery.js";
 import { pathToFileURL } from "node:url";
 import { Resvg } from "@resvg/resvg-js";
 import { readBundleManifest } from "@vexa-video/bundler";
@@ -2385,8 +2390,13 @@ export type HostedCompositionOutputResolver = (
   context: HostedCompositionWorkerContext
 ) => string | Promise<string>;
 
+export interface HostedCompositionPublicationContext extends HostedCompositionWorkerContext {
+  /** Request-derived identity, independent of attempt number or worker ID. */
+  readonly fingerprint: string;
+}
+
 export interface HostedCompositionArtifactPublishContext
-  extends HostedCompositionWorkerContext {
+  extends HostedCompositionPublicationContext {
   readonly localOutput: string;
   readonly contentType: string;
 }
@@ -2427,6 +2437,25 @@ export interface HostedCompositionWorkerOptions {
    * a directory; hosts can package/upload it however their provider requires.
    */
   readonly publishArtifact?: HostedCompositionArtifactPublisher;
+  /**
+   * Optional provider-backed receipt lookup before rendering. Null means no published artifact;
+   * errors and mismatched fingerprints fail closed rather than overwriting a remote destination.
+   */
+  readonly lookupPublishedArtifact?: (
+    output: HostedCompositionOutputReference,
+    payload: HostedCompositionRenderPayload,
+    context: HostedCompositionPublicationContext
+  ) => HostedCompositionPublicationReceipt | null | Promise<HostedCompositionPublicationReceipt | null>;
+  /**
+   * Optional durable receipt writer, invoked after publication but before job completion.
+   * This is not atomic with the upload or the Redis job result; provider writes must be idempotent.
+   */
+  readonly recordPublishedArtifact?: (
+    receipt: HostedCompositionPublicationReceipt,
+    output: HostedCompositionOutputReference,
+    payload: HostedCompositionRenderPayload,
+    context: HostedCompositionPublicationContext
+  ) => void | Promise<void>;
   /** Test/provider seam; normal execution uses VexaCompositionRenderer.fromManifest(). */
   readonly createRenderer?: (
     manifestPath: string,
@@ -2528,7 +2557,8 @@ async function publishHostedWorkerArtifact(
   payload: HostedCompositionRenderPayload,
   context: HostedCompositionWorkerContext,
   options: HostedCompositionWorkerOptions,
-  contentType: string
+  contentType: string,
+  fingerprint: string
 ): Promise<HostedRenderArtifact | undefined> {
   const destination = payload.output.destination;
   if (!destination) return undefined;
@@ -2537,7 +2567,8 @@ async function publishHostedWorkerArtifact(
   const publishContext: HostedCompositionArtifactPublishContext = Object.freeze({
     ...context,
     localOutput,
-    contentType
+    contentType,
+    fingerprint
   });
 
   const publishWithProvider = async (): Promise<HostedRenderArtifact> => {
@@ -2697,6 +2728,44 @@ export function registerHostedCompositionRenderWorker<
         outputValue,
         "Hosted composition output resolver"
       );
+      const contentType = hostedWorkerContentType(payload);
+      const fingerprint = fingerprintHostedCompositionPublication(payload);
+      const publicationContext: HostedCompositionPublicationContext = Object.freeze({
+        ...context,
+        fingerprint
+      });
+      if (payload.output.destination && options.lookupPublishedArtifact) {
+        let receipt: HostedCompositionPublicationReceipt | null;
+        try {
+          receipt = await options.lookupPublishedArtifact(payload.output, payload, publicationContext);
+        } catch (cause) {
+          if (context.signal.aborted) throw new JobCancelledError(context.jobId);
+          throw hostedWorkerPublicationError(payload, "Hosted artifact receipt lookup failed.", cause);
+        }
+        if (context.signal.aborted) throw new JobCancelledError(context.jobId);
+        if (receipt !== null) {
+          if (!receipt || receipt.fingerprint !== fingerprint) {
+            throw hostedWorkerPublicationError(payload, "Hosted artifact receipt fingerprint mismatch.");
+          }
+          const artifact = normalizeHostedWorkerArtifact(receipt.artifact, payload, contentType);
+          await jobContext.reportProgress({
+            percent: 100,
+            phase: "complete",
+            message: "Reused previously published hosted composition artifact.",
+            data: { artifactId: payload.output.artifactId, url: artifact.url }
+          });
+          return Object.freeze({
+            schemaVersion: 1 as const,
+            artifactId: payload.output.artifactId,
+            bundleId: payload.bundle.id,
+            compositionId: payload.compositionId,
+            target: payload.target.kind,
+            output,
+            contentType,
+            artifact
+          });
+        }
+      }
       const renderer = await (
         options.createRenderer?.(manifestPath, options.rendererOptions ?? {}) ??
         VexaCompositionRenderer.fromManifest(manifestPath, options.rendererOptions)
@@ -2726,7 +2795,6 @@ export function registerHostedCompositionRenderWorker<
         onProgress
       } satisfies VexaRenderExecutionOptions;
 
-      const contentType = hostedWorkerContentType(payload);
       let artifact: HostedRenderArtifact | undefined;
 
       try {
@@ -2790,8 +2858,23 @@ export function registerHostedCompositionRenderWorker<
             payload,
             context,
             options,
-            contentType
+            contentType,
+            fingerprint
           );
+          if (artifact && options.recordPublishedArtifact) {
+            try {
+              await options.recordPublishedArtifact(
+                Object.freeze({ fingerprint, artifact }),
+                payload.output,
+                payload,
+                publicationContext
+              );
+            } catch (cause) {
+              if (context.signal.aborted) throw new JobCancelledError(context.jobId);
+              throw hostedWorkerPublicationError(payload, "Hosted artifact receipt recording failed.", cause);
+            }
+            if (context.signal.aborted) throw new JobCancelledError(context.jobId);
+          }
           await jobContext.reportProgress({
             percent: 100,
             phase: "complete",

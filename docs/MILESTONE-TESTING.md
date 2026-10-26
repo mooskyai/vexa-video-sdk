@@ -88,4 +88,6 @@ V3.1f also tests opt-in atomic repair of a missing queue reference without dupli
 
 V3.1g retention tests cover no-op dry runs, oldest-first batch limits, recent failure preservation, unchanged job snapshots, repeat safety, unsafe option rejection and non-blocking diagnostic listeners. Fake Redis emulates the atomic Lua contract; live Redis fault-injection and operator backup/retention verification remain required before production adoption.
 
-V3.1h real-Redis acceptance is opt-in and is **not** included in `npm run verify`. Launch a dedicated local Redis 7 instance, set `VEXA_TEST_REDIS_URL=redis://127.0.0.1:6389`, and run `npm run test:redis`. All four tests must pass: concurrent claim exclusivity and fencing, forced child-process death and replacement claim, cancellation after crash, and concurrent due-retry promotion. This suite does not prove artifact publication exactly once; retain live external-output acceptance before production sign-off.
+V3.1h real-Redis acceptance is opt-in and is **not** included in `npm run verify`. Launch Redis 7 on loopback, set `VEXA_TEST_REDIS_URL=redis://127.0.0.1:6389` and run `npm run test:redis`. All four process death, fencing, cancellation, and retry race tests must pass.
+
+V3.1i tests deterministic publication fingerprints, persisted-receipt reuse after a simulated post-publication failure, mismatched receipt rejection, and fail-closed provider lookup errors. These tests use a fake provider; validating provider-backed durable receipts and publication under real process crashes is a separate acceptance gate.
