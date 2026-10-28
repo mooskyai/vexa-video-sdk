@@ -146,3 +146,5 @@ Every new capability must:
 6. preserve or intentionally version public API behavior.
 
 The detailed V3 delivery plan is maintained in [`docs/V3_MILESTONE.md`](./docs/V3_MILESTONE.md).
+
+V3.1q adds an optional authoritative `confirmAbandoned(path)` guard to bounded workspace reclamation and a separate FFmpeg child-process crash/cancel/restart acceptance suite. The V3.1 stage remains **NO-GO for production release** pending host-specific live ownership policy and a documented provider artifact-retention/finalization scope. V3.1p live CI passed at `2ea4572` ([run 40632531852](https://github.com/mooskyai/vexa-video-sdk/actions/runs/40632531852)); V3.1q needs its own independent green run.

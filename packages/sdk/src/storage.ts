@@ -84,6 +84,8 @@ export interface AbandonedWorkspaceCleanupOptions {
   minAgeMs: number;
   maxEntries?: number;
   dryRun?: boolean;
+  /** Optional authoritative job/lease/reference guard. Only a literal true permits eligibility. */
+  confirmAbandoned?: (path: string) => boolean | Promise<boolean>;
 }
 
 export interface AbandonedWorkspaceCleanupResult {
@@ -435,6 +437,9 @@ export class MediaWorkspace {
     if (!Number.isInteger(maxEntries) || maxEntries < 1 || maxEntries > 1_000) {
       throw new InvalidStorageError("Workspace reclamation maxEntries must be between 1 and 1,000.");
     }
+    if (options.confirmAbandoned !== undefined && typeof options.confirmAbandoned !== "function") {
+      throw new InvalidStorageError("Workspace reclamation confirmAbandoned must be a function.");
+    }
     const canonicalRoot = await realpath(resolve(root));
     const entries = (await readdir(canonicalRoot, { withFileTypes: true }))
       .filter((entry) => entry.name.startsWith(prefix))
@@ -456,8 +461,22 @@ export class MediaWorkspace {
         skipped += 1;
         continue;
       }
+      // Directory mtime is never authoritative evidence that a worker has stopped.
+      if (options.confirmAbandoned && await options.confirmAbandoned(candidate) !== true) {
+        skipped += 1;
+        continue;
+      }
       eligiblePaths.push(candidate);
       if (!dryRun) {
+        // Re-check after asynchronous authority lookup; operators must still coordinate
+        // producers because a filesystem check is not a distributed ownership lock.
+        const latest = await lstat(candidate);
+        if (!latest.isDirectory() || latest.isSymbolicLink() || latest.mtimeMs > cutoff
+          || await realpath(candidate) !== candidate
+          || (options.confirmAbandoned && await options.confirmAbandoned(candidate) !== true)) {
+          skipped += 1;
+          continue;
+        }
         await rm(candidate, { recursive: true, force: false });
         removedPaths.push(candidate);
       }

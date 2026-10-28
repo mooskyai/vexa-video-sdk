@@ -58,3 +58,7 @@ npm run test:object-storage
 ```
 
 The V3.1p GitHub workflow is separate from the published Version 2 release workflow; adding it does not change package versions or release permissions. Tests must use isolated loopback endpoints, disposable unique resource namespaces, and no production secrets.
+
+## V3.1q follow-on (not a retroactive change to this review)
+
+V3.1q introduces `confirmAbandoned` and an isolated FFmpeg-backed process-crash/restart/cancellation workspace acceptance suite (`npm run test:workspace-crash`). This addresses the focused managed-directory test gap **only when the host supplies current authoritative ownership data**. The V3.1p workflow passed at commit `2ea4572` ([run 40632531852](https://github.com/mooskyai/vexa-video-sdk/actions/runs/40632531852)); V3.1q still requires its own CI evidence. This audit remains a **NO-GO** for general production hosted deployment: do not infer global producer quiescence, safe deletion under unknown concurrent processes or production provider retention guarantees. See `docs/V3_1Q_WORKSPACE_CRASH_ACCEPTANCE.md`.

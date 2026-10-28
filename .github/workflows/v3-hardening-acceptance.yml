@@ -39,6 +39,9 @@ jobs:
       - name: Verify repository
         run: npm run verify
 
+      - name: Verify workspace process-crash recovery
+        run: npm run test:workspace-crash
+
       - name: Start isolated Redis and S3-compatible storage
         shell: bash
         run: |

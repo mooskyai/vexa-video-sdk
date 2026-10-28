@@ -63,3 +63,4 @@ Existing 1.x users should read [`docs/V2_MIGRATION.md`](./docs/V2_MIGRATION.md).
 ## [1.0.0]
 
 Initial public Vexa Video SDK release line.
+- V3.1q opt-in FFmpeg-backed child-process workspace crash/cancel/restart acceptance and optional authoritative cleanup guard; destructive cleanup remains operator-controlled.

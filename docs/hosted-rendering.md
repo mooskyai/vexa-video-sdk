@@ -77,3 +77,5 @@ Version 3 plans:
 - tenant-aware platform controls.
 
 Do not design a Version 2 deployment assuming those planned platform features already exist.
+
+V3.1q independently tests managed workspace artifacts across abrupt child-process death, safe restart and normal cancellation. The optional `confirmAbandoned(path)` callback lets a deployment reject workspaces still referenced by running workers; the SDK does not infer abandonment from Redis receipts or directory age alone. See [the V3.1q operator guide](./V3_1Q_WORKSPACE_CRASH_ACCEPTANCE.md).

@@ -152,6 +152,48 @@ test("workspace reclamation refuses broad prefixes, short ages and invalid scan 
   }), InvalidStorageError);
 });
 
+test("V3.1q authority callback prevents age-only deletion of an active workspace", async () => {
+  const root = await mkdtemp(join(tmpdir(), "vexa-guard-test-"));
+  try {
+    const abandoned = await MediaWorkspace.create({ root, prefix: "vexa-guard-" });
+    const active = await MediaWorkspace.create({ root, prefix: "vexa-guard-" });
+    const oldTime = new Date(Date.now() - 5 * 60_000);
+    await utimes(abandoned.path, oldTime, oldTime);
+    await utimes(active.path, oldTime, oldTime);
+    const confirmed: string[] = [];
+    const opts = { root, prefix: "vexa-guard-", minAgeMs: 60_000,
+      confirmAbandoned: async (path: string) => { confirmed.push(path); return path === abandoned.path; } };
+    const preview = await MediaWorkspace.reclaimAbandoned(opts);
+    assert.deepEqual(preview.eligiblePaths, [abandoned.path]);
+    assert.deepEqual(preview.removedPaths, []);
+    const removed = await MediaWorkspace.reclaimAbandoned({ ...opts, dryRun: false });
+    assert.deepEqual(removed.removedPaths, [abandoned.path]);
+    assert.ok(confirmed.includes(active.path));
+    assert.equal((await stat(active.path)).isDirectory(), true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("V3.1q authority errors abort cleanup and invalid guard options fail validation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "vexa-guard-error-test-"));
+  try {
+    const candidate = await MediaWorkspace.create({ root, prefix: "vexa-guard-" });
+    const oldTime = new Date(Date.now() - 5 * 60_000);
+    await utimes(candidate.path, oldTime, oldTime);
+    const opts = { root, prefix: "vexa-guard-", minAgeMs: 60_000, dryRun: false };
+    await assert.rejects(() => MediaWorkspace.reclaimAbandoned({
+      ...opts, confirmAbandoned: "yes" as unknown as () => boolean
+    }), InvalidStorageError);
+    await assert.rejects(() => MediaWorkspace.reclaimAbandoned({
+      ...opts, confirmAbandoned: () => { throw new Error("authority offline"); }
+    }), /authority offline/);
+    assert.equal((await stat(candidate.path)).isDirectory(), true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("object-storage adapters delegate S3 downloads and uploads without cloud SDK dependencies", async () => {
   const workspace = await new Storage().createWorkspace({ root: tmpdir(), prefix: "vexa-adapter-test-" });
   const sourceFile = workspace.file("source.txt");

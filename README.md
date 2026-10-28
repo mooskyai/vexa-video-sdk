@@ -298,3 +298,5 @@ Read [CONTRIBUTING.md](./CONTRIBUTING.md) before changing public APIs or package
 ## License
 
 MIT
+
+V3.1q adds optional `confirmAbandoned` ownership checks to dry-run-first managed workspace reclamation and an opt-in `npm run test:workspace-crash` FFmpeg child-process crash/cancellation/restart suite. See [the V3.1q workspace acceptance guide](./docs/V3_1Q_WORKSPACE_CRASH_ACCEPTANCE.md). Age alone is not proof of abandonment; no automatic or provider-side artifact deletion is introduced.

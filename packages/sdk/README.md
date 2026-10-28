@@ -67,3 +67,5 @@ Do not import this package into browser bundles. Browser packages communicate wi
 - [hosted-rendering.md](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/hosted-rendering.md)
 
 For the full package map and runtime boundaries, see the [Vexa package guide](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/package-guide.md).
+
+V3.1q workspace recovery: `MediaWorkspace.reclaimAbandoned({ root, prefix, minAgeMs, confirmAbandoned: async (path) => ... })` optionally checks application-owned durable lease/reference authority before listing and deleting an aged candidate. The callback must return literal `true` for eligibility; `false` skips and exceptions abort. It is rechecked immediately before `{ dryRun: false }` deletion. Defaults remain dry-run-first and legacy age-only cleanup remains available; neither is a distributed lock. Run `npm run test:workspace-crash` for the opt-in FFmpeg child-process fixture; see `docs/V3_1Q_WORKSPACE_CRASH_ACCEPTANCE.md`.

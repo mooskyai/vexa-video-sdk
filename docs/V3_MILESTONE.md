@@ -226,3 +226,4 @@ V3.16 Version 3 release
 ## Definition of done for a V3 stage
 
 A stage is complete only when public contracts, validation/planning, tests, real integration coverage, docs and migration/compatibility impact are all complete. A partial foundation from Version 2 does not make the V3 stage complete by itself.
+- **V3.1q — workspace crash lifecycle acceptance:** optional authoritative abandonment guard on bounded, operator-triggered workspace reclamation; FFmpeg-backed child-process kill/restart/cancel tests, with live and stale ownership protection. No automated sweeper or distributed quiescence lock.

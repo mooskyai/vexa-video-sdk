@@ -23,6 +23,7 @@
     "test:watch": "node --import tsx --test --watch \"packages/**/*.test.ts\"",
     "test:redis": "node --import tsx --test packages/sdk/test/redis-live.acceptance.ts packages/renderer/test/redis-publication-live.acceptance.ts",
     "test:object-storage": "node --import tsx --test packages/renderer/test/object-storage-live.acceptance.mjs",
+    "test:workspace-crash": "node --import tsx --test packages/sdk/test/workspace-crash.acceptance.mjs",
     "typecheck": "tsc -b --pretty false",
     "check": "npm run typecheck && npm test",
     "example:probe": "node --import tsx examples/probe/src/index.ts",

@@ -190,3 +190,4 @@ Unless intentionally changed through a documented API revision:
 5. plans remain inspectable before expensive execution;
 6. new surfaces reuse existing validators/renderers/jobs/storage instead of parallel engines;
 7. Windows, Linux and macOS differences are tested where paths/processes/fonts/hardware are involved.
+V3.1q adds an optional `confirmAbandoned(path)` callback to the existing `MediaWorkspace.reclaimAbandoned` operator API, evaluated after age checks and again before destructive removal. This lets a host consult its own job/lease/consumer ownership authority; callbacks that reject or throw never grant deletion. A dedicated FFmpeg-backed child-process acceptance suite covers crash, restart, explicit cleanup and fail-closed guards. This is not a distributed lock or automated cleanup daemon; deployments must coordinate producers, especially where legacy age-only behavior is still used.
