@@ -29,6 +29,8 @@ Status: **REVIEWED; NOT APPROVED FOR PRODUCTION RELEASE**. This review adds an o
 
 ## Go/no-go decision
 
+**Follow-on evidence and scope (2026-10-28):** V3.1q live acceptance succeeded on commit `83b54959bfcf9ce8120c6c55c75207492f272ecc` ([run 40653898073](https://github.com/mooskyai/vexa-video-sdk/actions/runs/40653898073)). V3.1r adds only a read-only lifecycle policy/planner and does not override the original production NO-GO decision. No V3.1 production cloud artifact finalizer, global quiescence lock or provider qualification is claimed; see [the V3.1r policy](./V3_1R_ARTIFACT_RETENTION_POLICY.md).
+
 **NO-GO for claiming the whole V3.1 stage production-complete or publishing a V3 release.** V3.1a–V3.1o slices are implemented and their local tests have passed, but the explicitly documented V3.1 workspace cleanup acceptance still lacks a full end-to-end crash/cancellation/restart proof. The new V3.1p hosted CI must pass, and the artifact lifecycle scope/ownership and actual deployment provider guarantees must be addressed or explicitly gated to their later stages.
 
 This decision does **not** invalidate V3.1o or prohibit starting separate V3.2 design work. Do not silently reinterpret operator-only, opt-in cleanup as automatic production finalization; do not equate Redis receipt CAS with a distributed transaction; do not mark cloud-provider qualification as passed because the SILO acceptance is green.

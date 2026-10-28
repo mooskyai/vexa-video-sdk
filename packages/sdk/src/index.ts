@@ -21,6 +21,8 @@ export { RedisJobTransport } from "./redis-jobs.js";
 export type { RedisCommandClient, RedisJobTransportOptions, RedisJobRecoveryResult, RedisJobDeadLetter, RedisRetryReconciliationResult, RedisJobQueueDiagnostics, RedisJobDiagnosticEvent, RedisJobOrphanResult, RedisDeadLetterPruneOptions, RedisDeadLetterPruneResult } from "./redis-jobs.js";
 export { Storage, MediaWorkspace, parseStorageSource } from "./storage.js";
 export type { StorageAdapter, StorageAdapterHandlers, StorageOptions, ResolvedMediaSource, AbandonedWorkspaceCleanupOptions, AbandonedWorkspaceCleanupResult } from "./storage.js";
+export { planArtifactLifecycleReview } from "./artifact-lifecycle.js";
+export type { ArtifactLifecycleKind, ArtifactReferenceState, ArtifactRemoteState, ArtifactLifecycleReason, ArtifactLifecycleCandidate, ArtifactLifecycleRetentionPolicy, ArtifactLifecycleReviewOptions, ArtifactLifecycleReviewEntry, ArtifactLifecycleReview } from "./artifact-lifecycle.js";
 export { Hardware } from "./hardware.js";
 export { Streaming } from "./streaming.js";
 export { Captions } from "./captions.js";

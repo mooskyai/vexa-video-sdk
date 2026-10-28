@@ -16,6 +16,8 @@ Start here for a Node service, CLI-like application, worker, media API or server
 
 ## Capabilities
 
+V3.1r (unreleased) exports `planArtifactLifecycleReview({ tenantId, nowMs, policy, candidates })` as a **read-only** operator pre-screening API. It holds job snapshots and remote media unconditionally; dead-letter/receipt/workspace review requires explicit age, reference and authority evidence. Output `review` means *human review*, not deletion permission. See [`docs/V3_1R_ARTIFACT_RETENTION_POLICY.md`](../../docs/V3_1R_ARTIFACT_RETENTION_POLICY.md) for the five-resource retention matrix and operator runbook.
+
 - Immutable `Video` and `Audio` workflows with inspectable plans
 - `VideoProject` timeline composition
 - Streaming, storage and safe remote-media resolution

@@ -57,6 +57,8 @@ Version 3 turns the Version 2 programmable-video foundation into a more resilien
 
 ### V3.1 — production hardening
 
+**V3.1r development:** a bounded, tenant-scoped, read-only retention planner now records why job snapshots and remote artifacts must be held and why dead letters, missing publication receipts, and workspace directories require independent operator review. It does not create an automatic finalizer. See [V3.1r retention policy](./docs/V3_1R_ARTIFACT_RETENTION_POLICY.md). V3.1q live CI passed at `83b5495` ([run 40653898073](https://github.com/mooskyai/vexa-video-sdk/actions/runs/40653898073)); V3.1r CI is pending and V3.1 remains in progress.
+
 Add operational guarantees around the existing worker/job model:
 
 - worker heartbeat and lease ownership;

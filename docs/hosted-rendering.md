@@ -44,6 +44,8 @@ Vexa owns the portable request/state/cancel/wait contract.
 
 ## Idempotency
 
+For operator retention decisions in the unreleased V3.1r branch, `planArtifactLifecycleReview()` offers a read-only five-resource review matrix in `@vexa-video/sdk`. A receipt is only reviewable after independently verified remote absence, current no-reference authority and minimum age; the report never deletes or authorizes deletion. See [V3.1r retention policy](./V3_1R_ARTIFACT_RETENTION_POLICY.md).
+
 Use stable idempotency keys for user actions that may be retried. External side effects must still be idempotent because distributed retries can occur after an operation has partially completed.
 
 V3.1i optionally lets `registerHostedCompositionRenderWorker` accept `lookupPublishedArtifact` and `recordPublishedArtifact`. Both receive a retry-stable SHA-256 fingerprint of the normalized hosted composition request. A matching provider-backed receipt skips rendering and uploading on a retry, including after a worker failed after recording publication but before committing its job result. Mismatched receipts and lookup errors fail closed; no remote destination is overwritten blindly. `publishArtifact` receives the same `context.fingerprint` so providers can attach it to artifact metadata. Receipt writers must be durable, repeat-safe and validate the remote artifact before returning it. A crash between upload and receipt write can still cause another upload, so stable artifact destinations and provider idempotence are required. This is not exactly-once delivery.

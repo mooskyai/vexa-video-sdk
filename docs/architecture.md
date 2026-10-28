@@ -135,6 +135,8 @@ Arbitrary media output, uploads and other external handler side effects are stil
 
 ## Storage
 
+V3.1r adds `planArtifactLifecycleReview()` in Node-only `@vexa-video/sdk`: one explicit tenant-scoped candidate batch, a fixed evaluation time and resource-specific minimum ages. It returns immutable hold/review diagnostics and does no storage, Redis or network I/O. Existing targeted retention APIs still perform their own current authority checks. Job snapshots and external media are excluded from V3.1 destructive planning. See [the V3.1r operator matrix](./V3_1R_ARTIFACT_RETENTION_POLICY.md).
+
 The storage/workspace layer resolves local and remote media into managed execution paths and exposes adapter hooks for cloud providers. S3/GCS/Azure hooks in 2.0.0 are contracts, not first-party cloud SDK packages.
 
 First-party cloud packages are planned for Version 3.

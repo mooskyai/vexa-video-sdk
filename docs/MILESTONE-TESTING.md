@@ -72,6 +72,8 @@ Feature PRs do not need to reproduce the entire release matrix locally when focu
 
 ## Version 3 additions
 
+V3.1r adds **eight** read-only artifact lifecycle planner tests (expected **476** regular tests: 468 + 8), covering the five-resource ownership matrix, age floors, archive/remote proof, tenant and batch isolation, deterministic results and fail-closed invalid input. The V3.1q live CI passed on commit `83b5495` ([run 40653898073](https://github.com/mooskyai/vexa-video-sdk/actions/runs/40653898073)). V3.1r still needs its own successful `npm run verify` and commit-matched CI; opt-in workspace/Redis/S3 tests remain 4/12/7.
+
 Each V3 stage should add fault/scale/integration tests appropriate to its new guarantee. In particular, V3.1 worker hardening should use fault injection for process death, stale leases, retries, recovery and workspace cleanup rather than relying on happy-path worker tests.
 
 V3.1a focused acceptance covers renewable heartbeats during active work, rejection of stale claim-token mutations, cancellation while a lease is active, Redis lease-aware claim/save/finish behavior, and clearing the lease when work becomes terminal.

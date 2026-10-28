@@ -16,6 +16,8 @@ Each V3 stage must begin by identifying the Version 2 contracts it extends. Para
 
 ## V3.1 — Production hardening
 
+V3.1r introduces an opt-in **read-only** artifact lifecycle review planner and operator retention matrix (`docs/V3_1R_ARTIFACT_RETENTION_POLICY.md`). It covers job snapshots (always hold), dead letters (export and minimum age), missing receipts (authoritative provider absence), managed workspaces (host ownership guard), and remote media (hold/defer finalization). No general delete/sweeper or production provider certification is added. V3.1q acceptance succeeded on commit `83b5495`; this slice requires separate local and CI verification.
+
 ### Existing foundation
 
 Version 2 already provides local/Redis jobs, retries, idempotency, cancellation, progress, managed workspaces and deterministic artifact identity in hosted composition workflows.
