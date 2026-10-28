@@ -287,6 +287,8 @@ The current V3 development line adds renewable distributed-worker leases and hea
 
 See [ROADMAP.md](./ROADMAP.md) for current status and sequencing. These features are **unreleased** and do not change the published 2.0.0 package. Stop older V3 workers before upgrading; external side effects remain at-least-once and should use stable idempotent artifact identities.
 
+V3.1o adds opt-in real S3-compatible object-store and Redis crash-window acceptance using a loopback SILO container. Run `npm run test:object-storage` following [the V3.1o acceptance guide](./docs/V3_1O_OBJECT_STORAGE_ACCEPTANCE.md). The test proves conditional writes and receipt reconciliation for the isolated fixture, not general cloud provider atomicity.
+
 ## Contributing and security
 
 Read [CONTRIBUTING.md](./CONTRIBUTING.md) before changing public APIs or package boundaries. Report security concerns according to [SECURITY.md](./SECURITY.md).

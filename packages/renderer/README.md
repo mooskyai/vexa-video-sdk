@@ -31,6 +31,7 @@ The renderer reuses Vexa project/FFmpeg/storage contracts; it must not create a 
 
 - [compositions.md](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/compositions.md)
 - [hosted-rendering.md](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/hosted-rendering.md)
+- [V3.1o object-storage acceptance](../../docs/V3_1O_OBJECT_STORAGE_ACCEPTANCE.md)
 - [architecture.md](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/architecture.md)
 
 For the full package map and runtime boundaries, see the [Vexa package guide](https://github.com/mooskyai/vexa-video-sdk/blob/main/docs/package-guide.md).

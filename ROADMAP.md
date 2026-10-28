@@ -70,6 +70,8 @@ Current development includes V3.1a lease/heartbeat fencing, V3.1b atomic claim a
 
 **Acceptance:** fault-injection tests must demonstrate that process interruption does not silently lose or duplicate claimed work, retries remain idempotent, and abandoned workspaces/artifacts are handled predictably.
 
+V3.1o adds an opt-in SILO/Redis external artifact process-crash test gate (`npm run test:object-storage`): conditional publication, persisted provider fingerprint, fresh-client recovery, conflicting writers and remote absence/authorization failure handling. AWS S3/GCS/Azure adapter certification, multipart/network failure injection and cleanup policy remain separate release gates.
+
 ### V3.2 — capability-aware scheduling
 
 Workers advertise platform, CPU/memory/concurrency, codecs, hardware providers and browser/composition capability. Jobs declare requirements and fallback policy. Scheduling must explain why a worker is eligible or rejected.

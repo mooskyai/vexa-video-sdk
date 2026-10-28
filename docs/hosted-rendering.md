@@ -56,6 +56,8 @@ V3.1l adds `store.retireMissingReceipt(output, payload, context, { minAgeMs: 864
 
 V3.1m adds `store.inspectKnownReceipts([{ output, payload, context }], { minAgeMs: 86400000, onDiagnostic })` for up to 100 explicitly supplied, unique destinations. It applies the V3.1l dry-run authority checks and returns immutable per-destination statuses plus aggregate counts. Provider callback errors are redacted to `INSPECTION_FAILED` and cannot hide the status of other candidates; diagnostic observer exceptions are ignored. Inputs are prevalidated before Redis access, no keys are enumerated, and no receipts or remote objects are mutated. `eligible` is an operator finding, not an authorization to run cleanup without coordinating producers and validating live references.
 
+V3.1o adds a test-only isolated S3-compatible SILO + Redis acceptance suite. A separate process exits after S3 PUT and (in a second case) after Redis receipt CAS; fresh clients inspect authoritative remote metadata and recover without overwriting. Conflicting conditional writes, missing metadata, missing remote objects and auth failures must fail closed. See [the V3.1o acceptance guide](./V3_1O_OBJECT_STORAGE_ACCEPTANCE.md). This is not a bundled production provider adapter or exactly-once guarantee.
+
 ## Version 2 vs Version 3
 
 Version 2 provides portable hosted-render contracts and job/storage integration. It does **not** claim a complete multi-tenant hosted platform.
