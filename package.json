@@ -24,6 +24,7 @@
     "test:redis": "node --import tsx --test packages/sdk/test/redis-live.acceptance.ts packages/renderer/test/redis-publication-live.acceptance.ts",
     "test:object-storage": "node --import tsx --test packages/renderer/test/object-storage-live.acceptance.mjs",
     "test:workspace-crash": "node --import tsx --test packages/sdk/test/workspace-crash.acceptance.mjs",
+    "test:v3-release-gate": "node --test scripts/v3-release-gate.test.mjs && node scripts/v3-release-gate.mjs",
     "typecheck": "tsc -b --pretty false",
     "check": "npm run typecheck && npm test",
     "example:probe": "node --import tsx examples/probe/src/index.ts",

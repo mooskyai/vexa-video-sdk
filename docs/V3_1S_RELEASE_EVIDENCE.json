@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "milestone": "V3.1s",
+  "auditBaselineSha": "b8bdb867aca70259adf12740003bfc68208e17aa",
+  "verifiedCi": {
+    "commitSha": "b8bdb867aca70259adf12740003bfc68208e17aa",
+    "runUrl": "https://github.com/mooskyai/vexa-video-sdk/actions/runs/40668676497",
+    "conclusion": "success"
+  },
+  "gates": [
+    {
+      "id": "isolated_hardening_ci",
+      "status": "passed",
+      "evidenceUrls": ["https://github.com/mooskyai/vexa-video-sdk/actions/runs/40668676497"]
+    },
+    {
+      "id": "current_commit_ci",
+      "status": "blocked",
+      "reason": "The next V3.1s commit has not yet completed its own CI acceptance run."
+    },
+    {
+      "id": "workspace_producer_quiescence",
+      "status": "blocked",
+      "reason": "No deployed global producer and consumer ownership coordination or quiescence evidence."
+    },
+    {
+      "id": "retention_operator_approval",
+      "status": "blocked",
+      "reason": "V3.1r is read-only; no approved per-tenant operator retention, backup, hold and deletion runbook."
+    },
+    {
+      "id": "production_provider_conditional_writes",
+      "status": "blocked",
+      "reason": "Loopback SILO evidence does not qualify a first-party AWS, GCS or Azure adapter."
+    },
+    {
+      "id": "provider_interruption_and_multipart",
+      "status": "blocked",
+      "reason": "No target-provider multipart, network-partition and retry interruption recovery evidence."
+    },
+    {
+      "id": "tenant_iam_isolation",
+      "status": "blocked",
+      "reason": "No production environment IAM, cross-tenant or managed key isolation certification."
+    },
+    {
+      "id": "backup_restore_and_legal_hold",
+      "status": "blocked",
+      "reason": "No tested restore of failure records and artifacts or reviewed legal-hold preservation policy."
+    },
+    {
+      "id": "cross_platform_release_matrix",
+      "status": "blocked",
+      "reason": "The V3 feature commit has not completed its own Windows/macOS/Ubuntu and packed-install release matrix."
+    },
+    {
+      "id": "migration_and_mixed_worker_compatibility",
+      "status": "blocked",
+      "reason": "Stop-old-worker migration instructions exist, but production cutover and rollback have no acceptance evidence."
+    }
+  ]
+}

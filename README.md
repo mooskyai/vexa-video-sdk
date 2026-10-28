@@ -1,5 +1,7 @@
 # Vexa Video SDK
 
+**V3.1s (unreleased):** the [production release-gate review](./docs/V3_1S_RELEASE_GATE_REVIEW.md) records audited V3.1r CI and a conservative **NO-GO** for general hosted production release. Run `npm run test:v3-release-gate` to validate the read-only evidence inventory; it does not authorize npm publication.
+
 [![CI](https://github.com/mooskyai/vexa-video-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/mooskyai/vexa-video-sdk/actions/workflows/ci.yml)
 ![Node.js](https://img.shields.io/badge/Node.js-%3E%3D24.21.0-339933.svg?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6.svg?logo=typescript&logoColor=white)

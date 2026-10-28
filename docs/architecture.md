@@ -1,5 +1,7 @@
 # Architecture
 
+**V3.1s (unreleased) release governance:** [the evidence register](./V3_1S_RELEASE_GATE_REVIEW.md) inventories audited CI and unverified production requirements without mutating runtime state, deleting media or granting publication rights. Candidate-specific owner fencing and cloud-provider fault acceptance are outside this read-only reviewer.
+
 This document describes the released Vexa Video SDK **2.0.0** architecture. Planned Version 3 work is documented separately and must not be treated as current behavior.
 
 ## Design goals

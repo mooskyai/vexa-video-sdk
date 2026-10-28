@@ -39,6 +39,9 @@ jobs:
       - name: Verify repository
         run: npm run verify
 
+      - name: Validate V3 release-gate inventory (NO-GO remains allowed)
+        run: npm run test:v3-release-gate
+
       - name: Verify workspace process-crash recovery
         run: npm run test:workspace-crash
 

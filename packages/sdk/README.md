@@ -1,5 +1,7 @@
 # @vexa-video/sdk
 
+**V3.1s development release gate:** [review and evidence inventory](../../docs/V3_1S_RELEASE_GATE_REVIEW.md) record historical CI success but general production **NO-GO**. This is not a new SDK API or a change to the released `2.0.0` installation instructions.
+
 The primary high-level Node.js API for media editing, audio, captions, timeline projects, streaming, storage, hardware, jobs/workers, plugins and hosted-render adapters.
 
 > Stable baseline: **2.0.0** · Node.js only; may execute FFmpeg/ffprobe and access the filesystem/network.

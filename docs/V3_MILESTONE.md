@@ -1,5 +1,7 @@
 # Version 3 Delivery Plan — Production Media Platform
 
+**V3.1s — production acceptance/release-gate review:** the [audit](./V3_1S_RELEASE_GATE_REVIEW.md) and `scripts/v3-release-gate.mjs` inventory validate evidence structure and record a **NO-GO** for V3.1 hosted production release. The verified V3.1r isolated CI passed at `b8bdb86`; provider, quiescence, retention authorization, multi-platform package release and rollback requirements remain blocked. This milestone does not introduce a production storage adapter or auto-publisher.
+
 Version 3 builds on the released Vexa Video SDK **2.0.0** contract. It is not a rewrite of programmable compositions, media execution, jobs, storage or browser tooling.
 
 ## Baseline

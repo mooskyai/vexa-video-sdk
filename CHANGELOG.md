@@ -5,6 +5,7 @@ All notable public changes to Vexa Video SDK are documented here. Public `@vexa-
 ## Unreleased
 
 ### Added
+- V3.1s read-only production release-gate evidence inventory, exact-SHA CI audit and fail-closed reviewer tests; documented NO-GO without automatic deployment or publication.
 - V3.1r bounded, read-only, tenant-scoped artifact lifecycle review planner with explicit retention ages, archived-failure export evidence, provider-verified missing receipts and authority checks; no deletion executor.
 
 - V3 distributed-worker lease ownership with unique claim fencing tokens, renewable heartbeats, expiry timestamps, and lease-aware Redis mutation guards.

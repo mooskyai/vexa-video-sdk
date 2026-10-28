@@ -1,5 +1,7 @@
 # Vexa Video SDK Roadmap
 
+**V3.1s release gate (in progress, NO-GO):** [audit and operator decision register](./docs/V3_1S_RELEASE_GATE_REVIEW.md) plus machine-readable evidence; the green V3.1r Redis/S3-compatible CI run is not production provider, multi-OS or deployment migration certification. The release version stays 2.0.0.
+
 This roadmap starts from the **released Version 2.0.0 baseline** and describes the work that remains. It is intentionally outcome-oriented: detailed implementation notes belong in focused design documents and pull requests.
 
 ## Current baseline

@@ -1,5 +1,7 @@
 # Hosted Rendering
 
+**V3.1s production gate:** [review and machine-readable evidence](./V3_1S_RELEASE_GATE_REVIEW.md) record **NO-GO** for a general hosted deployment. Passing isolated Redis/S3-compatible CI does not demonstrate real provider conditional-write, multipart cleanup, tenant isolation, producer quiescence or disaster recovery in a deployed system.
+
 Vexa separates the portable render contract from provider infrastructure. Applications can submit/get/cancel/wait through `HostedRenderer` while the adapter owns authentication, vendor SDKs, queues and deployment details.
 
 ## Basic adapter usage
