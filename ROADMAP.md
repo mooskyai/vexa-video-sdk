@@ -72,6 +72,8 @@ Current development includes V3.1a lease/heartbeat fencing, V3.1b atomic claim a
 
 V3.1o adds an opt-in SILO/Redis external artifact process-crash test gate (`npm run test:object-storage`): conditional publication, persisted provider fingerprint, fresh-client recovery, conflicting writers and remote absence/authorization failure handling. AWS S3/GCS/Azure adapter certification, multipart/network failure injection and cleanup policy remain separate release gates.
 
+V3.1p records the [production-hardening go/no-go review](./docs/V3_1P_PRODUCTION_HARDENING_REVIEW.md) and adds a separate Linux CI job for the isolated Redis and S3 suites. **V3.1 remains in progress** until the new workflow has green run evidence and the remaining workspace crash-cleanup and artifact lifecycle gates are closed or explicitly scoped to later milestones. Feature branch implementation completion is not release acceptance.
+
 ### V3.2 — capability-aware scheduling
 
 Workers advertise platform, CPU/memory/concurrency, codecs, hardware providers and browser/composition capability. Jobs declare requirements and fallback policy. Scheduling must explain why a worker is eligible or rejected.

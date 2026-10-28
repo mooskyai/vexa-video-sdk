@@ -289,6 +289,8 @@ See [ROADMAP.md](./ROADMAP.md) for current status and sequencing. These features
 
 V3.1o adds opt-in real S3-compatible object-store and Redis crash-window acceptance using a loopback SILO container. Run `npm run test:object-storage` following [the V3.1o acceptance guide](./docs/V3_1O_OBJECT_STORAGE_ACCEPTANCE.md). The test proves conditional writes and receipt reconciliation for the isolated fixture, not general cloud provider atomicity.
 
+V3.1p adds a dedicated [production-hardening review](./docs/V3_1P_PRODUCTION_HARDENING_REVIEW.md) and isolated GitHub Actions live-acceptance job. The 466 regular, 12 Redis and 7 S3-compatible tests passed in the local Windows acceptance, but V3.1 is not signed off for production: crash-lifecycle workspace cleanup, retention scope and deployment-specific storage gates remain open.
+
 ## Contributing and security
 
 Read [CONTRIBUTING.md](./CONTRIBUTING.md) before changing public APIs or package boundaries. Report security concerns according to [SECURITY.md](./SECURITY.md).

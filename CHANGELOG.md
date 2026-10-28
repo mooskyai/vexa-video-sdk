@@ -22,6 +22,7 @@ All notable public changes to Vexa Video SDK are documented here. Public `@vexa-
 - V3.1m bounded, read-only operator inspection of known publication destinations, structured status counts, per-entry redacted errors and isolated diagnostics; no sweeps or deletion.
 - V3.1n opt-in exporter-neutral worker counters, duration histograms and completed-attempt spans, with synchronous sink failure isolation and no metrics cardinality from job IDs.
 - V3.1o isolated opt-in SILO and Redis crash-recovery acceptance for conditional object publication, metadata verification, concurrent writers, and provider failure modes; no production storage adapter added.
+- V3.1p release-readiness audit and isolated CI job for Redis plus S3-compatible process-crash acceptance; production sign-off remains blocked by documented gaps.
 
 ### Changed
 

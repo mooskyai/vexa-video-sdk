@@ -129,6 +129,8 @@ V3.1m layers bounded operator diagnostics over V3.1l dry-run retirement: explici
 
 V3.1n exposes synchronous, optional `onMetric` and `onSpan` sinks on `DistributedJobWorker`. Monotonic elapsed time produces attempt duration samples, while completed spans include explicit outcome and job/claim correlation. Metrics only tag stable job type/outcome (never job or claim identifiers), and no payload, exception text or stack is exported by these hooks. Exporters are application-owned: callbacks that throw cannot disrupt job mutations, but high-volume exporters should use nonblocking bounded queues. Span completion reflects observed worker attempts, not exactly-once remote storage publication.
 
+V3.1p introduces a separate CI acceptance job for Redis/process-death and S3-compatible conditional publication, plus a [production go/no-go audit](./V3_1P_PRODUCTION_HARDENING_REVIEW.md). These do not alter worker/Redis/object protocols or establish exactly-once external publication; deterministic crash-workspace cleanup and provider-specific artifact lifecycle remain explicit gates.
+
 Arbitrary media output, uploads and other external handler side effects are still at-least-once, not exactly once; use idempotent artifact identities and later reconciliation. Stop old V3 worker processes before deploying protocol changes. Pre-existing failures are not retroactively backfilled into the dead-letter index.
 
 ## Storage

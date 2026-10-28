@@ -1,0 +1,81 @@
+name: V3 hardening live acceptance
+
+on:
+  push:
+    branches: [feature/v3-worker-lease-heartbeat]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  redis-and-object-storage:
+    name: Redis 7 and S3-compatible crash recovery (Node 24)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify FFmpeg baseline
+        run: npm run release:ffmpeg-check
+
+      - name: Verify repository
+        run: npm run verify
+
+      - name: Start isolated Redis and S3-compatible storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name vexa-v31p-redis -p 127.0.0.1:6389:6379 redis:7-alpine
+          docker run -d --name vexa-v31p-silo -p 127.0.0.1:9005:9000 \
+            -e MINIO_ROOT_USER=vexaacceptance \
+            -e MINIO_ROOT_PASSWORD=vexaacceptance-only-local-2026 \
+            docker.io/pgsty/silo@sha256:2636fc4155d9a7e41ff58cdb65ddd13ba9304e67184e13c25bc5cb34016269d7 server /data
+
+      - name: Wait for local services
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 45); do
+            if docker exec vexa-v31p-redis redis-cli ping | grep -q PONG \
+              && curl --fail --silent --output /dev/null http://127.0.0.1:9005/minio/health/live; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs vexa-v31p-redis || true
+          docker logs vexa-v31p-silo || true
+          echo 'Acceptance services never became ready' >&2
+          exit 1
+
+      - name: Verify live Redis and object-store crash recovery
+        env:
+          VEXA_TEST_REDIS_URL: redis://127.0.0.1:6389
+          VEXA_TEST_S3_URL: http://127.0.0.1:9005
+          VEXA_TEST_S3_ACCESS_KEY: vexaacceptance
+          VEXA_TEST_S3_SECRET_KEY: vexaacceptance-only-local-2026
+        run: |
+          npm run test:redis
+          npm run test:object-storage
+
+      - name: Cleanup isolated test services
+        if: always()
+        shell: bash
+        run: docker rm -f vexa-v31p-silo vexa-v31p-redis || true

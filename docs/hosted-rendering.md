@@ -58,6 +58,8 @@ V3.1m adds `store.inspectKnownReceipts([{ output, payload, context }], { minAgeM
 
 V3.1o adds a test-only isolated S3-compatible SILO + Redis acceptance suite. A separate process exits after S3 PUT and (in a second case) after Redis receipt CAS; fresh clients inspect authoritative remote metadata and recover without overwriting. Conflicting conditional writes, missing metadata, missing remote objects and auth failures must fail closed. See [the V3.1o acceptance guide](./V3_1O_OBJECT_STORAGE_ACCEPTANCE.md). This is not a bundled production provider adapter or exactly-once guarantee.
 
+V3.1p keeps production hosted publication status at **NO-GO** pending [the acceptance review](./V3_1P_PRODUCTION_HARDENING_REVIEW.md): the isolated SILO tests are not a deployment-specific S3/GCS/Azure adapter certification, and neither Redis CAS nor conditional PUT makes publication globally exactly once.
+
 ## Version 2 vs Version 3
 
 Version 2 provides portable hosted-render contracts and job/storage integration. It does **not** claim a complete multi-tenant hosted platform.
