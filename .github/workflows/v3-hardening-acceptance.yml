@@ -79,6 +79,7 @@ jobs:
           VEXA_TEST_S3_SECRET_KEY: vexaacceptance-only-local-2026
         run: |
           npm run test:redis
+          npm run test:workspace-quiescence-redis
           npm run test:object-storage
 
       - name: Cleanup isolated test services

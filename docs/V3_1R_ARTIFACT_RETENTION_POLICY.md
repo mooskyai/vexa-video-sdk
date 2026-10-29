@@ -1,5 +1,7 @@
 # V3.1r — Artifact lifecycle and retention review policy
 
+**V3.1t clarification:** opt-in Redis quiescence seals do not remove the need for a named retention owner, legal-hold/backup authorization and fresh host reference checks before workspace deletion. This retention planner remains read-only. See [V3.1t contract](./V3_1T_DISTRIBUTED_WORKSPACE_OWNERSHIP.md).
+
 Status: **unreleased, review-only implementation; NOT production cloud finalization**. Source baseline: `83b54959bfcf9ce8120c6c55c75207492f272ecc` on `feature/v3-worker-lease-heartbeat`. The V3.1q Linux hardening workflow succeeded for this commit ([run 40653898073](https://github.com/mooskyai/vexa-video-sdk/actions/runs/40653898073)); that result does not certify V3.1r until the new commit has its own green run.
 
 ## Resource ownership and retention matrix

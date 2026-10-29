@@ -1,5 +1,7 @@
 # V3.1s — Production acceptance and release-gate review
 
+**V3.1t follow-up (unreleased):** opt-in Redis workspace admission and reclamation seals address a narrow part of the distributed ownership gap, but are not a deployment-wide producer/consumer/FFmpeg crash proof. `workspace_producer_quiescence` remains BLOCKED in the unchanged evidence register; all other blockers and overall NO-GO remain unchanged. See [V3.1t](./V3_1T_DISTRIBUTED_WORKSPACE_OWNERSHIP.md).
+
 **Decision: NO-GO for general V3.1 production deployment or npm V3 release.** This is a *review milestone*, not a deployment-specific provider adapter, an automatic artifact finalizer, or an authorization to publish. Stable packages remain `2.0.0`. V3.2 remains a separate capability-aware scheduling milestone.
 
 ## Audited baseline and evidence

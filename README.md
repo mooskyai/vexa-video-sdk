@@ -1,5 +1,7 @@
 # Vexa Video SDK
 
+V3.1t (unreleased) adds an opt-in Redis-backed workspace admission/reclamation seal. Producers and consumers must explicitly register and renew ownership; destructive cleanup also requires a fresh external quiescence check. It does not make legacy age-only cleanup safe or clear the production NO-GO. See [V3.1t workspace ownership](./docs/V3_1T_DISTRIBUTED_WORKSPACE_OWNERSHIP.md).
+
 **V3.1s (unreleased):** the [production release-gate review](./docs/V3_1S_RELEASE_GATE_REVIEW.md) records audited V3.1r CI and a conservative **NO-GO** for general hosted production release. Run `npm run test:v3-release-gate` to validate the read-only evidence inventory; it does not authorize npm publication.
 
 [![CI](https://github.com/mooskyai/vexa-video-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/mooskyai/vexa-video-sdk/actions/workflows/ci.yml)

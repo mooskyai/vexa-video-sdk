@@ -19,8 +19,10 @@ export { JobQueue, JobHandle, DistributedJobQueue, DistributedJobWorker } from "
 export type { JobHandler, JobHandlerContext, JobHandlerOptions, JobProgressUpdate, LocalJobQueueOptions, JobListOptions, WaitForJobOptions, DistributedJobTransport, DistributedJobWorkerOptions, DistributedWorkerDiagnostics, DistributedWorkerDiagnosticEvent, DistributedWorkerMetric, DistributedWorkerSpan, DistributedWorkerAttemptOutcome } from "./jobs.js";
 export { RedisJobTransport } from "./redis-jobs.js";
 export type { RedisCommandClient, RedisJobTransportOptions, RedisJobRecoveryResult, RedisJobDeadLetter, RedisRetryReconciliationResult, RedisJobQueueDiagnostics, RedisJobDiagnosticEvent, RedisJobOrphanResult, RedisDeadLetterPruneOptions, RedisDeadLetterPruneResult } from "./redis-jobs.js";
+export { RedisWorkspaceQuiescence } from "./workspace-quiescence.js";
+export type { RedisWorkspaceQuiescenceOptions } from "./workspace-quiescence.js";
 export { Storage, MediaWorkspace, parseStorageSource } from "./storage.js";
-export type { StorageAdapter, StorageAdapterHandlers, StorageOptions, ResolvedMediaSource, AbandonedWorkspaceCleanupOptions, AbandonedWorkspaceCleanupResult } from "./storage.js";
+export type { StorageAdapter, StorageAdapterHandlers, StorageOptions, ResolvedMediaSource, AbandonedWorkspaceCleanupOptions, AbandonedWorkspaceCleanupResult, WorkspaceQuiescence } from "./storage.js";
 export { planArtifactLifecycleReview } from "./artifact-lifecycle.js";
 export type { ArtifactLifecycleKind, ArtifactReferenceState, ArtifactRemoteState, ArtifactLifecycleReason, ArtifactLifecycleCandidate, ArtifactLifecycleRetentionPolicy, ArtifactLifecycleReviewOptions, ArtifactLifecycleReviewEntry, ArtifactLifecycleReview } from "./artifact-lifecycle.js";
 export { Hardware } from "./hardware.js";

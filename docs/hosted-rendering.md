@@ -1,5 +1,7 @@
 # Hosted Rendering
 
+**V3.1t boundary:** managed local workspaces can opt into Redis-backed ownership admission and a persistent reclamation seal, but hosted workers must explicitly register every producer/consumer, renew leases, handle lost claims and verify external references before cleanup. This is not deployed provider finalization, remote deletion or approval to release; [details](./V3_1T_DISTRIBUTED_WORKSPACE_OWNERSHIP.md).
+
 **V3.1s production gate:** [review and machine-readable evidence](./V3_1S_RELEASE_GATE_REVIEW.md) record **NO-GO** for a general hosted deployment. Passing isolated Redis/S3-compatible CI does not demonstrate real provider conditional-write, multipart cleanup, tenant isolation, producer quiescence or disaster recovery in a deployed system.
 
 Vexa separates the portable render contract from provider infrastructure. Applications can submit/get/cancel/wait through `HostedRenderer` while the adapter owns authentication, vendor SDKs, queues and deployment details.

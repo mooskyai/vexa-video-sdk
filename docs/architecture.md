@@ -1,5 +1,7 @@
 # Architecture
 
+**Unreleased V3.1t:** the opt-in `RedisWorkspaceQuiescence` uses the existing `RedisCommandClient` to serialize owner admission and a one-way reclamation seal on a per-workspace key. The SDK does not automatically attach worker leases or consumer references; deployers must enroll every process and supply independent quiescence evidence. See [the V3.1t contract](./V3_1T_DISTRIBUTED_WORKSPACE_OWNERSHIP.md).
+
 **V3.1s (unreleased) release governance:** [the evidence register](./V3_1S_RELEASE_GATE_REVIEW.md) inventories audited CI and unverified production requirements without mutating runtime state, deleting media or granting publication rights. Candidate-specific owner fencing and cloud-provider fault acceptance are outside this read-only reviewer.
 
 This document describes the released Vexa Video SDK **2.0.0** architecture. Planned Version 3 work is documented separately and must not be treated as current behavior.

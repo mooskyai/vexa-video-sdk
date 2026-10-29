@@ -77,6 +77,17 @@ export interface ResolvedMediaSource {
   cleanup(): Promise<void>;
 }
 
+/** Deployment-coordinated producer/consumer admission and reclamation boundary. */
+export interface WorkspaceQuiescence {
+  /** Read-only dry-run check. A true result alone never authorizes deletion. */
+  inspect(path: string): Promise<boolean>;
+  /**
+   * Exclusively seal admission before running a fresh authoritative check and
+   * removing files. Return false without deletion if coordination is denied.
+   */
+  withExclusiveReclaim(path: string, action: (assertCurrent: () => Promise<boolean>) => Promise<boolean>): Promise<boolean>;
+}
+
 /** Explicit, dry-run-first operator sweep; never run destructive sweeps beside active workers. */
 export interface AbandonedWorkspaceCleanupOptions {
   root: string;
@@ -86,6 +97,8 @@ export interface AbandonedWorkspaceCleanupOptions {
   dryRun?: boolean;
   /** Optional authoritative job/lease/reference guard. Only a literal true permits eligibility. */
   confirmAbandoned?: (path: string) => boolean | Promise<boolean>;
+  /** V3.1t opt-in distributed admission seal. Requires confirmAbandoned too. */
+  quiescence?: WorkspaceQuiescence;
 }
 
 export interface AbandonedWorkspaceCleanupResult {
@@ -440,6 +453,13 @@ export class MediaWorkspace {
     if (options.confirmAbandoned !== undefined && typeof options.confirmAbandoned !== "function") {
       throw new InvalidStorageError("Workspace reclamation confirmAbandoned must be a function.");
     }
+    if (options.quiescence && (typeof options.quiescence.inspect !== "function"
+      || typeof options.quiescence.withExclusiveReclaim !== "function")) {
+      throw new InvalidStorageError("Workspace quiescence must provide inspection and exclusive reclamation.");
+    }
+    if (options.quiescence && !options.confirmAbandoned) {
+      throw new InvalidStorageError("Distributed workspace reclamation requires an external confirmAbandoned authority.");
+    }
     const canonicalRoot = await realpath(resolve(root));
     const entries = (await readdir(canonicalRoot, { withFileTypes: true }))
       .filter((entry) => entry.name.startsWith(prefix))
@@ -466,19 +486,32 @@ export class MediaWorkspace {
         skipped += 1;
         continue;
       }
+      if (options.quiescence && await options.quiescence.inspect(candidate) !== true) {
+        skipped += 1;
+        continue;
+      }
       eligiblePaths.push(candidate);
       if (!dryRun) {
-        // Re-check after asynchronous authority lookup; operators must still coordinate
-        // producers because a filesystem check is not a distributed ownership lock.
-        const latest = await lstat(candidate);
-        if (!latest.isDirectory() || latest.isSymbolicLink() || latest.mtimeMs > cutoff
-          || await realpath(candidate) !== candidate
-          || (options.confirmAbandoned && await options.confirmAbandoned(candidate) !== true)) {
-          skipped += 1;
-          continue;
-        }
-        await rm(candidate, { recursive: true, force: false });
-        removedPaths.push(candidate);
+        const removeIfStillAbandoned = async (assertCurrent?: () => Promise<boolean>): Promise<boolean> => {
+          // Recheck *inside* the admission seal. External authority must account
+          // for unregistered producers, consumers, retries and replacement workers.
+          const latest = await lstat(candidate);
+          if (!latest.isDirectory() || latest.isSymbolicLink() || latest.mtimeMs > cutoff
+            || await realpath(candidate) !== candidate
+            || (options.confirmAbandoned && await options.confirmAbandoned(candidate) !== true)) {
+            return false;
+          }
+          // Redis authority must still be reachable and own the same seal just
+          // before removal, after the potentially slow external host check.
+          if (assertCurrent && await assertCurrent() !== true) return false;
+          await rm(candidate, { recursive: true, force: false });
+          removedPaths.push(candidate);
+          return true;
+        };
+        const removed = options.quiescence
+          ? await options.quiescence.withExclusiveReclaim(candidate, removeIfStillAbandoned)
+          : await removeIfStillAbandoned();
+        if (!removed) skipped += 1;
       }
     }
     return { scanned: entries.length, eligiblePaths, removedPaths, skipped, dryRun };

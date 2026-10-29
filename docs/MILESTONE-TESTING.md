@@ -1,5 +1,7 @@
 # Engineering Verification Guide
 
+**V3.1t targeted acceptance:** `npm run verify` includes new exclusive-reclamation unit tests. `npm run test:workspace-quiescence-redis` requires dedicated loopback Redis and exercises active owners, fencing, concurrent admission, host denial and authority outage. Continue to run `npm run test:workspace-crash`, `npm run test:redis`, `npm run test:object-storage` and `npm run test:v3-release-gate`. These targeted cases are not proof of deployment-wide FFmpeg producer quiescence; see [V3.1t acceptance boundary](./V3_1T_DISTRIBUTED_WORKSPACE_OWNERSHIP.md).
+
 **V3.1s acceptance:** `npm run test:v3-release-gate` verifies the exact audit evidence schema and its intentional NO-GO; `node scripts/v3-release-gate.mjs --json` prints a read-only decision. A strict `--require-ready` intentionally exits 2 while the evidence is blocked. This does not replace `npm run verify`, real Redis/S3-compatible acceptance, current-commit GitHub CI or the cross-platform release matrix. See [the release-gate review](./V3_1S_RELEASE_GATE_REVIEW.md).
 
 This file keeps its historical filename because existing repository links may reference it. It now describes the current verification model for Version 2.0.0 and future work.
