@@ -33,6 +33,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Enforce V3.1u zero-vulnerability audits (production and full tree)
+        run: |
+          npm run test:v3-security-audit
+          npm run security:audit:baseline
+
       - name: Verify FFmpeg baseline
         run: npm run release:ffmpeg-check
 

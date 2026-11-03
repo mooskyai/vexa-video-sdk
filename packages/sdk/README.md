@@ -1,5 +1,7 @@
 # @vexa-video/sdk
 
+**V3.1u dependency security candidate:** the repository-level Angular build/CLI 21.2.29 upgrade and scoped `glob`/`minimatch` overrides produced **0 production and 0 full-tree npm audit findings** on November 3, 2026. Both CI audit scopes now require zero; local Angular and packed-consumer builds, Redis/S3 acceptance and package checks passed on November 3. The published SDK is unchanged, and V3.1 production remains **NO_GO** pending independent release acceptance. See [V3.1u review](../../docs/V3_1U_DEPENDENCY_SECURITY.md).
+
 **Unreleased V3.1t workspace option:** `RedisWorkspaceQuiescence(client, { prefix })` gives deployment-enrolled producers/consumers `acquire`/`renew`/`release`, and can be passed as `quiescence` to `MediaWorkspace.reclaimAbandoned` with a mandatory external `confirmAbandoned` callback. Dry run remains the default; failed authority checks and live owners deny deletion. See [the integration contract](../../docs/V3_1T_DISTRIBUTED_WORKSPACE_OWNERSHIP.md).
 
 **V3.1s development release gate:** [review and evidence inventory](../../docs/V3_1S_RELEASE_GATE_REVIEW.md) record historical CI success but general production **NO-GO**. This is not a new SDK API or a change to the released `2.0.0` installation instructions.

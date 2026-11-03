@@ -5,6 +5,7 @@ All notable public changes to Vexa Video SDK are documented here. Public `@vexa-
 ## Unreleased
 
 ### Added
+- V3.1u npm-regenerated Angular build/CLI 21.2.29 lockfile plus scoped `glob@14.0.3` and `minimatch@11.0.3` CLI overrides. November 3 Windows npm scans show zero production and full-tree findings; both audit gates now enforce zero. Local Angular consumer compilation, 26 live Redis/S3 tests, four workspace-crash tests, Studio parity and 18 packed-package installs passed. Exact-candidate CI and broader production acceptance remain open; V3.1 production NO_GO.
 - V3.1t opt-in Redis-backed workspace producer/consumer admission and persistent reclamation seals, with fail-closed external quiescence checks and isolated/live Redis acceptance. Production distributed-quiescence release gate remains blocked; V3.2 is unchanged.
 - V3.1s read-only production release-gate evidence inventory, exact-SHA CI audit and fail-closed reviewer tests; documented NO-GO without automatic deployment or publication.
 - V3.1r bounded, read-only, tenant-scoped artifact lifecycle review planner with explicit retention ages, archived-failure export evidence, provider-verified missing receipts and authority checks; no deletion executor.

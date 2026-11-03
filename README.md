@@ -1,5 +1,7 @@
 # Vexa Video SDK
 
+**V3.1u dependency security candidate (unreleased):** updates Angular build/CLI to 21.2.29, using an npm-regenerated lockfile and a scoped override for `glob@14.0.3` / `minimatch@11.0.3`. On November 3, 2026, clean Windows installation, both npm audits (**0 vulnerabilities each**), and all 481 repository tests passed. Both audit scopes now require zero findings. Angular consumer compilation, all 26 live Redis/S3 cases, four workspace-crash cases, Studio visual parity and 18 packed-package install checks have since passed locally. Exact-candidate GitHub CI and V3.1 production gates remain open; V3.1 production stays **NO_GO**. See [V3.1u security review](./docs/V3_1U_DEPENDENCY_SECURITY.md).
+
 V3.1t (unreleased) adds an opt-in Redis-backed workspace admission/reclamation seal. Producers and consumers must explicitly register and renew ownership; destructive cleanup also requires a fresh external quiescence check. It does not make legacy age-only cleanup safe or clear the production NO-GO. See [V3.1t workspace ownership](./docs/V3_1T_DISTRIBUTED_WORKSPACE_OWNERSHIP.md).
 
 **V3.1s (unreleased):** the [production release-gate review](./docs/V3_1S_RELEASE_GATE_REVIEW.md) records audited V3.1r CI and a conservative **NO-GO** for general hosted production release. Run `npm run test:v3-release-gate` to validate the read-only evidence inventory; it does not authorize npm publication.
