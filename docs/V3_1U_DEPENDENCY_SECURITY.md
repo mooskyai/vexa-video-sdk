@@ -63,6 +63,10 @@ After zero-target hardening, the same recovered worktree passed the following, a
 
 The local Angular build used root-installed dependencies; packed-install acceptance separately tested a consumer compiled against all 18 packed packages. Neither test establishes every production deployment scenario.
 
+## PR #2 cross-platform workspace path follow-up (CI recheck pending)
+
+[CI run #21](https://github.com/mooskyai/vexa-video-sdk/actions/runs/41667455803) on commit `c3e47826a42bdcec9fa24e63ebb93123a85b802f` found three failing workspace reclamation tests on Windows and macOS. Creation returned an aliased temporary-root path (Windows `RUNNER~1`; macOS `/var`), while cleanup used the canonical filesystem path (Windows `runneradmin`; macOS `/private/var`). The V3.1u follow-up canonicalizes managed workspace roots after creation of the root directory, before allocating the workspace, and tests the same path identity across creation, read-only reclamation, and the external authority callback. This is not permission for age-only destructive cleanup; existing external authority and exclusive-admission checks stay required. The follow-up is **not CI-accepted** until the new PR commit passes the cross-platform suite.
+
 ## Remaining review and release boundaries
 
 1. Review the **actual final consolidated patch and registry-generated `package-lock.json`** for unexpected changes. The previously exported 46,148-byte file was not independently inspected here; re-export after this documentation update. Keep baseline `7711681fb3e2b1ca504ca01308aed5011efc07d6`.

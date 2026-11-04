@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { createReadStream } from "node:fs";
-import { access, mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, realpath, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 import { InvalidStorageError, RemoteMediaRejectedError } from "@vexa-video/core";
 import { runProcess } from "@vexa-video/ffmpeg";
@@ -113,6 +113,26 @@ test("managed workspaces prevent path escape and clean up recursively", async ()
   const root = workspace.path;
   await workspace.cleanup();
   await assert.rejects(access(root));
+});
+
+test("managed workspaces use the canonical filesystem identity for reclamation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "vexa-canonical-test-"));
+  try {
+    const workspace = await MediaWorkspace.create({ root, prefix: "vexa-canonical-" });
+    assert.equal(dirname(workspace.path), await realpath(root));
+    assert.equal(workspace.path, await realpath(workspace.path));
+    const oldTime = new Date(Date.now() - 5 * 60_000);
+    await utimes(workspace.path, oldTime, oldTime);
+    const preview = await MediaWorkspace.reclaimAbandoned({
+      root, prefix: "vexa-canonical-", minAgeMs: 60_000,
+      confirmAbandoned: (candidate) => candidate === workspace.path
+    });
+    assert.deepEqual(preview.eligiblePaths, [workspace.path]);
+    assert.deepEqual(preview.removedPaths, []);
+    assert.equal((await stat(workspace.path)).isDirectory(), true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("abandoned managed-workspace reclamation is dry-run first and bounded", async () => {
