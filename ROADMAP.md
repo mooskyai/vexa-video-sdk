@@ -1,6 +1,8 @@
 # Vexa Video SDK Roadmap
 
-**Next V3.1t — distributed workspace ownership:** opt-in Redis admission and persistent exclusive reclamation seals with fail-closed external proof, documented in [V3.1t](./docs/V3_1T_DISTRIBUTED_WORKSPACE_OWNERSHIP.md). Deployment-wide producer/consumer enrollment and FFmpeg process-tree proof remain open; **NO-GO** is unchanged. V3.2 capability scheduling remains separate.
+**V3.1u dependency security candidate:** Angular build/CLI 21.2.29 and a subtree-scoped `glob`/`minimatch` override resolve the November 3 Windows production and full npm audits to **0 findings each**, with a registry-generated lockfile and passing 481-test repository verification. Both CI audit scopes require zero findings. November 3 local acceptance also passed the Angular app build, 26 live Redis/S3 tests, four workspace-crash tests, Studio visual parity and 18 packed-package installs. Still open: final lockfile/diff review, exact-candidate GitHub CI and the independent V3.1 production gates. See [V3.1u](./docs/V3_1U_DEPENDENCY_SECURITY.md). V3.2 remains separate and production release remains **NO_GO**.
+
+**V3.1t — distributed workspace ownership (CI accepted at 7711681):** opt-in Redis admission and persistent exclusive reclamation seals with fail-closed external proof, documented in [V3.1t](./docs/V3_1T_DISTRIBUTED_WORKSPACE_OWNERSHIP.md). Deployment-wide producer/consumer enrollment and FFmpeg process-tree proof remain open; **NO-GO** is unchanged. V3.2 capability scheduling remains separate.
 
 **V3.1s release gate (in progress, NO-GO):** [audit and operator decision register](./docs/V3_1S_RELEASE_GATE_REVIEW.md) plus machine-readable evidence; the green V3.1r Redis/S3-compatible CI run is not production provider, multi-OS or deployment migration certification. The release version stays 2.0.0.
 

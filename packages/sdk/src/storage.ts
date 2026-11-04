@@ -431,8 +431,11 @@ export class MediaWorkspace {
   static async create(options: StorageWorkspaceOptions = {}): Promise<MediaWorkspace> {
     const root = resolve(options.root ?? tmpdir());
     await mkdir(root, { recursive: true });
+    // Use the same filesystem identity as reclamation when the configured root
+    // is an alias (Windows 8.3 paths or macOS /var).
+    const canonicalRoot = await realpath(root);
     const prefix = (options.prefix ?? "vexa-media-").replace(/[^a-zA-Z0-9._-]/gu, "-") || "vexa-media-";
-    return new MediaWorkspace(await mkdtemp(join(root, prefix)));
+    return new MediaWorkspace(await mkdtemp(join(canonicalRoot, prefix)));
   }
 
   /** Operator-led cleanup of old, named managed directories. Dry run is the default. */
